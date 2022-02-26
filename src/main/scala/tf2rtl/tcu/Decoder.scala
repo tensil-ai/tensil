@@ -1,0 +1,666 @@
+package tf2rtl.tcu
+
+import chisel3._
+import chisel3.util.{Decoupled, DecoupledIO, Queue, log2Ceil}
+import tf2rtl.PlatformConfig
+import tf2rtl.mem.MemControl
+import tf2rtl.tools.compiler.InstructionLayout
+import tf2rtl.tcu.instruction._
+import tf2rtl.util.decoupled.Counter
+import tf2rtl.util.decoupled.QueueWithReporting
+import tf2rtl.util.zero
+import tf2rtl.Architecture
+import tf2rtl.mem.StrideHandler
+import tf2rtl.mem.MemControlWithStride
+import tf2rtl.mem.SizeAndStrideHandler
+import tf2rtl.mem.SizeHandler
+import tf2rtl.util.WithLast
+import tf2rtl.util.decoupled.MultiEnqueue
+
+class Decoder(val arch: Architecture)(implicit
+    val platformConfig: PlatformConfig
+) extends Module {
+  val arrayWidth           = arch.arraySize
+  val accDepth             = arch.accumulatorDepth
+  val memDepth             = arch.localDepth
+  val dram0Depth           = arch.dram0Depth
+  val dram1Depth           = arch.dram1Depth
+  val validateInstructions = arch.validateInstructions
+  val defaultTimeout       = arch.decoderTimeout
+  implicit val layout      = new InstructionLayout(arch)
+  implicit val _arch       = arch
+
+  val io = IO(new Bundle {
+    val instruction =
+      Flipped(Decoupled(new Instruction(layout.instructionSizeBytes * 8)))
+    val memPortA = Decoupled(new MemControl(layout.arch.localDepth))
+    val memPortB = Decoupled(new MemControl(layout.arch.localDepth))
+    val dram0    = Decoupled(new MemControl(layout.arch.dram0Depth))
+    val dram1    = Decoupled(new MemControl(layout.arch.dram1Depth))
+    val dataflow =
+      Decoupled(new DataFlowControlWithSize(arch.localDepth))
+    val acc = Decoupled(
+      new AccumulatorWithALUArrayControl(layout)
+    )
+    val array = Decoupled(new SystolicArrayControl)
+    val config = new Bundle {
+      val dram0AddressOffset  = Output(UInt(platformConfig.axi.addrWidth.W))
+      val dram0CacheBehaviour = Output(UInt(4.W))
+      val dram1AddressOffset  = Output(UInt(platformConfig.axi.addrWidth.W))
+      val dram1CacheBehaviour = Output(UInt(4.W))
+    }
+    val status =
+      Decoupled(new WithLast(new Instruction(layout.instructionSizeBytes * 8)))
+    val timeout        = Output(Bool())
+    val error          = Output(Bool())
+    val tracepoint     = Output(Bool())
+    val programCounter = Output(UInt(32.W))
+    val sample         = Decoupled(new WithLast(new Sample))
+    val skipped        = Decoupled(Bool())
+    val nooped         = Decoupled(Bool())
+  })
+
+  dontTouch(io.timeout)
+  dontTouch(io.error)
+  dontTouch(io.tracepoint)
+  dontTouch(io.programCounter)
+
+  // val instruction = QueueWithReporting(io.instruction, 1 << 1) // 4
+  val instruction = io.instruction
+
+  // only enqueues when instruction is done. we're just assuming
+  // status.io.enq.ready will always be true, hence the 50 element buffer
+  val status = Module {
+    new Queue(
+      new WithLast(new Instruction(layout.instructionSizeBytes * 8)),
+      1,
+      flow = true,
+    )
+  }
+  status.io.enq.valid := instruction.valid && instruction.ready
+  status.io.enq.bits.bits := instruction.bits
+  status.io.enq.bits.last := true.B
+  io.status <> status.io.deq
+
+  // timeout signal for debug
+  val timeout = RegInit(layout.arch.decoderTimeout.U(16.W))
+  val timer   = RegInit(0.U(16.W))
+  when(instruction.ready) {
+    timer := 0.U
+  }.otherwise {
+    when(timer < timeout) {
+      timer := timer + 1.U
+    }
+  }
+  io.timeout := timer === timeout
+
+  // tracepoint
+  val tracepoint     = RegInit("hFFFFFFFF".U(32.W))
+  val programCounter = RegInit(0.U(32.W))
+  when(instruction.ready && instruction.valid) {
+    programCounter := programCounter + 1.U
+  }
+  io.tracepoint := programCounter === tracepoint
+  io.programCounter := programCounter
+
+  // sampler
+  val sampleInterval = RegInit(0.U(16.W))
+
+  io.nooped.bits := true.B
+  io.nooped.valid := false.B
+  io.skipped.bits := true.B
+  io.skipped.valid := false.B
+
+  // configuration registers
+  val registerWidth       = 4
+  val dram0AddressOffset  = RegInit(0.U(platformConfig.axi.addrWidth.W))
+  val dram0CacheBehaviour = RegInit(0.U(4.W))
+  val dram1AddressOffset  = RegInit(0.U(platformConfig.axi.addrWidth.W))
+  val dram1CacheBehaviour = RegInit(0.U(4.W))
+
+  io.config.dram0AddressOffset := dram0AddressOffset
+  io.config.dram0CacheBehaviour := dram0CacheBehaviour
+  io.config.dram1AddressOffset := dram1AddressOffset
+  io.config.dram1CacheBehaviour := dram1CacheBehaviour
+
+  // size and stride handlers
+  //// drams
+  val dram0Gen = new MemControlWithStride(arch.dram0Depth, arch.stride1Depth)
+  val dram1Gen = new MemControlWithStride(arch.dram1Depth, arch.stride1Depth)
+  val dram0Handler = Module(
+    new StrideHandler(
+      dram0Gen,
+      io.dram0.bits,
+      arch.dram0Depth,
+      arch.stride1Depth,
+      name = "dram0"
+    )
+  )
+  val dram1Handler = Module(
+    new StrideHandler(
+      dram1Gen,
+      io.dram1.bits,
+      arch.dram1Depth,
+      arch.stride1Depth,
+      name = "dram1"
+    )
+  )
+  io.dram0 <> dram0Handler.io.out
+  io.dram1 <> dram1Handler.io.out
+  val dram0 = dram0Handler.io.in
+  val dram1 = dram1Handler.io.in
+  //// local
+  val memPortAGen = new MemControlWithStride(arch.localDepth, arch.stride0Depth)
+  val memPortBGen = new MemControlWithStride(arch.localDepth, arch.stride0Depth)
+  val memPortAHandler = Module(
+    new SizeAndStrideHandler(
+      memPortAGen,
+      io.memPortA.bits,
+      arch.localDepth,
+      arch.stride0Depth,
+      name = "memPortA"
+    )
+  )
+  val memPortBHandler = Module(
+    new SizeAndStrideHandler(
+      memPortBGen,
+      io.memPortB.bits,
+      arch.localDepth,
+      arch.stride0Depth,
+      name = "memPortB"
+    )
+  )
+  io.memPortA <> memPortAHandler.io.out
+  io.memPortB <> memPortBHandler.io.out
+  val memPortA = memPortAHandler.io.in
+  val memPortB = memPortBHandler.io.in
+  //// accumulator
+  val accInGen  = new AccumulatorMemControlWithSizeWithStride(layout)
+  val accOutGen = new AccumulatorMemControl(layout)
+  val accHandler = Module(
+    new SizeAndStrideHandler(
+      accInGen,
+      accOutGen,
+      arch.accumulatorDepth,
+      arch.stride1Depth,
+      debug = false,
+      name = "acc"
+    )
+  )
+  io.acc.bits := accHandler.io.out.bits.toAccumulatorWithALUArrayControl()
+  io.acc.valid := accHandler.io.out.valid
+  accHandler.io.out.ready := io.acc.ready
+  val acc = accHandler.io.in
+  //// array
+  val arrayInGen  = new SystolicArrayControlWithSize(arch.localDepth)
+  val arrayOutGen = new SystolicArrayControl
+  val arrayHandler = Module(
+    new SizeHandler(
+      arrayInGen,
+      arrayOutGen,
+      arch.localDepth,
+      debug = false,
+      name = "array"
+    )
+  )
+  io.array <> arrayHandler.io.out
+  val array = arrayHandler.io.in
+  //// router
+  // val routerInGen  = new DataFlowControlWithSize(arch.localDepth)
+  // val routerOutGen = new DataFlowControl
+  // val routerHandler = Module(
+  //   new SizeHandler(routerInGen, routerOutGen, arch.localDepth, name = "router")
+  // )
+  // io.dataflow <> routerHandler.io.out
+  // val dataflow = routerHandler.io.in
+  val dataflow = io.dataflow
+
+  setDefault(memPortA)
+  setDefault(memPortB)
+  setDefault(dataflow)
+  setDefault(acc)
+  setDefault(array)
+  setDefault(dram0)
+  setDefault(dram1)
+
+  val enqueuer1 = MultiEnqueue(1)
+  val enqueuer2 = MultiEnqueue(2)
+  val enqueuer3 = MultiEnqueue(3)
+  val enqueuer4 = MultiEnqueue(4)
+  enqueuer1.tieOff()
+  enqueuer2.tieOff()
+  enqueuer3.tieOff()
+  enqueuer4.tieOff()
+
+  // when(instruction.valid) {
+  when(instruction.bits.opcode === Opcode.MatMul) {
+    val flags = Wire(new MatMulFlags)
+    val args = Wire(
+      new MatMulArgs(layout)
+    )
+
+    flags := instruction.bits.flags.asTypeOf(flags)
+    args := instruction.bits.arguments.asTypeOf(args)
+
+    when(flags.zeroes) {
+      instruction.ready := enqueuer3.enqueue(
+        instruction.valid,
+        dataflow,
+        dataflowBundle(DataFlowControl._arrayToAcc, args.size),
+        array,
+        arrayBundle(false.B, flags.zeroes, args.size),
+        acc,
+        accWrite(
+          args.accAddress,
+          flags.accumulate,
+          args.size,
+          args.accStride
+        ),
+      )
+    }.otherwise {
+      instruction.ready := enqueuer4.enqueue(
+        instruction.valid,
+        dataflow,
+        dataflowBundle(DataFlowControl._memoryToArrayToAcc, args.size),
+        memPortA,
+        MemControlWithStride(memDepth, arch.stride0Depth)(
+          args.memAddress,
+          args.size,
+          args.memStride,
+          false.B,
+          false.B,
+        ),
+        array,
+        arrayBundle(false.B, flags.zeroes, args.size),
+        acc,
+        accWrite(
+          args.accAddress,
+          flags.accumulate,
+          args.size,
+          args.accStride
+        ),
+      )
+    }
+  }.elsewhen(instruction.bits.opcode === Opcode.LoadWeights) {
+    val flags = Wire(new LoadWeightFlags)
+    val args =
+      Wire(
+        new LoadWeightArgs(layout)
+      )
+
+    flags := instruction.bits.flags.asTypeOf(flags)
+    args := instruction.bits.arguments.asTypeOf(args)
+
+    when(flags.zeroes) {
+      instruction.ready := enqueuer1.enqueue(
+        instruction.valid,
+        array,
+        arrayBundle(true.B, flags.zeroes, args.size),
+      )
+    }.otherwise {
+      val stride = 1.U << args.stride
+      instruction.ready := enqueuer2.enqueue(
+        instruction.valid,
+        array,
+        arrayBundle(true.B, flags.zeroes, args.size),
+        memPortB,
+        MemControlWithStride(memDepth, arch.stride0Depth)(
+          args.address + (args.size * stride),
+          args.size,
+          args.stride,
+          true.B,
+          false.B,
+        ),
+      )
+    }
+  }.elsewhen(instruction.bits.opcode === Opcode.DataMove) {
+    val args =
+      Wire(
+        new DataMoveArgs(layout)
+      )
+    val flags = Wire(new DataMoveFlags)
+
+    args := instruction.bits.arguments.asTypeOf(args)
+    flags := instruction.bits.flags.asTypeOf(flags)
+
+    when(flags.dataFlowControl === DataFlowControl.dram0ToMemory) {
+      // data in
+      instruction.ready := enqueuer3.enqueue(
+        instruction.valid,
+        dataflow,
+        DataFlowControlWithSize(arch.localDepth)(
+          DataFlowControl.dram0ToMemory,
+          args.size
+        ),
+        memPortA,
+        MemControlWithStride(memDepth, arch.stride0Depth)(
+          args.memAddress,
+          args.size,
+          args.memStride,
+          false.B,
+          true.B,
+        ),
+        dram0,
+        MemControlWithStride(arch.dram0Depth, arch.stride1Depth)(
+          args.accAddress,
+          args.size,
+          args.accStride,
+          false.B,
+          false.B,
+        ),
+      )
+    }.elsewhen(flags.dataFlowControl === DataFlowControl.memoryToDram0) {
+      // data out
+      instruction.ready := enqueuer3.enqueue(
+        instruction.valid,
+        dataflow,
+        DataFlowControlWithSize(arch.localDepth)(
+          DataFlowControl.memoryToDram0,
+          args.size
+        ),
+        memPortA,
+        MemControlWithStride(memDepth, arch.stride0Depth)(
+          args.memAddress,
+          args.size,
+          args.memStride,
+          false.B,
+          false.B,
+        ),
+        dram0,
+        MemControlWithStride(arch.dram0Depth, arch.stride1Depth)(
+          args.accAddress,
+          args.size,
+          args.accStride,
+          false.B,
+          true.B,
+        ),
+      )
+    }.elsewhen(flags.dataFlowControl === DataFlowControl.dram1ToMemory) {
+      // weights in
+      instruction.ready := enqueuer2.enqueue(
+        instruction.valid,
+        memPortB,
+        MemControlWithStride(memDepth, arch.stride0Depth)(
+          args.memAddress,
+          args.size,
+          args.memStride,
+          false.B,
+          true.B,
+        ),
+        dram1,
+        MemControlWithStride(arch.dram1Depth, arch.stride1Depth)(
+          args.accAddress,
+          args.size,
+          args.accStride,
+          false.B,
+          false.B,
+        ),
+      )
+    }.elsewhen(flags.dataFlowControl === DataFlowControl.memoryToDram1) {
+      // weights out (new)
+      instruction.ready := enqueuer2.enqueue(
+        instruction.valid,
+        memPortB,
+        MemControlWithStride(memDepth, arch.stride0Depth)(
+          args.memAddress,
+          args.size,
+          args.memStride,
+          false.B,
+          false.B,
+        ),
+        dram1,
+        MemControlWithStride(arch.dram1Depth, arch.stride1Depth)(
+          args.accAddress,
+          args.size,
+          args.accStride,
+          false.B,
+          true.B,
+        ),
+      )
+    }.elsewhen(
+      flags.dataFlowControl === DataFlowControl.accumulatorToMemory
+    ) {
+      // data move acc=>mem
+      instruction.ready := enqueuer3.enqueue(
+        instruction.valid,
+        dataflow,
+        DataFlowControlWithSize(memDepth)(
+          DataFlowControl.accumulatorToMemory,
+          args.size
+        ),
+        memPortA,
+        MemControlWithStride(memDepth, arch.stride0Depth)(
+          args.memAddress,
+          args.size,
+          args.memStride,
+          false.B,
+          true.B,
+        ),
+        acc,
+        accRead(args.accAddress, args.size, args.accStride),
+      )
+    }.elsewhen(
+      flags.dataFlowControl === DataFlowControl.memoryToAccumulator
+    ) {
+      // data move mem=>acc
+      instruction.ready := enqueuer3.enqueue(
+        instruction.valid,
+        dataflow,
+        DataFlowControlWithSize(memDepth)(
+          DataFlowControl.memoryToAccumulator,
+          args.size
+        ),
+        memPortA,
+        MemControlWithStride(memDepth, arch.stride0Depth)(
+          args.memAddress,
+          args.size,
+          args.memStride,
+          false.B,
+          false.B,
+        ),
+        acc,
+        accWrite(args.accAddress, false.B, args.size, args.accStride),
+      )
+    }.elsewhen(
+      flags.dataFlowControl === DataFlowControl.memoryToAccumulatorAccumulate
+    ) {
+      // data move mem=>acc(acc)
+      instruction.ready := enqueuer3.enqueue(
+        instruction.valid,
+        dataflow,
+        DataFlowControlWithSize(memDepth)(
+          DataFlowControl.memoryToAccumulator,
+          args.size
+        ),
+        memPortA,
+        MemControlWithStride(memDepth, arch.stride0Depth)(
+          args.memAddress,
+          args.size,
+          args.memStride,
+          false.B,
+          false.B,
+        ),
+        acc,
+        accWrite(args.accAddress, true.B, args.size, args.accStride),
+      )
+    }.otherwise {
+      // all invalid dataflow control kinds
+      instruction.ready := true.B
+    }
+  }.elsewhen(instruction.bits.opcode === Opcode.SIMD) {
+    val flags = Wire(new SIMDFlags)
+    val args =
+      Wire(
+        new SIMDArgs(layout)
+      )
+    flags := instruction.bits.flags.asTypeOf(flags)
+    args := instruction.bits.arguments.asTypeOf(args)
+
+    instruction.ready := enqueuer1.enqueue(
+      instruction.valid,
+      acc,
+      accBundle(
+        args.instruction,
+        args.accReadAddress,
+        args.accWriteAddress,
+        flags.read,
+        flags.write,
+        flags.accumulate,
+        0.U,
+        0.U
+      ),
+    )
+  }.elsewhen(instruction.bits.opcode === Opcode.Configure) {
+    val args =
+      Wire(new ConfigureArgs(registerWidth, platformConfig.axi.addrWidth))
+
+    args := instruction.bits.arguments.asTypeOf(args)
+
+    when(args.register === Configure.dram0AddressOffset) {
+      dram0AddressOffset := (args.value << 16)
+    }.elsewhen(args.register === Configure.dram0CacheBehaviour) {
+      dram0CacheBehaviour := args.value
+    }.elsewhen(args.register === Configure.dram1AddressOffset) {
+      dram1AddressOffset := (args.value << 16)
+    }.elsewhen(args.register === Configure.dram1CacheBehaviour) {
+      dram1CacheBehaviour := args.value
+    }.elsewhen(args.register === Configure.timeout) {
+      timeout := args.value
+    }.elsewhen(args.register === Configure.tracepoint) {
+      tracepoint := args.value
+    }.elsewhen(args.register === Configure.programCounter) {
+      programCounter := args.value
+    }.elsewhen(args.register === Configure.sampleInterval) {
+      sampleInterval := args.value
+    }
+
+    instruction.ready := true.B
+  }.elsewhen(instruction.bits.opcode === Opcode.NoOp) {
+    instruction.ready := true.B
+    io.nooped.valid := true.B
+  }.otherwise { // all invalid opcodes
+    instruction.ready := true.B
+    io.skipped.valid := true.B
+  }
+
+  if (layout.arch.validateInstructions) {
+    val validator = Module(new Validator(layout))
+    validator.io.instruction.bits := instruction.bits
+    validator.io.instruction.valid := instruction.valid
+    io.error := validator.io.error
+  } else {
+    io.error := false.B
+  }
+
+  if (layout.arch.sampleBlockSize > 0) {
+    val sampler = Module(new Sampler(layout.arch.sampleBlockSize))
+    sampler.io.sampleInterval := sampleInterval
+    sampler.io.programCounter := programCounter
+    sampler.io.flags.instruction.connect(instruction)
+    sampler.io.flags.memPortA.connect(io.memPortA)
+    sampler.io.flags.memPortB.connect(io.memPortB)
+    sampler.io.flags.dram0.connect(io.dram0)
+    sampler.io.flags.dram1.connect(io.dram1)
+    sampler.io.flags.dataflow.connect(io.dataflow)
+    sampler.io.flags.acc.connect(io.acc)
+    sampler.io.flags.array.connect(io.array)
+    io.sample <> sampler.io.sample
+  } else {
+    io.sample.bits.bits := zero(new Sample)
+    io.sample.bits.last := false.B
+    io.sample.valid := false.B
+  }
+
+  def allReady(ports: DecoupledIO[Data]*): Bool = {
+    ports.map(_.ready).reduce(_ && _)
+  }
+
+  def enqueue[T <: Data](port: DecoupledIO[T], value: T): Bool = {
+    port.bits <> value
+    port.valid := true.B
+    port.ready
+  }
+
+  def setDefault[T <: Data](port: DecoupledIO[T]): Unit = {
+    port.bits := zero(port.bits)
+    port.valid := false.B
+  }
+
+  def accWrite(
+      address: UInt,
+      accumulate: Bool,
+      size: UInt,
+      stride: UInt
+  ): AccumulatorMemControlWithSizeWithStride =
+    accBundle(
+      simd.Instruction.noOp(),
+      address,
+      0.U,
+      false.B,
+      true.B,
+      accumulate,
+      size,
+      stride
+    )
+
+  def accRead(
+      address: UInt,
+      size: UInt,
+      stride: UInt
+  ): AccumulatorMemControlWithSizeWithStride =
+    accBundle(
+      simd.Instruction.noOp(),
+      address,
+      0.U,
+      true.B,
+      false.B,
+      false.B,
+      size,
+      stride
+    )
+
+  def accBundle(
+      instruction: simd.Instruction,
+      address: UInt,
+      altAddress: UInt,
+      read: Bool,
+      write: Bool,
+      accumulate: Bool,
+      size: UInt,
+      stride: UInt
+  ): AccumulatorMemControlWithSizeWithStride = {
+    val w = Wire(accInGen)
+    w.instruction := instruction
+    w.address := address
+    w.altAddress := altAddress
+    w.accumulate := accumulate
+    w.write := write
+    w.read := read
+    w.size := size
+    w.stride := stride
+    w.reverse := false.B
+    w
+  }
+
+  def dataflowBundle(
+      kind: UInt,
+      size: UInt
+  ): DataFlowControlWithSize = {
+    val w = Wire(chiselTypeOf(dataflow.bits))
+    w.kind := kind
+    w.size := size
+    w
+  }
+
+  def arrayBundle(
+      load: Bool,
+      zeroes: Bool,
+      size: UInt
+  ): SystolicArrayControlWithSize = {
+    val w = Wire(arrayInGen)
+    w.load := load
+    w.zeroes := zeroes
+    w.size := size
+    w
+  }
+}

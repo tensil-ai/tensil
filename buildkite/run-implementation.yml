@@ -1,0 +1,20 @@
+env:
+  GIT_LFS_SKIP_SMUDGE: 1
+  BUILDKITE_CLEAN_CHECKOUT: "true"
+
+steps:
+  - command: "if [ -z \\${CORE_NAME} ]; then\n  echo \"Env variable CORE_NAME must be defined\"\n  exit 1\nfi"
+
+  - wait
+
+  - command: "sbt \"runMain tf2rtl.xillybus.\\${CORE_NAME}.Top\""
+    artifact_paths: "build/*.v"
+
+  - wait
+
+  - command: "mkdir -p build\nbuildkite-agent artifact download \"build/*.v\" build/\n./scripts/vivado/buildkite.sh ./scripts/vivado/run_implementation.tcl \\${CORE_NAME}"
+    agents:
+    - "vivado=true"
+    env:
+      XILINXD_LICENSE_FILE: "/home/tom/.Xilinx/Xilinx.lic"
+    artifact_paths: "**/*.bit;**/*.log;**/impl_1/*.rpt"

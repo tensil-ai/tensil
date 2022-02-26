@@ -1,0 +1,32 @@
+
+############################## SUBJECT LINE ############################
+#<----- Preferably use fewer than 50 chars ----->|----- 72 chars ----->#
+#                                                                      #
+#  - Begin with a leading commit verb (see below)                      #
+#  - Use the imperative mood (if applied, this commit will...)         #
+#  - Capitalize the first word                                         #
+#  - Don't end the line with a period                                  #
+#                                                                      #
+############################## COMMIT VERBS ############################
+#                                                                      #
+#   MAY CHANGE FUNCTIONALITY                                           #
+#     Add   = Create a capability e.g. feature, test, dependency       #
+#     Cut   = Remove a capability                                      #
+#     Fix   = Fix an issue e.g. bug, typo, accident, misstatement      #
+#     Make  = Change the build process, tooling or infrastructure      #
+#     Start = Begin doing something e.g. create a feature flag         #
+#     Stop  = End doing something e.g. remove a feature flag           #
+#     Bump  = Increase the version of something e.g. dependency        #
+#                                                                      #
+#   MUST NOT CHANGE FUNCTIONALITY                                      #
+#     Refactor = A source change that aims to reduce cognitive load    #
+#     Reformat = Refactor of formatting e.g. omit whitespace           #
+#     Optimise = A source change that aims to improve performance      #
+#     Document = Create explanatory comments or writings               #
+#                                                                      #
+################################## BODY ################################
+#                                                                      #
+#  - Explain the "what" and the "why"                                  #
+#  - Don't explain the "how": use comments in the source for that      #
+#                                                                      #
+########################################################################

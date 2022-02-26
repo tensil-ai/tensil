@@ -1,0 +1,42 @@
+$date
+2021-02-12T20:50+0000
+$end
+$version
+0.2
+$end
+$comment
+
+$end
+$timescale 1ns  $end
+$var wire 1 a foo $end
+$var wire 1 z derp $end
+$scope module bar $end
+ $var wire 32 %w baz $end
+ $var wire 1 y quux $end
+ $scope module io $end
+  $var wire 1 b foo $end
+  $var wire 32 x blerp $end
+ $upscope $end
+$upscope $end
+
+$enddefinitions $end
+
+$dumpvars
+0a
+b00000000000000000000000000000000 %w
+0b
+0z
+0y
+b00000000000000000000000000000000 x
+$end
+
+#0
+1a
+b00000000000000000000000000000001 %w
+1y
+1z
+#1
+1b
+b00000000000000000000000000000010 %w
+0y
+b00100010010000000000000000000000 x

@@ -1,0 +1,1 @@
+export project_root=$(pwd)

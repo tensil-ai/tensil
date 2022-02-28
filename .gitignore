@@ -379,7 +379,6 @@ hs_err_pid*
 *.ignore
 
 # other
-rtl/
 perf/
 
 # Compiler test artifacts

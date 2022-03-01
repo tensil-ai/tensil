@@ -3,6 +3,10 @@ Tensil
 
 [![Build status](https://badge.buildkite.com/e44156260ed9775ea72699e45cb394526ea7db24b09c4059aa.svg?branch=master)](https://buildkite.com/tensil/build)
 
+# Tensil Flow
+
+![Flow](/doc/flow.png)
+
 ## Setup
 
 1. Download and install [JDK 11 from Azul](https://www.azul.com/downloads/?version=java-11-lts&package=jdk);
@@ -12,7 +16,7 @@ Tensil
 5. Download and install [Xilinx PYNQ](http://www.pynq.io/board.html) for your FPGA development platform;
 6. Clone [Tensil PYNQ driver](#) to `/home/xilinx` on your FPGA development platform.
 
-## Compile command line tools
+## Build command line tools
 
     $ ./mill '{rtl,tools}.assembly'
 
@@ -40,4 +44,4 @@ Tensil
 
 ## Use PYNQ and Jupyter notebooks to run AI/ML model on FPGA
 
-TODO
+![Resnet on PYNQ](/doc/resnet_on_pynq.png)

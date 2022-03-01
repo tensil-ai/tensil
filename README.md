@@ -3,7 +3,7 @@ Tensil
 
 [![Build status](https://badge.buildkite.com/e44156260ed9775ea72699e45cb394526ea7db24b09c4059aa.svg?branch=master)](https://buildkite.com/tensil/build)
 
-# Tensil Flow
+## Tensil toolchain flow
 
 ![Flow](/doc/flow.png)
 
@@ -44,4 +44,4 @@ Tensil
 
 ## Use PYNQ and Jupyter notebooks to run AI/ML model on FPGA
 
-![Resnet on PYNQ](/doc/resnet_on_pynq.png)
+![Resnet on PYNQ](/doc/resnet20_on_pynq.png)

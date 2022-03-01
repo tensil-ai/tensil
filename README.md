@@ -24,7 +24,9 @@ Tensil
 
     $ ./mill __.test -l org.scalatest.tags.Slow -l tensil.tags.Broken
 
-## Compile AI/ML model (resnet20v2_cifar.onnx) for specific TCU architecture and FPGA development platform (Ultra96 v2)
+## Compile AI/ML model
+
+Compile AI/ML model (resnet20v2_cifar.onnx) for specific TCU architecture and FPGA development platform (Ultra96 v2)
 
 ### From frozen TensorFlow graph
 
@@ -34,14 +36,20 @@ Tensil
 
     $ ./compile -a ./arch/ultra96v2.tarch -m ../tensil_models/resnet20v2_cifar.onnx -o "Identity:0"
 
-## Make Verilog RTL for specific TCU architecture and FPGA development platform (Ultra96 v2) and 128-bit DRAM AXI 
+## Make Verilog RTL
+
+Make Verilog RTL for specific TCU architecture and FPGA development platform (Ultra96 v2) and 128-bit DRAM AXI
 
     $ ./make_rtl -a ./arch/ultra96v2.tarch -d 128
 
-## Create Vivado design for specific FPGA development platform (Ultra96 v2)
+## Create Vivado design
+
+Create Vivado design for specific FPGA development platform (Ultra96 v2)
 
 ![Ultra96 v2 design](/doc/ultra96v2_design.png)
 
-## Use PYNQ and Jupyter notebooks to run AI/ML model on FPGA
+## Run AI/ML model on FPGA
+
+Use PYNQ and Jupyter notebooks to run AI/ML model on FPGA
 
 ![Resnet on PYNQ](/doc/resnet20_on_pynq.png)

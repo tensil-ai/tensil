@@ -12,7 +12,7 @@ Tensil
 1. Download and install [JDK 11 from Azul](https://www.azul.com/downloads/?version=java-11-lts&package=jdk);
 2. Download and install [Verilator](https://verilator.org/guide/latest/install.html) (tests only);
 3. Clone [Tensil models repo](https://github.com/tensil-ai/tensil_models) on the same level with this repo (tests and demo only);
-4. Download and install [Xilinx Vitis or Vivado](https://www.xilinx.com/support/download.html).
+4. Download and install [Xilinx Vitis or Vivado](https://www.xilinx.com/support/download.html);
 5. Download and install [Xilinx PYNQ](http://www.pynq.io/board.html) for your FPGA development platform;
 6. Clone [Tensil PYNQ driver](#) to `/home/xilinx` on your FPGA development platform.
 
@@ -26,11 +26,11 @@ Tensil
 
 ## Compile AI/ML model
 
-Compile AI/ML model (resnet20v2_cifar.onnx) for specific TCU architecture and FPGA development platform (Ultra96 v2)
+Compile AI/ML model (ResNet20 v2 CIFAR) for specific TCU architecture and FPGA development platform ([Avnet Ultra96 v2](https://www.avnet.com/wps/portal/us/products/avnet-boards/avnet-board-families/ultra96-v2/))
 
 ### From frozen TensorFlow graph
 
-    $ ./compile -a ./arch/ultra96v2.tarch -m ../tensil_models/resnet20v2_cifar.pb
+    $ ./compile -a ./arch/ultra96v2.tarch -m ../tensil_models/resnet20v2_cifar.pb -o "Identity"
 
 ### From ONNX
 

@@ -18,7 +18,7 @@ import chisel3.util.Queue
 class TCUFormal extends Formal {
   val arch   = tensil.Architecture.formal
   val layout = InstructionLayout(arch)
-  val m      = Module(new TCU(SInt(2.W), arch))
+  val m      = Module(new TCU(SInt(2.W), layout))
   val io     = IO(m.io.cloneType)
   io <> m.io
 

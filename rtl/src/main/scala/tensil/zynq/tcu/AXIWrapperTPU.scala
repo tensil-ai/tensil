@@ -15,18 +15,19 @@ import tensil.tcu.instruction.Instruction
 import tensil.util.{WithLast, DecoupledHelper}
 import tensil.util.decoupled.Extend
 import tensil.Architecture
+import tensil.InstructionLayout
 
 class AXIWrapperTCU[T <: Data with Num[T]](
-    val axiConfig: axi.Config,
+    val dramAxiConfig: axi.Config,
     val gen: T,
-    val arch: Architecture,
+    val layout: InstructionLayout,
 )(implicit val platformConfig: PlatformConfig)
     extends MultiIOModule {
   val numScalarsPerWord: Int =
-    (axiConfig.dataWidth / 8) / arch.dataType.sizeBytes
+    (dramAxiConfig.dataWidth / 8) / layout.arch.dataType.sizeBytes
 
   val tcu = Module(
-    new TCU(gen, arch)
+    new TCU(gen, layout)
   )
   // IO
   val instruction = IO(
@@ -35,8 +36,8 @@ class AXIWrapperTCU[T <: Data with Num[T]](
   val status = IO(
     Decoupled(new WithLast(new Instruction(tcu.instructionWidth)))
   )
-  val dram0  = IO(new axi.Master(axiConfig))
-  val dram1  = IO(new axi.Master(axiConfig))
+  val dram0  = IO(new axi.Master(dramAxiConfig))
+  val dram1  = IO(new axi.Master(dramAxiConfig))
   val error  = IO(Output(Bool()))
   val sample = IO(Decoupled(new WithLast(new Sample)))
 
@@ -50,20 +51,20 @@ class AXIWrapperTCU[T <: Data with Num[T]](
   val maxLen   = 1 << 8  // 256
 
   val dram0BoundarySplitter = Module(
-    new axi.MemBoundarySplitter(axiConfig, boundary, maxLen)
+    new axi.MemBoundarySplitter(dramAxiConfig, boundary, maxLen)
   )
   dram0 <> dram0BoundarySplitter.io.out
   val dram1BoundarySplitter = Module(
-    new axi.MemBoundarySplitter(axiConfig, boundary, maxLen)
+    new axi.MemBoundarySplitter(dramAxiConfig, boundary, maxLen)
   )
   dram1 <> dram1BoundarySplitter.io.out
 
   val dram0Converter = Module(
     new axi.Converter(
-      axiConfig,
+      dramAxiConfig,
       gen,
-      arch.arraySize,
-      arch.dram0Depth,
+      layout.arch.arraySize,
+      layout.arch.dram0Depth,
       numScalarsPerWord = numScalarsPerWord
     )
   )
@@ -77,10 +78,10 @@ class AXIWrapperTCU[T <: Data with Num[T]](
 
   val dram1Converter = Module(
     new axi.Converter(
-      axiConfig,
+      dramAxiConfig,
       gen,
-      arch.arraySize,
-      arch.dram1Depth,
+      layout.arch.arraySize,
+      layout.arch.dram1Depth,
       numScalarsPerWord = numScalarsPerWord
     )
   )

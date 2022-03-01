@@ -33,7 +33,7 @@ class TCULargeSpec extends FunUnitSpec {
       val numBytesPerWord    = 8
 
       it("should not stall at 0xb4d #0", tensil.tags.Verilator) {
-        test(new AXIWrapperTCU(axiConfig, gen, arch))
+        test(new AXIWrapperTCU(axiConfig, gen, layout))
           .withAnnotations(Seq(VerilatorBackendAnnotation)) { m =>
             m.instruction.setSourceClock(m.clock)
 
@@ -183,14 +183,13 @@ class TCULargeSpec extends FunUnitSpec {
       //   PlatformConfig.default.copy(memKind = MemKind.ChiselSyncReadMem)
       implicit val platformConfig =
         PlatformConfig.default.copy(memKind = MemKind.XilinxBlockRAM)
-      val gen  = FixedPoint(16.W, 8.BP)
-      val arch = Architecture.tiny
+      val gen             = FixedPoint(16.W, 8.BP)
+      val arch            = Architecture.tiny
+      implicit val layout = new InstructionLayout(arch)
 
       it("should not stall at 0xb4d", tensil.tags.Verilator) {
-        test(new TCU(gen, arch))
+        test(new TCU(gen, layout))
           .withAnnotations(Seq(VerilatorBackendAnnotation)) { m =>
-            implicit val layout = m.layout
-
             m.io.instruction.setSourceClock(m.clock)
             m.io.dram0.dataIn.setSourceClock(m.clock)
             m.io.dram0.dataOut.setSinkClock(m.clock)

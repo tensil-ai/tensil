@@ -1,0 +1,3 @@
+#!/bin/bash
+
+java -jar ./out/tools/assembly.dest/out.jar "$@"

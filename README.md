@@ -9,7 +9,7 @@ Tensil
 
 ## Setup
 
-1. Download and install [JDK 11 from Azul](https://www.azul.com/downloads/?version=java-11-lts&package=jdk);
+1. Download and install [OpenJDK 11 from Azul](https://www.azul.com/downloads/?version=java-11-lts&package=jdk);
 2. Download and install [Verilator](https://verilator.org/guide/latest/install.html) (tests only);
 3. Clone [Tensil models repo](https://github.com/tensil-ai/tensil_models) on the same level with this repo (tests and demo only);
 4. Download and install [Xilinx Vitis or Vivado](https://www.xilinx.com/support/download.html);

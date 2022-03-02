@@ -1,3 +1,6 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright © 2019-2022 Tensil AI Company */
+
 package tensil.tools.data
 
 class Shape(private val dimensions: Array[Int]) extends Iterable[Int] {

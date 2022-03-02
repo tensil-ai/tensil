@@ -1,3 +1,6 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* Copyright © 2019-2022 Tensil AI Company */
+
 package tensil.axi
 
 case class Config(idWidth: Int, addrWidth: Int, dataWidth: Int) {

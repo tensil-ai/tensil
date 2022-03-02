@@ -10,11 +10,10 @@ Tensil
 ## Setup
 
 1. Download and install [OpenJDK 11 from Azul](https://www.azul.com/downloads/?version=java-11-lts&package=jdk);
-2. Download and install [Verilator](https://verilator.org/guide/latest/install.html) (optional - tests only);
-3. Clone [Tensil models repo](https://github.com/tensil-ai/tensil_models) on the same level with this repo (optional - tests and demo only);
-4. Download and install [Xilinx Vitis or Vivado](https://www.xilinx.com/support/download.html);
-5. Download and install [Xilinx PYNQ](http://www.pynq.io/board.html) for your FPGA development platform;
-6. Clone [Tensil PYNQ driver](https://github.com/tensil-ai/tensil_drivers) to `/home/xilinx` on your FPGA development platform.
+2. Clone [Tensil models repo](https://github.com/tensil-ai/tensil_models) on the same level with this repo (optional - demo only);
+3. Download and install [Xilinx Vitis or Vivado](https://www.xilinx.com/support/download.html);
+4. Download and install [Xilinx PYNQ](http://www.pynq.io/board.html) for your FPGA development platform;
+5. Clone [Tensil PYNQ driver](https://github.com/tensil-ai/tensil_drivers) to `/home/xilinx` on your FPGA development platform.
 
 ## Build command line tools
 
@@ -58,5 +57,10 @@ Use PYNQ and Jupyter notebooks to run AI/ML model on FPGA.
 ![Resnet on PYNQ](/doc/resnet20_on_pynq.png)
 
 ## Run full test suite
+
+#### Additional setup steps for running tests
+
+- Download and install [Verilator](https://verilator.org/guide/latest/install.html);
+- Clone [Tensil models repo](https://github.com/tensil-ai/tensil_models) on the same level with this repo.
 
     $ ./mill __.test -l org.scalatest.tags.Slow -l tensil.tags.Broken

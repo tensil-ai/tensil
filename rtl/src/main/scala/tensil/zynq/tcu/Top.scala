@@ -21,7 +21,7 @@ import java.io.File
 
 case class Args(
     archFile: File = new File("."),
-    dramAxiConfig: axi.Config = axi.Config.Xilinx,
+    dramAxiConfig: axi.Config = axi.Config.Xilinx64,
     verbose: Boolean = false,
     summary: Boolean = false,
 )
@@ -81,6 +81,8 @@ class Top(archName: String, arch: Architecture, dramAxiConfig: axi.Config)(
 
 object Top extends App {
   val argParser = new scopt.OptionParser[Args]("make_rtl") {
+    help("help").text("Prints this usage text")
+    
     opt[File]('a', "arch")
       .required()
       .valueName("<file>")
@@ -101,7 +103,7 @@ object Top extends App {
           case 256 => axi.Config.Xilinx256
         })
       )
-      .text("Optional DRAM0 and DRAM1 AXI width, defaults to 32")
+      .text("Optional DRAM0 and DRAM1 AXI width, defaults to 64")
   }
 
   argParser.parse(args, Args()) match {

@@ -17,6 +17,8 @@ case class Args(
 
 object Main extends App {
   val argParser = new scopt.OptionParser[Args]("compile") {
+      help("help").text("Prints this usage text")
+
       opt[File]('m', "model")
         .required()
         .valueName("<file>")

@@ -63,6 +63,6 @@ Use PYNQ and Jupyter notebooks to run AI/ML model on FPGA.
 - Download and install [Verilator](https://verilator.org/guide/latest/install.html);
 - Clone [Tensil models repo](https://github.com/tensil-ai/tensil-models) on the same level with this repo.
 
-#### Run tests excluding slow and broken
+#### Run tests
 
-    $ ./mill __.test -l org.scalatest.tags.Slow -l tensil.tags.Broken
+    $ ./mill __.test -l org.scalatest.tags.Slow

@@ -4,7 +4,6 @@ import chisel3._
 import chisel3.experimental.FixedPoint
 import chisel3.util.{Decoupled, Queue}
 import chiseltest._
-import tensil.tags.Broken
 import tensil.{FixedDriver, FixedPeekPokeTester, Scratch, Treadle, UnitSpec}
 
 class UtilPackageTests extends UnitSpec {

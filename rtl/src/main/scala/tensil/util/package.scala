@@ -33,7 +33,7 @@ package object util {
 
   def emitToBuildDir[T <: RawModule](dut: => T, filename: String = ""): Unit = {
     val stage = new ChiselStage
-    stage.emitSystemVerilog(
+    stage.emitVerilog(
       dut,
       args = Array("--target-dir", "build"),
     )

@@ -15,32 +15,29 @@ import tensil.ArchitectureDataType
 
 class TCU[T <: Data with Num[T]](
     val gen: T,
-    val arch: Architecture,
+    val layout: InstructionLayout,
 )(implicit val platformConfig: PlatformConfig)
     extends Module {
-  val layout = new InstructionLayout(
-    arch
-  )
   val instructionWidth     = layout.instructionSizeBytes * 8
-  val width                = arch.arraySize
-  val accDepth             = arch.accumulatorDepth
-  val localDepth           = arch.localDepth
-  val dram0Depth           = arch.dram0Depth
-  val dram1Depth           = arch.dram1Depth
-  val validateInstructions = arch.validateInstructions
+  val width                = layout.arch.arraySize
+  val accDepth             = layout.arch.accumulatorDepth
+  val localDepth           = layout.arch.localDepth
+  val dram0Depth           = layout.arch.dram0Depth
+  val dram1Depth           = layout.arch.dram1Depth
+  val validateInstructions = layout.arch.validateInstructions
 
   val io = IO(new Bundle {
     val instruction = Flipped(Decoupled(new Instruction(instructionWidth)))
     val status      = Decoupled(new WithLast(new Instruction(instructionWidth)))
     val dram0 = new Bundle {
-      val control = Decoupled(new MemControl(arch.dram0Depth))
-      val dataIn  = Flipped(Decoupled(Vec(arch.arraySize, gen)))
-      val dataOut = Decoupled(Vec(arch.arraySize, gen))
+      val control = Decoupled(new MemControl(layout.arch.dram0Depth))
+      val dataIn  = Flipped(Decoupled(Vec(layout.arch.arraySize, gen)))
+      val dataOut = Decoupled(Vec(layout.arch.arraySize, gen))
     }
     val dram1 = new Bundle {
-      val control = Decoupled(new MemControl(arch.dram1Depth))
-      val dataIn  = Flipped(Decoupled(Vec(arch.arraySize, gen)))
-      val dataOut = Decoupled(Vec(arch.arraySize, gen))
+      val control = Decoupled(new MemControl(layout.arch.dram1Depth))
+      val dataIn  = Flipped(Decoupled(Vec(layout.arch.arraySize, gen)))
+      val dataOut = Decoupled(Vec(layout.arch.arraySize, gen))
     }
     val config = new Bundle {
       val dram0AddressOffset  = Output(UInt(platformConfig.axi.addrWidth.W))
@@ -55,22 +52,28 @@ class TCU[T <: Data with Num[T]](
     val sample         = Decoupled(new WithLast(new Sample))
   })
 
-  val decoder = Module(new Decoder(arch))
-  val array   = Module(new SystolicArray(gen, arch.arraySize, arch.arraySize))
+  val decoder = Module(new Decoder(layout.arch))
+  val array = Module(
+    new SystolicArray(gen, layout.arch.arraySize, layout.arch.arraySize)
+  )
   val acc = Module(
-    new AccumulatorWithALUArray(gen, arch)
+    new AccumulatorWithALUArray(gen, layout.arch)
   )
   val mem = Module(
     new DualPortMem(
-      Vec(arch.arraySize, gen),
-      arch.localDepth.toInt,
+      Vec(layout.arch.arraySize, gen),
+      layout.arch.localDepth.toInt,
       name = "main",
       debug = false,
     )
   )
   val router = Module(
-    // new Router(Vec(arch.arraySize, gen), arch, controlQueueSize = 50)
-    new Router(Vec(arch.arraySize, gen), arch, controlQueueSize = 2)
+    // new Router(Vec(layout.arch.arraySize, gen), layout.arch, controlQueueSize = 50)
+    new Router(
+      Vec(layout.arch.arraySize, gen),
+      layout.arch,
+      controlQueueSize = 2
+    )
   )
 
   val dataPort    = mem.io.portA

@@ -7,7 +7,6 @@ import chiseltest.internal.TesterThreadList
 import scala.collection.mutable
 import tensil.UnitSpec
 import tensil.decoupled.{decoupledToDriver, decoupledVecToDriver}
-import tensil.tags.Broken
 
 class AccumulatorSpec extends UnitSpec {
   behavior of "Accumulator"

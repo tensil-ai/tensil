@@ -386,7 +386,6 @@ perf/
 *.tconsts
 *.tmodel
 *.tdata
-*.tarch
 *.tasm
 *.tgraph
 *.dot

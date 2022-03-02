@@ -14,6 +14,7 @@ object common extends ScalaModule { m =>
   override def ivyDeps =
     Agg(
       ivy"com.lihaoyi::upickle:1.3.8",
+      ivy"com.github.scopt::scopt:3.7.1",
     )
 
   object test extends Tests with TestModule.ScalaTest {
@@ -26,6 +27,8 @@ object tools extends ScalaPBModule { m =>
 
   def scalaVersion   = common.scalaVersion
   def scalaPBVersion = "0.11.6"
+
+  def mainClass = Some("tensil.tools.Main")
 
   override def ivyDeps =
     common.ivyDeps() ++ super.ivyDeps() ++ Agg(
@@ -54,6 +57,9 @@ object rtl extends SbtModule { m =>
       "-feature",
       "-language:reflectiveCalls",
     )
+
+  def mainClass = Some("tensil.zynq.tcu.Top")
+
   override def ivyDeps =
     common.ivyDeps() ++ super.ivyDeps() ++ Agg(
       ivy"edu.berkeley.cs::chisel3:3.4.3",
@@ -87,4 +93,3 @@ object sim extends ScalaModule { m =>
       m.ivyDeps() ++ Agg(ivy"org.scalatest::scalatest:3.0.4")
   }
 }
-

@@ -1,56 +1,68 @@
-TensorFlow To RTL (tf2rtl)
+Tensil
 ==========================
 
 [![Build status](https://badge.buildkite.com/e44156260ed9775ea72699e45cb394526ea7db24b09c4059aa.svg?branch=master)](https://buildkite.com/tensil/build)
 
+## Tensil toolchain flow
+
+![Flow](/doc/flow.png)
+
 ## Setup
 
-1. [Install](https://www.scala-sbt.org/download.html) `sbt` (scala build tool).
-2. Get IntelliJ and install the Scala plugin. See the [IntelliJ Installation Guide](https://github.com/ucb-bar/chisel-template/wiki/IntelliJ-Installation-Guide) for how to install it.
-3. Clone this repo. In IntelliJ > Import Project from sbt. Point it at the build.sbt file. 
-4. Download JDK 11 from Azul https://www.azul.com/downloads/?version=java-11-lts&package=jdk
-5. In IntelliJ > Settings > Build, Execution, Deployment > Build Tools > sbt, set the Java runtime (JRE) to Azul JDK 11.
-6. Launch sbt by running `sbt` in a terminal or by opening the sbt shell in IntelliJ
-7. In the sbt console, run `compile` and then `test:compile`
-8. *\[optional\]* Do the Chisel [tutorials](https://github.com/ucb-bar/chisel-tutorial)
+1. Download and install [OpenJDK 11 from Azul](https://www.azul.com/downloads/?version=java-11-lts&package=jdk);
+2. Clone [Tensil models repo](https://github.com/tensil-ai/tensil-models) on the same level with this repo (optional - demo only);
+3. Download and install [Xilinx Vitis or Vivado](https://www.xilinx.com/support/download.html);
+4. Download and install [Xilinx PYNQ](http://www.pynq.io/board.html) for your FPGA development platform;
+5. Clone [Tensil PYNQ driver](https://github.com/tensil-ai/tensil-drivers) to `/home/xilinx` on your FPGA development platform.
+
+## Build command line tools
+
+    $ ./mill '{rtl,tools}.assembly'
+
+## Compile AI/ML model
+
+Compile AI/ML model (ResNet20 v2 CIFAR) for specific TCU architecture and FPGA development platform ([Avnet Ultra96 v2](https://www.avnet.com/wps/portal/us/products/avnet-boards/avnet-board-families/ultra96-v2/)).
+
+#### From ONNX
+
+    $ ./compile -a ./arch/ultra96v2.tarch -m ../tensil-models/resnet20v2_cifar.onnx -o "Identity:0"
+
+#### From frozen TensorFlow graph
+
+    $ ./compile -a ./arch/ultra96v2.tarch -m ../tensil-models/resnet20v2_cifar.pb -o "Identity"
+
+#### Other ML frameworks are supported by convering to ONNX
+
+- [TensorFlow and Tflite](https://github.com/onnx/tensorflow-onnx/blob/master/README.md)
+- [Pytorch](https://pytorch.org/docs/stable/onnx.html)
+- [Other](https://onnx.ai/supported-tools.html)
 
 
-## Run
+## Make Verilog RTL
 
-### Building for Zynq
+Make Verilog RTL for specific TCU architecture and FPGA development platform (Ultra96 v2) and 128-bit AXI interface to DDR memory.
 
-1. Go to `tf2rtl/zynq/tcu/Top.scala` and adjust the design parameters as desired. 
-2. `sbt> runMain tf2rtl.zynq.tcu.Top`
+    $ ./make_rtl -a ./arch/ultra96v2.tarch -d 128
 
-Two files will be generated in the `build` directory: `Top.v` and `bram_<width>x<depth>.v`. With those two files, then follow the instructions in the [tcu-pynq](https://github.com/tensil-ai/tcu-pynq) project to implement on the Zynq platform.
+## Create Vivado design
 
+Create Vivado design for specific FPGA development platform (Ultra96 v2). If this is something you don't know how to do, we can help! Please reach out to us at [contact@tensil.ai](mailto:contact@tensil.ai).
 
-### Compiling a model
+![Ultra96 v2 design](/doc/ultra96v2_design.png)
 
-1. Add the model to the `tf_models` directory under the project root.
-2. Go to `tf2rt/tools/Main.scala` and adjust the model filename and accelerator design parameters as desired.
-3. `sbt> runMain tf2rtl.tools.Main`
+## Run AI/ML model on FPGA
 
-Several artifacts will be generated in the `build` directory, including `program.tensil` and `weights.tensil`. How to use these artifacts depends on the specific platform. For Zynq, see the [tcu-pynq](https://github.com/tensil-ai/tcu-pynq) project.
+Use PYNQ and Jupyter notebooks to run AI/ML model on FPGA.
 
-## Web compiler
+![Resnet on PYNQ](/doc/resnet20_on_pynq.png)
 
-### Authenticate with AWS
+## Run full test suite
 
-    $ aws ecr get-login-password --region us-west-1 | docker login --username AWS --password-stdin 550752563960.dkr.ecr.us-west-1.amazonaws.com
+#### Additional setup steps for running tests
 
-### Build and push
+- Download and install [Verilator](https://verilator.org/guide/latest/install.html);
+- Clone [Tensil models repo](https://github.com/tensil-ai/tensil-models) on the same level with this repo.
 
-    $ sbt assembly
-    $ docker-compose build
-    $ docker-compose push
+#### Run tests
 
-### Creating compiler job (SBT console)
-
-User ID, job ID and model name derived from model object name in S3 uploads bucket. Thus is an example for `f21fbe299f890b135342661430e556f21c640e89c97f1a1dfaf2db2de0cbca7c/cnn_mnist_pb_2022_02_11_23_26_34/cnn-mnist.pb`:
-
-    tf2rtl.tools.web.CompilerTask.submitGrid("f21fbe299f890b135342661430e556f21c640e89c97f1a1dfaf2db2de0cbca7c", "cnn_mnist_pb_2022_02_11_23_26_34", "cnn_mnist_pb", 0, "f21fbe299f890b135342661430e556f21c640e89c97f1a1dfaf2db2de0cbca7c/cnn_mnist_pb_2022_02_11_23_26_34/cnn-mnist.pb")
-
-### Launch compiler task
-
-    $ aws ecs run-task --region us-west-1 --cluster tf2rtl-web-d6de55d --network-configuration "awsvpcConfiguration={subnets=[subnet-0ec7bfe08a86df91b,subnet-045397e5cc0c1eb48],securityGroups=[sg-0c1ade67f5e17fb6f],assignPublicIp=DISABLED}" --task-definition tf2rtl-web-compiler:2 --count 1 --launch-type FARGATE
+    $ ./mill __.test -l org.scalatest.tags.Slow

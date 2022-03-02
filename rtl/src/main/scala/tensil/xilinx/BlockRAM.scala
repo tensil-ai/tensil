@@ -3,6 +3,7 @@ package tensil.xilinx
 import chisel3._
 import chisel3.util.HasBlackBoxInline
 import tensil.util
+import tensil.ArtifactsLogger
 
 class BlockRAM(width: Int, depth: Long)
     extends BlackBox
@@ -47,7 +48,5 @@ class BlockRAM(width: Int, depth: Long)
      |endmodule""".stripMargin
   )
 
-  println(
-    s"Generated dynamic BlackBox ${desiredName}.v"
-  ) // scalastyle:ignore regex
+  ArtifactsLogger.log(desiredName)
 }

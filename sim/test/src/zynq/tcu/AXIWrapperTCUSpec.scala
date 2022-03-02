@@ -47,6 +47,8 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
       s"when axi=$axiConfig, gen=$gen, arch=$arch"
     ) {
 
+      val layout = InstructionLayout(arch)
+
       def varyDramDelay(readDelayCycles: Int, writeDelayCycles: Int)(implicit
           axiConfig: axi.Config
       ) =
@@ -75,7 +77,7 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
                 new AXIWrapperTCU(
                   axiConfig,
                   gen,
-                  arch
+                  layout
                 )
               ).withAnnotations(Seq(VerilatorBackendAnnotation)) { m =>
                 m.setClocks()
@@ -91,7 +93,7 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
                 )
 
                 // setup compiler input/output streams
-                val modelFileName = "../tensil_models/xor4.pb"
+                val modelFileName = "../tensil-models/xor4.pb"
                 val model         = new FileInputStream(modelFileName)
                 val consts        = new ByteArrayOutputStream()
                 val program       = new ByteArrayOutputStream()
@@ -200,7 +202,7 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
                 new AXIWrapperTCU(
                   axiConfig,
                   gen,
-                  arch
+                  layout
                 )
               ).withAnnotations(Seq(VerilatorBackendAnnotation)) { m =>
                 m.setClocks()
@@ -217,7 +219,7 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
                 )
 
                 // setup compiler output streams
-                val modelFileName = "../tensil_models/resnet20v2_cifar.pb"
+                val modelFileName = "../tensil-models/resnet20v2_cifar.pb"
                 val model         = new FileInputStream(modelFileName)
                 val consts        = new ByteArrayOutputStream()
                 val program       = new ByteArrayOutputStream()
@@ -253,7 +255,7 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
 
                 // write input to dram0
                 val source = Source.fromFile(
-                  s"../tensil_models/data/resnet_input_${inputSize}x32x32x${m.arch.arraySize}.csv"
+                  s"../tensil-models/data/resnet_input_${inputSize}x32x32x${m.layout.arch.arraySize}.csv"
                 )
                 val lines = source.getLines().toList
                 source.close()
@@ -265,7 +267,7 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
                   for (a <- compilerResult.inputObjects(0).span) {
                     val pixel = lines(i).split(",").map(_.toFloat)
 
-                    assert(pixel.size == m.arch.arraySize)
+                    assert(pixel.size == m.layout.arch.arraySize)
 
                     dram0.writeFloatVector(
                       a.raw,
@@ -317,7 +319,7 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
                   )
 
                   val resultsSize =
-                    divCeil(ResNet.ClassSize, m.arch.arraySize)
+                    divCeil(ResNet.ClassSize, m.layout.arch.arraySize)
 
                   for (l <- 0 until batchSize) {
 
@@ -353,7 +355,7 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
                 new AXIWrapperTCU(
                   axiConfig,
                   gen,
-                  arch
+                  layout
                 )
               ).withAnnotations(Seq(VerilatorBackendAnnotation)) { m =>
                 m.setClocks()
@@ -379,7 +381,7 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
                   fromLocalBaseAddress + size.toLong
 
                 val values =
-                  Array.fill[Float](size * m.arch.arraySize)(0)
+                  Array.fill[Float](size * m.layout.arch.arraySize)(0)
 
                 for (
                   shift0 <- 0 until untilShift; shift1 <- 0 until untilShift
@@ -411,8 +413,8 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
                     dram0.writeFloatVector(
                       fromDramBaseAddress + fromDramShift + i,
                       values.slice(
-                        i * m.arch.arraySize,
-                        (i + 1) * m.arch.arraySize
+                        i * m.layout.arch.arraySize,
+                        (i + 1) * m.layout.arch.arraySize
                       )
                     )
 
@@ -467,16 +469,20 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
 
                   for (i <- 0 until size) {
                     val expected = values.slice(
-                      i * m.arch.arraySize,
-                      (i + 1) * m.arch.arraySize
+                      i * m.layout.arch.arraySize,
+                      (i + 1) * m.layout.arch.arraySize
                     )
 
                     var read = dram0.readFloatVector(
                       toDramBaseAddress + toDramShift + i,
                     )
 
-                    for (k <- 0 until m.arch.arraySize)
-                      assertEqual(read(k), expected(k), m.arch.dataType.error)
+                    for (k <- 0 until m.layout.arch.arraySize)
+                      assertEqual(
+                        read(k),
+                        expected(k),
+                        m.layout.arch.dataType.error
+                      )
                   }
                 }
               }

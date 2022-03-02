@@ -2,7 +2,13 @@ package tensil
 
 import upickle.default.{ReadWriter, macroRW}
 import upickle.implicits.key
-import java.io.{DataOutputStream, DataInputStream, FileOutputStream}
+import java.io.{
+  DataOutputStream,
+  DataInputStream,
+  FileOutputStream,
+  FileInputStream,
+  File
+}
 
 case class Architecture(
     @key("data_type") dataType: ArchitectureDataType,
@@ -24,8 +30,8 @@ case class Architecture(
   def varsDepth   = dram0Depth
   def constsDepth = dram1Depth
 
-  def writeDriverArchitecureParams(): Unit = {
-    val stream = new FileOutputStream("architecture_params.h")
+  def writeDriverArchitectureParams(fileName: String): Unit = {
+    val stream = new FileOutputStream(fileName)
     writeDriverArchitecureParams(new DataOutputStream(stream));
     stream.close()
   }
@@ -72,6 +78,15 @@ case class Architecture(
 }
 
 object Architecture {
+  def read(file: File): Architecture = {
+    val stream = new FileInputStream(file)
+    val arch   = upickle.default.read[Architecture](stream)
+
+    stream.close()
+
+    arch
+  }
+
   def mkWithDefaults(
       arraySize: Int = 8,
       localDepth: Long = 2048,

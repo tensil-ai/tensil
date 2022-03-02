@@ -32,8 +32,9 @@ class TCUSpec extends UnitSpec {
       stride0Depth = 8,
       stride1Depth = 8,
     )
+    val layout = InstructionLayout(arch)
 
-    test(new TCU(gen, arch)) { m =>
+    test(new TCU(gen, layout)) { m =>
       implicit val layout = m.setInstructionParameters()
       m.setClocks()
       m.clock.setTimeout(2000)
@@ -83,8 +84,9 @@ class TCUSpec extends UnitSpec {
       stride0Depth = 8,
       stride1Depth = 8,
     )
+    val layout = InstructionLayout(arch)
 
-    test(new TCU(gen, arch)) { m =>
+    test(new TCU(gen, layout)) { m =>
       implicit val layout = m.setInstructionParameters()
       m.setClocks()
       m.clock.setTimeout(2000)
@@ -154,8 +156,9 @@ class TCUSpec extends UnitSpec {
       stride0Depth = 8,
       stride1Depth = 8,
     )
+    val layout = InstructionLayout(arch)
 
-    test(new TCU(gen, arch)) { m =>
+    test(new TCU(gen, layout)) { m =>
       implicit val layout = m.setInstructionParameters()
       m.setClocks()
       m.clock.setTimeout(1000)
@@ -220,8 +223,9 @@ class TCUSpec extends UnitSpec {
       stride0Depth = 8,
       stride1Depth = 8,
     )
+    val layout = InstructionLayout(arch)
 
-    test(new TCU(gen, arch)) { m =>
+    test(new TCU(gen, layout)) { m =>
       implicit val layout = m.setInstructionParameters()
       m.setClocks()
       m.clock.setTimeout(2000)
@@ -264,8 +268,9 @@ class TCUSpec extends UnitSpec {
       stride0Depth = 8,
       stride1Depth = 8,
     )
+    val layout = InstructionLayout(arch)
 
-    test(new TCU(gen, arch)) { m =>
+    test(new TCU(gen, layout)) { m =>
       implicit val layout = m.setInstructionParameters()
       m.setClocks()
       m.clock.setTimeout(1000)
@@ -319,8 +324,9 @@ class TCUSpec extends UnitSpec {
       stride0Depth = 8,
       stride1Depth = 8,
     )
+    val layout = InstructionLayout(arch)
 
-    test(new TCU(gen, arch)) { m =>
+    test(new TCU(gen, layout)) { m =>
       implicit val layout = m.setInstructionParameters()
       m.setClocks()
       m.clock.setTimeout(1000)
@@ -369,8 +375,9 @@ class TCUSpec extends UnitSpec {
       localDepth = memoryDepth,
       accumulatorDepth = accumulatorDepth
     )
+    val layout = InstructionLayout(arch)
 
-    test(new TCU(gen, arch)) { m =>
+    test(new TCU(gen, layout)) { m =>
       implicit val layout = m.setInstructionParameters()
       m.setClocks()
 
@@ -432,8 +439,9 @@ class TCUSpec extends UnitSpec {
       localDepth = memoryDepth,
       accumulatorDepth = accumulatorDepth
     )
+    val layout = InstructionLayout(arch)
 
-    decoupledTest(new TCU(gen, arch)) { m =>
+    decoupledTest(new TCU(gen, layout)) { m =>
       implicit val layout = m.setInstructionParameters()
       m.setClocks()
 
@@ -510,9 +518,10 @@ class TCUSpec extends UnitSpec {
       localDepth = memoryDepth,
       accumulatorDepth = accumulatorDepth
     )
+    val layout = InstructionLayout(arch)
 
     test(
-      new TCU(gen, arch)
+      new TCU(gen, layout)
     ) { m =>
       implicit val layout = m.setInstructionParameters()
       m.setClocks()
@@ -551,9 +560,10 @@ class TCUSpec extends UnitSpec {
       localDepth = memoryDepth,
       accumulatorDepth = accumulatorDepth
     )
+    val layout = InstructionLayout(arch)
 
     test(
-      new TCU(gen, arch)
+      new TCU(gen, layout)
     ) { m =>
       implicit val layout = m.setInstructionParameters()
       m.setClocks()
@@ -591,9 +601,10 @@ class TCUSpec extends UnitSpec {
       localDepth = memoryDepth,
       accumulatorDepth = accumulatorDepth
     )
+    val layout = InstructionLayout(arch)
 
     test(
-      new TCU(gen, arch)
+      new TCU(gen, layout)
     ) { m =>
       implicit val layout = m.setInstructionParameters()
       m.setClocks()
@@ -750,9 +761,10 @@ class TCUSpec extends UnitSpec {
       localDepth = memoryDepth,
       accumulatorDepth = accumulatorDepth
     )
+    val layout = InstructionLayout(arch)
 
     test(
-      new TCU(gen, arch)
+      new TCU(gen, layout)
     ) { m =>
       implicit val layout = m.setInstructionParameters()
       m.setClocks()
@@ -808,6 +820,7 @@ class TCUSpec extends UnitSpec {
       localDepth = memoryDepth,
       accumulatorDepth = accumulatorDepth
     )
+    val layout = InstructionLayout(arch)
 
     def f(x: Int): FixedPoint = {
       x.F(gen.getWidth.W, gen.binaryPoint)
@@ -827,7 +840,7 @@ class TCUSpec extends UnitSpec {
     val outputAddress = 2
 
     decoupledTest(
-      new TCU(gen, arch)
+      new TCU(gen, layout)
     ) { m =>
       implicit val layout = m.setInstructionParameters()
       m.setClocks()
@@ -957,9 +970,10 @@ class TCUSpec extends UnitSpec {
       localDepth = memoryDepth,
       accumulatorDepth = accumulatorDepth
     )
+    val layout = InstructionLayout(arch)
 
     decoupledTest(
-      new TCU(gen, arch)
+      new TCU(gen, layout)
     ) { m =>
       implicit val layout = m.setInstructionParameters()
       m.setClocks()
@@ -1119,6 +1133,7 @@ class TCUSpec extends UnitSpec {
       localDepth = memoryDepth,
       accumulatorDepth = accumulatorDepth
     )
+    val layout = InstructionLayout(arch)
 
     val weights =
       new Tensor((for (i <- 0 until 16) yield i).toArray, Shape(4, 4))
@@ -1127,7 +1142,7 @@ class TCUSpec extends UnitSpec {
     val expected = input * weights
 
     test(
-      new TCU(gen, arch)
+      new TCU(gen, layout)
     ) { m =>
       implicit val layout = m.setInstructionParameters()
       m.setClocks()
@@ -1159,6 +1174,7 @@ class TCUSpec extends UnitSpec {
       localDepth = memoryDepth,
       accumulatorDepth = accumulatorDepth
     )
+    val layout = InstructionLayout(arch)
 
     val weights  = new Tensor(Array(1, 2, 3, 4), Shape(2, 2))
     val bias     = new Tensor(Array(5, 6), Shape(1, 2))
@@ -1166,7 +1182,7 @@ class TCUSpec extends UnitSpec {
     val expected = input * weights + bias.broadcast(0, 2)
 
     test(
-      new TCU(gen, arch)
+      new TCU(gen, layout)
     ) { m =>
       implicit val layout = m.setInstructionParameters()
       m.setClocks()
@@ -1199,6 +1215,7 @@ class TCUSpec extends UnitSpec {
       localDepth = memoryDepth,
       accumulatorDepth = accumulatorDepth
     )
+    val layout = InstructionLayout(arch)
 
     val weightsData = Array(
       // sequential_10/dense_24/BiasAdd/ReadVariableOp
@@ -1247,7 +1264,7 @@ class TCUSpec extends UnitSpec {
     ).map(BigDecimal.binary(_))
 
     test(
-      new TCU(gen, arch)
+      new TCU(gen, layout)
     ) { m =>
       implicit val layout = m.setInstructionParameters()
       m.setClocks()
@@ -1298,6 +1315,7 @@ class TCUSpec extends UnitSpec {
       localDepth = memoryDepth,
       accumulatorDepth = accumulatorDepth
     )
+    val layout = InstructionLayout(arch)
 
     val weightsData = Array(
       // sequential_10/dense_24/BiasAdd/ReadVariableOp
@@ -1337,7 +1355,7 @@ class TCUSpec extends UnitSpec {
     ).map(BigDecimal.binary(_))
 
     test(
-      new TCU(gen, arch)
+      new TCU(gen, layout)
     ) { m =>
       implicit val layout = m.setInstructionParameters()
       m.setClocks()
@@ -1360,7 +1378,7 @@ class TCUSpec extends UnitSpec {
     }
 
     test(
-      new TCU(gen, arch)
+      new TCU(gen, layout)
     ) { m =>
       implicit val layout = m.setInstructionParameters()
       m.setClocks()
@@ -1383,7 +1401,7 @@ class TCUSpec extends UnitSpec {
     }
 
     test(
-      new TCU(gen, arch)
+      new TCU(gen, layout)
     ) { m =>
       implicit val layout = m.setInstructionParameters()
       m.setClocks()
@@ -1427,6 +1445,7 @@ class TCUSpec extends UnitSpec {
       localDepth = memDepth,
       accumulatorDepth = depth
     )
+    val layout = InstructionLayout(arch)
 
     val weights = new Tensor(Array(1, 2, 3, 4), Shape(2, 2))
     val input   = new Tensor(Array(7, 8, 9, 10), Shape(2, 2))
@@ -1434,7 +1453,7 @@ class TCUSpec extends UnitSpec {
       .map(BigInt(_))
 
     test(
-      new TCU(gen, arch)
+      new TCU(gen, layout)
     ) { m =>
       implicit val layout = m.setInstructionParameters()
       m.setClocks()
@@ -1466,6 +1485,7 @@ class TCUSpec extends UnitSpec {
       localDepth = memDepth,
       accumulatorDepth = depth
     )
+    val layout = InstructionLayout(arch)
 
     // 4 input channels, 4 output channels
     // 3x3 image
@@ -1526,7 +1546,7 @@ class TCUSpec extends UnitSpec {
     val expected = Tensor.goldenConv(img, flt, BigInt(0))
 
     test(
-      new TCU(gen, arch)
+      new TCU(gen, layout)
     ) { m =>
       implicit val layout = m.setInstructionParameters()
       m.setClocks()
@@ -1561,6 +1581,7 @@ class TCUSpec extends UnitSpec {
       localDepth = memDepth,
       accumulatorDepth = depth
     )
+    val layout = InstructionLayout(arch)
 
     // 4 input channels, 4 output channels
     // 3x3 image
@@ -1621,7 +1642,7 @@ class TCUSpec extends UnitSpec {
     val expected = Tensor.goldenConv(img, flt, BigInt(0))
 
     test(
-      new TCU(gen, arch)
+      new TCU(gen, layout)
     ) { m =>
       implicit val layout = m.setInstructionParameters()
       m.setClocks()
@@ -1691,8 +1712,10 @@ class TCUSpec extends UnitSpec {
       localDepth = memDepth,
       accumulatorDepth = depth
     )
+    val layout = InstructionLayout(arch)
+
     test(
-      new TCU(gen, arch)
+      new TCU(gen, layout)
     ) { m =>
       implicit val layout = m.setInstructionParameters()
       m.setClocks()
@@ -1743,6 +1766,7 @@ class TCUSpec extends UnitSpec {
       localDepth = memDepth,
       accumulatorDepth = depth
     )
+    val layout = InstructionLayout(arch)
 
     val a: Array[Array[BigInt]] = Array(
       Array(1, 2, 3, 4),
@@ -1762,7 +1786,7 @@ class TCUSpec extends UnitSpec {
     val expected = new Tensor(e.flatten, Shape(4, 4))
 
     test(
-      new TCU(gen, arch)
+      new TCU(gen, layout)
     ) { m =>
       implicit val layout = m.setInstructionParameters()
       m.setClocks()
@@ -1842,6 +1866,7 @@ class TCUSpec extends UnitSpec {
       localDepth = memDepth,
       accumulatorDepth = depth
     )
+    val layout = InstructionLayout(arch)
 
     val a: Array[Array[BigInt]] = Array(
       Array(1, 2, 3, 4),
@@ -1861,7 +1886,7 @@ class TCUSpec extends UnitSpec {
     val expected = new Tensor(e.flatten, Shape(4, 4))
 
     test(
-      new TCU(gen, arch)
+      new TCU(gen, layout)
     ) { m =>
       implicit val layout = m.setInstructionParameters()
       m.setClocks()

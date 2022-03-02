@@ -93,7 +93,7 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
                 )
 
                 // setup compiler input/output streams
-                val modelFileName = "../tensil_models/xor4.pb"
+                val modelFileName = "../tensil-models/xor4.pb"
                 val model         = new FileInputStream(modelFileName)
                 val consts        = new ByteArrayOutputStream()
                 val program       = new ByteArrayOutputStream()
@@ -219,7 +219,7 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
                 )
 
                 // setup compiler output streams
-                val modelFileName = "../tensil_models/resnet20v2_cifar.pb"
+                val modelFileName = "../tensil-models/resnet20v2_cifar.pb"
                 val model         = new FileInputStream(modelFileName)
                 val consts        = new ByteArrayOutputStream()
                 val program       = new ByteArrayOutputStream()
@@ -255,7 +255,7 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
 
                 // write input to dram0
                 val source = Source.fromFile(
-                  s"../tensil_models/data/resnet_input_${inputSize}x32x32x${m.layout.arch.arraySize}.csv"
+                  s"../tensil-models/data/resnet_input_${inputSize}x32x32x${m.layout.arch.arraySize}.csv"
                 )
                 val lines = source.getLines().toList
                 source.close()

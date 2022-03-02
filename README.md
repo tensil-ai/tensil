@@ -10,10 +10,10 @@ Tensil
 ## Setup
 
 1. Download and install [OpenJDK 11 from Azul](https://www.azul.com/downloads/?version=java-11-lts&package=jdk);
-2. Clone [Tensil models repo](https://github.com/tensil-ai/tensil_models) on the same level with this repo (optional - demo only);
+2. Clone [Tensil models repo](https://github.com/tensil-ai/tensil-models) on the same level with this repo (optional - demo only);
 3. Download and install [Xilinx Vitis or Vivado](https://www.xilinx.com/support/download.html);
 4. Download and install [Xilinx PYNQ](http://www.pynq.io/board.html) for your FPGA development platform;
-5. Clone [Tensil PYNQ driver](https://github.com/tensil-ai/tensil_drivers) to `/home/xilinx` on your FPGA development platform.
+5. Clone [Tensil PYNQ driver](https://github.com/tensil-ai/tensil-drivers) to `/home/xilinx` on your FPGA development platform.
 
 ## Build command line tools
 
@@ -25,11 +25,11 @@ Compile AI/ML model (ResNet20 v2 CIFAR) for specific TCU architecture and FPGA d
 
 #### From ONNX
 
-    $ ./compile -a ./arch/ultra96v2.tarch -m ../tensil_models/resnet20v2_cifar.onnx -o "Identity:0"
+    $ ./compile -a ./arch/ultra96v2.tarch -m ../tensil-models/resnet20v2_cifar.onnx -o "Identity:0"
 
 #### From frozen TensorFlow graph
 
-    $ ./compile -a ./arch/ultra96v2.tarch -m ../tensil_models/resnet20v2_cifar.pb -o "Identity"
+    $ ./compile -a ./arch/ultra96v2.tarch -m ../tensil-models/resnet20v2_cifar.pb -o "Identity"
 
 #### Other ML frameworks are supported by convering to ONNX
 
@@ -61,7 +61,7 @@ Use PYNQ and Jupyter notebooks to run AI/ML model on FPGA.
 #### Additional setup steps for running tests
 
 - Download and install [Verilator](https://verilator.org/guide/latest/install.html);
-- Clone [Tensil models repo](https://github.com/tensil-ai/tensil_models) on the same level with this repo.
+- Clone [Tensil models repo](https://github.com/tensil-ai/tensil-models) on the same level with this repo.
 
 #### Run tests excluding slow and broken
 

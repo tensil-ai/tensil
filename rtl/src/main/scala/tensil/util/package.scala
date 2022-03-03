@@ -34,11 +34,13 @@ package object util {
     DataMirror.directionOf(x) == ActualDirection.Output
   }
 
-  def emitToBuildDir[T <: RawModule](dut: => T, filename: String = ""): Unit = {
+  def emitToBuildDir[T <: RawModule](dut: => T): Unit = emitTo(dut, "build")
+
+  def emitTo[T <: RawModule](dut: => T, dir: String): Unit = {
     val stage = new ChiselStage
     stage.emitVerilog(
       dut,
-      args = Array("--target-dir", "build"),
+      args = Array("--target-dir", dir),
     )
   }
 

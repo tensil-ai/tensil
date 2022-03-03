@@ -28,13 +28,13 @@ Compile AI/ML model (ResNet20 v2 CIFAR) for specific TCU architecture and FPGA d
 #### From ONNX
 
 ```
-tensil compile -a /demo/arch/ultra96v2.tarch -m /demo/models/resnet20v2_cifar.onnx -o "Identity:0"
+tensil compile -a /demo/arch/ultra96v2.tarch -m /demo/models/resnet20v2_cifar.onnx -o "Identity:0" -s true
 ```
 
 #### From frozen TensorFlow graph
 
 ```
-tensil compile -a /demo/arch/ultra96v2.tarch -m /demo/models/resnet20v2_cifar.pb -o "Identity"
+tensil compile -a /demo/arch/ultra96v2.tarch -m /demo/models/resnet20v2_cifar.pb -o "Identity" -s true
 ```
 
 #### Other ML frameworks are supported by convering to ONNX

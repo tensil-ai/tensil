@@ -389,6 +389,10 @@ perf/
 *.tgraph
 *.dot
 *.dot.png
-architecture_params.h
+/architecture_params.h
 
 /*.csv
+
+Debug
+_ide
+*.str

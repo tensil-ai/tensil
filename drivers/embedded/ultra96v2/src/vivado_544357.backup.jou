@@ -1,0 +1,45 @@
+#-----------------------------------------------------------
+# Vivado v2020.1 (64-bit)
+# SW Build 2902540 on Wed May 27 19:54:35 MDT 2020
+# IP Build 2902112 on Wed May 27 22:43:36 MDT 2020
+# Start of session at: Mon Jan 31 11:16:26 2022
+# Process ID: 544357
+# Current directory: /home/peter/workspace/ultra96v2/src
+# Command line: vivado
+# Log file: /home/peter/workspace/ultra96v2/src/vivado.log
+# Journal file: /home/peter/workspace/ultra96v2/src/vivado.jou
+#-----------------------------------------------------------
+start_gui
+open_project /home/peter/Projects/tensil/ultra96v2/ultra96v2.xpr
+update_compile_order -fileset sources_1
+open_bd_design {/home/peter/Projects/tensil/ultra96v2/ultra96v2.srcs/sources_1/bd/design_1/design_1.bd}
+startgroup
+set_property -dict [list CONFIG.PSU__CRL_APB__PL0_REF_CTRL__DIVISOR0 {15} CONFIG.PSU__OVERRIDE__BASIC_CLOCK {0} CONFIG.PSU__CRL_APB__PL0_REF_CTRL__FREQMHZ {150}] [get_bd_cells zynq_ultra_ps_e_0]
+endgroup
+save_bd_design
+reset_run synth_1
+launch_runs impl_1 -to_step write_bitstream -jobs 6
+wait_on_run impl_1
+close_bd_design [get_bd_designs design_1]
+open_bd_design {/home/peter/Projects/tensil/ultra96v2/ultra96v2.srcs/sources_1/bd/design_1/design_1.bd}
+startgroup
+set_property -dict [list CONFIG.PSU__CRL_APB__PL0_REF_CTRL__FREQMHZ {125}] [get_bd_cells zynq_ultra_ps_e_0]
+endgroup
+validate_bd_design
+save_bd_design
+reset_run synth_1
+reset_run design_1_axis_dwidth_converter_1_0_synth_1
+reset_run design_1_axi_dma_0_0_synth_1
+reset_run design_1_axis_dwidth_converter_0_2_synth_1
+reset_run design_1_rst_ps8_0_100M_0_synth_1
+reset_run design_1_zynq_ultra_ps_e_0_0_synth_1
+reset_run design_1_xbar_0_synth_1
+reset_run design_1_axi_dma_1_1_synth_1
+launch_runs impl_1 -to_step write_bitstream -jobs 6
+wait_on_run impl_1
+close_bd_design [get_bd_designs design_1]
+file copy -force /home/peter/Projects/tensil/ultra96v2/ultra96v2.runs/impl_1/design_1_wrapper.bit /home/peter/ultra96_v2/hello_ultra_tcu/_ide/bitstream/design_1_wrapper.bit
+open_bd_design {/home/peter/Projects/tensil/ultra96v2/ultra96v2.srcs/sources_1/bd/design_1/design_1.bd}
+regenerate_bd_layout
+set_property pfm_name {} [get_files -all {/home/peter/Projects/tensil/ultra96v2/ultra96v2.srcs/sources_1/bd/design_1/design_1.bd}]
+write_hw_platform -fixed -include_bit -force -file /home/peter/Projects/tensil/ultra96v2/design_1_wrapper.xsa

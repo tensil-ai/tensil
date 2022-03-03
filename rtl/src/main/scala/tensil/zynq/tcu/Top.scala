@@ -24,6 +24,7 @@ import java.io.File
 
 case class Args(
     archFile: File = new File("."),
+    targetDir: File = new File("."),
     dramAxiConfig: axi.Config = axi.Config.Xilinx64,
     verbose: Boolean = false,
     summary: Boolean = false,
@@ -85,12 +86,17 @@ class Top(archName: String, arch: Architecture, dramAxiConfig: axi.Config)(
 object Top extends App {
   val argParser = new scopt.OptionParser[Args]("make_rtl") {
     help("help").text("Prints this usage text")
-    
+
     opt[File]('a', "arch")
       .required()
       .valueName("<file>")
       .action((x, c) => c.copy(archFile = x))
       .text("Tensil architecture descrition (.tarch) file")
+
+    opt[File]('t', "target")
+      .valueName("<dir>")
+      .action((x, c) => c.copy(targetDir = x))
+      .text("Optional target directory")
 
     opt[Int]('d', "dram-axi-width")
       .valueName("32|64|128|256")
@@ -114,9 +120,13 @@ object Top extends App {
       val arch     = Architecture.read(args.archFile)
       val archName = args.archFile.getName().split("\\.")(0)
 
-      tensil.util.emitToBuildDir(new Top(archName, arch, args.dramAxiConfig))
+      tensil.util.emitTo(
+        new Top(archName, arch, args.dramAxiConfig),
+        args.targetDir.getCanonicalPath()
+      )
 
-      val archParamsFileName = "build/architecture_params.h"
+      val archParamsFileName =
+        s"${args.targetDir.getCanonicalPath()}/architecture_params.h"
       arch.writeDriverArchitectureParams(archParamsFileName)
 
       val tb = new TablePrinter(Some("ARTIFACTS"))
@@ -124,12 +134,13 @@ object Top extends App {
       for (artifact <- ArtifactsLogger.artifacts)
         tb.addNamedLine(
           s"Verilog $artifact",
-          new File(s"build/${artifact}.v").getAbsolutePath()
+          new File(s"${args.targetDir.getCanonicalPath()}/${artifact}.v")
+            .getCanonicalPath()
         )
 
       tb.addNamedLine(
         "Driver parameters C header",
-        new File(archParamsFileName).getAbsolutePath()
+        new File(archParamsFileName).getCanonicalPath()
       )
 
       print(tb)

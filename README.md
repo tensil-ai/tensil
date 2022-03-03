@@ -12,7 +12,7 @@ Tensil
 1. Pull and run [Tensil docker container](https://hub.docker.com/r/tensilai/tensil) (see below);
 2. Download and install [Xilinx Vitis or Vivado](https://www.xilinx.com/support/download.html);
 3. Download and install [Xilinx PYNQ](http://www.pynq.io/board.html) for your FPGA development platform;
-4. Clone [Tensil PYNQ driver](https://github.com/tensil-ai/tensil-drivers) to `/home/xilinx` on your FPGA development platform.
+4. Copy Tensil PYNQ driver `drivers/tcu_pynq` to `/home/xilinx/tcu_pynq` on your FPGA development platform.
 
 ## Pull and run docker container
 

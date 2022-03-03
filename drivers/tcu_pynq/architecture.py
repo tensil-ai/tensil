@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright © 2019-2022 Tensil AI Company
+
+from collections import namedtuple
+from tcu_pynq.data_type import DataType
+
+Architecture = namedtuple(
+    "Architecture",
+    [
+        "data_type",  # DataType
+        "array_size",  # int
+        "dram0_depth",  # int
+        "dram1_depth",  # int
+        "local_depth",  # int
+        "accumulator_depth",  # int
+        "simd_registers_depth",  # int
+        "stride0_depth",  # int
+        "stride1_depth",  # int
+        "sample_block_size",  # int
+        "decoder_timeout",  # int
+        "validate_instructions",  # bool
+    ],
+)
+
+tiny = Architecture(
+    data_type=DataType.FP16BP8,
+    array_size=8,
+    dram0_depth=1048576,
+    dram1_depth=1048576,
+    local_depth=8192,
+    accumulator_depth=2048,
+    simd_registers_depth=1,
+    stride0_depth=8,
+    stride1_depth=8,
+    sample_block_size=0,
+    decoder_timeout=100,
+    validate_instructions=True,
+)
+
+
+ultra96 = Architecture(
+    data_type=DataType.FP16BP8,
+    array_size=16,
+    dram0_depth=2097152,
+    dram1_depth=2097152,
+    local_depth=20480,
+    accumulator_depth=4096,
+    simd_registers_depth=1,
+    stride0_depth=8,
+    stride1_depth=8,
+    sample_block_size=0,
+    decoder_timeout=100,
+    validate_instructions=False,
+)

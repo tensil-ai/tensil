@@ -1,0 +1,6 @@
+-I
+design_1_wrapper/export/design_1_wrapper/sw/design_1_wrapper/domain_psu_cortexa53_0/bspinclude/include/
+-I
+/tools/Xilinx/Vitis/2020.1/gnu/aarch64/lin/aarch64-none/aarch64-xilinx-elf/usr/include
+-D
+TENSIL_TARGET_ULTRA96_V2

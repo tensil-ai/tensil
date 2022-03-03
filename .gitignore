@@ -45,7 +45,6 @@ __pycache__
 *.pad
 *.par
 *.pcf
-*.prj
 *.ptwx
 *.rbb
 *.rbd
@@ -98,17 +97,11 @@ local.properties
 .settings/
 .loadpath
 
-# Eclipse Core
-.project
-
 # External tool builders
 .externalToolBuilders/
 
 # Locally stored "Eclipse launch configurations"
 *.launch
-
-# CDT-specific
-.cproject
 
 # JDT-specific (Eclipse Java Development Tools)
 .classpath

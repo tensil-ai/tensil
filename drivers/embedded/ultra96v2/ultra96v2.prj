@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="ASCII"?>
+<sdkproject:SdkProject xmi:version="2.0" xmlns:xmi="http://www.omg.org/XMI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:sdkproject="http://www.xilinx.com/sdkproject" name="ultra96v2" location="/home/peter/workspace/ultra96v2" platform="/home/peter/workspace/design_1_wrapper/export/design_1_wrapper/design_1_wrapper.xpfm" platformUID="xilinx:ultra96v2::0.0(custom)" systemProject="ultra96v2_system" sysConfig="design_1_wrapper" runtime="cpp" cpu="domain_psu_cortexa53_0" cpuInstance="psu_cortexa53_0" os="standalone" mssSignature="ffd8fe337709d9888fdf4cb6cda8e660">
+  <configuration name="Debug" id="xilinx.gnu.arm.a53.exe.debug.557833843">
+    <configBuildOptions xsi:type="sdkproject:SdkOptions"/>
+    <lastBuildOptions xsi:type="sdkproject:SdkOptions"/>
+  </configuration>
+  <configuration name="Release" id="xilinx.gnu.arm.a53.exe.release.500424909" dirty="true">
+    <configBuildOptions xsi:type="sdkproject:SdkOptions"/>
+  </configuration>
+  <template appTemplateName="hello_world"/>
+</sdkproject:SdkProject>

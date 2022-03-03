@@ -1,0 +1,17 @@
+#!/bin/bash
+
+case "$1" in
+"compile")
+    JAR="/opt/tensil/tools.jar"
+    ;;
+"rtl")
+    JAR="/opt/tensil/rtl.jar"
+    ;;
+*)
+    echo "Usage: tensil compile|rtl [OPTIONS]"
+
+    exit 1
+    ;;
+esac
+
+java -jar $JAR "${@:2}"

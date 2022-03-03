@@ -60,7 +60,7 @@ Create Vivado design for specific FPGA development platform (Ultra96 v2). If thi
 
 ## Run AI/ML model on FPGA
 
-Use PYNQ and Jupyter notebooks to run AI/ML model on FPGA. (See examples in `notebooks`.)
+Use PYNQ and Jupyter notebooks to run AI/ML model on FPGA. (See in `notebooks`.)
 
 ![Resnet on PYNQ](/doc/resnet20_on_pynq.png)
 

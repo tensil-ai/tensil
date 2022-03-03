@@ -9,7 +9,7 @@ Tensil
 
 ## Setup
 
-1. Pull and run [Tensil docker container](https://hub.docker.com/repository/docker/tensilai/tensil) (see below);
+1. Pull and run [Tensil docker container](https://hub.docker.com/r/tensilai/tensil) (see below);
 2. Clone [Tensil models repo](https://github.com/tensil-ai/tensil-models) on the same level with this repo (optional - demo only);
 3. Download and install [Xilinx Vitis or Vivado](https://www.xilinx.com/support/download.html);
 4. Download and install [Xilinx PYNQ](http://www.pynq.io/board.html) for your FPGA development platform;

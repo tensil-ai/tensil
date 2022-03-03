@@ -17,8 +17,10 @@ Tensil
 
 ## Pull and run docker container
 
-    $ docker pull tensilai/tensil:latest
-    $ docker run -v $(pwd)/..:/workspace -w /workspace -it tensilai/tensil:latest bash
+```
+docker pull tensilai/tensil:latest
+docker run -v $(pwd)/..:/workspace -w /workspace -it tensilai/tensil:latest bash
+```
 
 ## Compile AI/ML model
 
@@ -26,11 +28,15 @@ Compile AI/ML model (ResNet20 v2 CIFAR) for specific TCU architecture and FPGA d
 
 #### From ONNX
 
-    $ tensil compile -a ./tensil/arch/ultra96v2.tarch -m ./tensil-models/resnet20v2_cifar.onnx -o "Identity:0"
+```
+tensil compile -a ./tensil/arch/ultra96v2.tarch -m ./tensil-models/resnet20v2_cifar.onnx -o "Identity:0"
+```
 
 #### From frozen TensorFlow graph
 
-    $ tensil compile -a ./tensil/arch/ultra96v2.tarch -m ./tensil-models/resnet20v2_cifar.pb -o "Identity"
+```
+tensil compile -a ./tensil/arch/ultra96v2.tarch -m ./tensil-models/resnet20v2_cifar.pb -o "Identity"
+```
 
 #### Other ML frameworks are supported by convering to ONNX
 
@@ -43,7 +49,9 @@ Compile AI/ML model (ResNet20 v2 CIFAR) for specific TCU architecture and FPGA d
 
 Make Verilog RTL for specific TCU architecture and FPGA development platform (Ultra96 v2) and 128-bit AXI interface to DDR memory.
 
-    $ tensil rtl -a ./tensil/arch/ultra96v2.tarch -d 128
+```
+tensil rtl -a ./tensil/arch/ultra96v2.tarch -d 128
+```
 
 ## Create Vivado design
 
@@ -67,13 +75,19 @@ Use PYNQ and Jupyter notebooks to run AI/ML model on FPGA.
 
 ### Build command line tools
 
-    $ ./mill '{rtl,tools}.assembly'
+```
+./mill '{rtl,tools}.assembly'
+```
 
 ### Run full test suite
 
-    $ ./mill __.test -l org.scalatest.tags.Slow
+```
+./mill __.test -l org.scalatest.tags.Slow
+```
 
 ### Build and push docker image
 
-    $ docker build -t tensilai/tensil .
-    $ docker push tensilai/tensil
+```
+docker build -t tensilai/tensil .
+docker push tensilai/tensil
+```

@@ -10,16 +10,15 @@ Tensil
 ## Setup
 
 1. Pull and run [Tensil docker container](https://hub.docker.com/r/tensilai/tensil) (see below);
-2. Clone [Tensil models repo](https://github.com/tensil-ai/tensil-models) on the same level with this repo (optional - demo only);
-3. Download and install [Xilinx Vitis or Vivado](https://www.xilinx.com/support/download.html);
-4. Download and install [Xilinx PYNQ](http://www.pynq.io/board.html) for your FPGA development platform;
-5. Clone [Tensil PYNQ driver](https://github.com/tensil-ai/tensil-drivers) to `/home/xilinx` on your FPGA development platform.
+2. Download and install [Xilinx Vitis or Vivado](https://www.xilinx.com/support/download.html);
+3. Download and install [Xilinx PYNQ](http://www.pynq.io/board.html) for your FPGA development platform;
+4. Clone [Tensil PYNQ driver](https://github.com/tensil-ai/tensil-drivers) to `/home/xilinx` on your FPGA development platform.
 
 ## Pull and run docker container
 
 ```
 docker pull tensilai/tensil:latest
-docker run -v $(pwd)/..:/workspace -w /workspace -it tensilai/tensil:latest bash
+docker run -v $(pwd):/work -w /work -it tensilai/tensil:latest bash
 ```
 
 ## Compile AI/ML model
@@ -29,13 +28,13 @@ Compile AI/ML model (ResNet20 v2 CIFAR) for specific TCU architecture and FPGA d
 #### From ONNX
 
 ```
-tensil compile -a ./tensil/arch/ultra96v2.tarch -m ./tensil-models/resnet20v2_cifar.onnx -o "Identity:0"
+tensil compile -a /demo/arch/ultra96v2.tarch -m /demo/models/resnet20v2_cifar.onnx -o "Identity:0"
 ```
 
 #### From frozen TensorFlow graph
 
 ```
-tensil compile -a ./tensil/arch/ultra96v2.tarch -m ./tensil-models/resnet20v2_cifar.pb -o "Identity"
+tensil compile -a /demo/arch/ultra96v2.tarch -m /demo/models/resnet20v2_cifar.pb -o "Identity"
 ```
 
 #### Other ML frameworks are supported by convering to ONNX
@@ -50,7 +49,7 @@ tensil compile -a ./tensil/arch/ultra96v2.tarch -m ./tensil-models/resnet20v2_ci
 Make Verilog RTL for specific TCU architecture and FPGA development platform (Ultra96 v2) and 128-bit AXI interface to DDR memory.
 
 ```
-tensil rtl -a ./tensil/arch/ultra96v2.tarch -d 128
+tensil rtl -a /demo/arch/ultra96v2.tarch -d 128
 ```
 
 ## Create Vivado design
@@ -73,6 +72,14 @@ Use PYNQ and Jupyter notebooks to run AI/ML model on FPGA.
 2. Download and install [Verilator](https://verilator.org/guide/latest/install.html);
 3. Clone [Tensil models repo](https://github.com/tensil-ai/tensil-models) on the same level with this repo.
 
+Suggested directory structure:
+
+```
+tensil-ai
+|--tensil (this repo)
+|--tensil-models (models repo)
+```
+
 ### Build command line tools
 
 ```
@@ -88,6 +95,6 @@ Use PYNQ and Jupyter notebooks to run AI/ML model on FPGA.
 ### Build and push docker image
 
 ```
-docker build -t tensilai/tensil .
+docker build -t tensilai/tensil -f Dockerfile ..
 docker push tensilai/tensil
 ```

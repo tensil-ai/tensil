@@ -1,7 +1,7 @@
 Tensil
 ==========================
 
-[![Build status](https://badge.buildkite.com/e44156260ed9775ea72699e45cb394526ea7db24b09c4059aa.svg?branch=master)](https://buildkite.com/tensil/build)
+[![Build status](https://badge.buildkite.com/11c53cfb0931de5a89dfece9634fe3a5f5cefc9525e1162e1a.svg?branch=main)](https://buildkite.com/tensil/tensil)
 
 ## Tensil toolchain flow
 
@@ -70,6 +70,14 @@ Use PYNQ and Jupyter notebooks to run AI/ML model on FPGA. (See in `notebooks`.)
 
 1. Download and install [OpenJDK 11 from Azul](https://www.azul.com/downloads/?version=java-11-lts&package=jdk);
 2. Download and install [Verilator](https://verilator.org/guide/latest/install.html);
+3. Download test models:
+
+```
+wget https://github.com/tensil-ai/tensil-models/archive/main.tar.gz
+tar xf main.tar.gz
+mv tensil-models-main models
+rm main.tar.gz
+```
 
 ### Build command line tools
 

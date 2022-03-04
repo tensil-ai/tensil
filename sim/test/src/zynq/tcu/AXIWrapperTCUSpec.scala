@@ -96,7 +96,7 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
                 )
 
                 // setup compiler input/output streams
-                val modelFileName = "../tensil-models/xor4.pb"
+                val modelFileName = "./models/xor4.pb"
                 val model         = new FileInputStream(modelFileName)
                 val consts        = new ByteArrayOutputStream()
                 val program       = new ByteArrayOutputStream()
@@ -222,7 +222,7 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
                 )
 
                 // setup compiler output streams
-                val modelFileName = "../tensil-models/resnet20v2_cifar.pb"
+                val modelFileName = "./models/resnet20v2_cifar.pb"
                 val model         = new FileInputStream(modelFileName)
                 val consts        = new ByteArrayOutputStream()
                 val program       = new ByteArrayOutputStream()
@@ -258,7 +258,7 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
 
                 // write input to dram0
                 val source = Source.fromFile(
-                  s"../tensil-models/data/resnet_input_${inputSize}x32x32x${m.layout.arch.arraySize}.csv"
+                  s"./models/data/resnet_input_${inputSize}x32x32x${m.layout.arch.arraySize}.csv"
                 )
                 val lines = source.getLines().toList
                 source.close()
@@ -522,9 +522,9 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
         }
 
       varyDramDelay(0, 0)
-      varyDramDelay(10, 0)
+      /*varyDramDelay(10, 0)
       varyDramDelay(0, 10)
-      varyDramDelay(10, 10)
+      varyDramDelay(10, 10)*/
     }
 
   describe("AXIWrapperTCU") {
@@ -576,13 +576,13 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
     val fp18bp10 = FixedPoint(18.W, 10.BP)
     val fp32bp16 = FixedPoint(32.W, 16.BP)
 
-    varyArchAndAXI(fp16bp8, arch2x2fp16bp8)(axi.Config.Xilinx)
+    /*varyArchAndAXI(fp16bp8, arch2x2fp16bp8)(axi.Config.Xilinx)
     varyArchAndAXI(fp16bp8, arch2x2fp16bp8)(axi.Config.Xilinx64)
 
     varyArchAndAXI(fp16bp8, arch8x8fp16bp8)(axi.Config.Xilinx)
-    varyArchAndAXI(fp16bp8, arch8x8fp16bp8)(axi.Config.Xilinx64)
+    varyArchAndAXI(fp16bp8, arch8x8fp16bp8)(axi.Config.Xilinx64)*/
     varyArchAndAXI(fp16bp8, arch8x8fp16bp8)(axi.Config.Xilinx128)
-    varyArchAndAXI(fp16bp8, arch8x8fp16bp8)(axi.Config.Xilinx256)
+    /*varyArchAndAXI(fp16bp8, arch8x8fp16bp8)(axi.Config.Xilinx256)
 
     varyArchAndAXI(fp18bp10, arch8x8fp18bp10)(axi.Config.Xilinx)
     varyArchAndAXI(fp18bp10, arch8x8fp18bp10)(axi.Config.Xilinx64)
@@ -592,7 +592,7 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
     varyArchAndAXI(fp32bp16, arch8x8fp32bp16)(axi.Config.Xilinx)
     varyArchAndAXI(fp32bp16, arch8x8fp32bp16)(axi.Config.Xilinx64)
     varyArchAndAXI(fp32bp16, arch8x8fp32bp16)(axi.Config.Xilinx128)
-    varyArchAndAXI(fp32bp16, arch8x8fp32bp16)(axi.Config.Xilinx256)
+    varyArchAndAXI(fp32bp16, arch8x8fp32bp16)(axi.Config.Xilinx256)*/
   }
 
   private def assertEqual(

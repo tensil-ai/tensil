@@ -70,15 +70,6 @@ Use PYNQ and Jupyter notebooks to run AI/ML model on FPGA. (See in `notebooks`.)
 
 1. Download and install [OpenJDK 11 from Azul](https://www.azul.com/downloads/?version=java-11-lts&package=jdk);
 2. Download and install [Verilator](https://verilator.org/guide/latest/install.html);
-3. Clone [Tensil models repo](https://github.com/tensil-ai/tensil-models) on the same level with this repo.
-
-Suggested directory structure:
-
-```
-tensil-ai
-|--tensil (this repo)
-|--tensil-models (models repo)
-```
 
 ### Build command line tools
 
@@ -95,6 +86,6 @@ tensil-ai
 ### Build and push docker image
 
 ```
-docker build -t tensilai/tensil -f Dockerfile ..
+docker build -t tensilai/tensil .
 docker push tensilai/tensil
 ```

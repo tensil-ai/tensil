@@ -42,8 +42,6 @@ bool architecture_is_compatible(const struct architecture *driver_arch,
                 model_arch->simd_registers_depth);
 }
 
-#define DEFAULT_DECODER_TIMEOUT 0x0064
-
 static void parse_object_item_as_data_type(const cJSON *json, const char *name,
                                            enum data_type *target) {
     cJSON *item = cJSON_GetObjectItemCaseSensitive(json, name);
@@ -56,7 +54,6 @@ static void parse_object_item_as_data_type(const cJSON *json, const char *name,
 void architecture_parse(struct architecture *arch, const cJSON *json) {
 
     memset(arch, 0, sizeof(struct architecture));
-    arch->decoder_timeout = DEFAULT_DECODER_TIMEOUT;
 
     if (cJSON_IsObject(json)) {
         config_parse_object_item_as_size(json, "array_size", &arch->array_size);
@@ -75,9 +72,5 @@ void architecture_parse(struct architecture *arch, const cJSON *json) {
                                          &arch->stride1_depth);
         config_parse_object_item_as_size(json, "simd_registers_depth",
                                          &arch->simd_registers_depth);
-        config_parse_object_item_as_size(json, "sample_block_size",
-                                         &arch->sample_block_size);
-        config_parse_object_item_as_uint16(json, "decoder_timeout",
-                                           &arch->decoder_timeout);
     }
 }

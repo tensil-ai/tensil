@@ -26,6 +26,8 @@ import tensil.tcu.instruction.LoadWeightFlags
 import tensil.tcu.instruction.LoadWeightArgs
 
 class DecoderSpec extends FunUnitSpec {
+  val options = TCUOptions(decoderTimeout = 10)
+
   describe("Decoder") {
     describe("when instruction width = 32 bits") {
       implicit val layout: InstructionLayout =
@@ -39,14 +41,13 @@ class DecoderSpec extends FunUnitSpec {
             simdRegistersDepth = 1,
             stride0Depth = 1,
             stride1Depth = 1,
-            decoderTimeout = 10,
           )
         )
       implicit val arch: Architecture = layout.arch
 
       it("should raise tracepoint") {
         test(
-          new Decoder(layout.arch)
+          new Decoder(layout.arch, options)
         ) { m =>
           m.io.instruction.setSourceClock(m.clock)
 
@@ -87,7 +88,7 @@ class DecoderSpec extends FunUnitSpec {
 
       it("should raise timeout when stalled") {
         test(
-          new Decoder(layout.arch)
+          new Decoder(layout.arch, options)
         ) { m =>
           m.io.instruction.setSourceClock(m.clock)
 
@@ -136,7 +137,7 @@ class DecoderSpec extends FunUnitSpec {
 
       it("should set configuration registers") {
         test(
-          new Decoder(layout.arch)
+          new Decoder(layout.arch, options)
         ) { m =>
           m.io.instruction.setSourceClock(m.clock)
 
@@ -185,7 +186,7 @@ class DecoderSpec extends FunUnitSpec {
             s"with accumulate = $accumulate"
           ) {
             test(
-              new Decoder(layout.arch)
+              new Decoder(layout.arch, options)
             ) { m =>
               m.io.instruction.setSourceClock(m.clock)
               m.io.dataflow.setSinkClock(m.clock)
@@ -237,7 +238,7 @@ class DecoderSpec extends FunUnitSpec {
 
       it("should accept NoOps indefinitely") {
         test(
-          new Decoder(layout.arch)
+          new Decoder(layout.arch, options)
         ) { m =>
           m.io.instruction.setSourceClock(m.clock)
 
@@ -251,7 +252,7 @@ class DecoderSpec extends FunUnitSpec {
         "should emit an address on mem.dataOut when given a dataOut instruction"
       ) {
         test(
-          new Decoder(layout.arch)
+          new Decoder(layout.arch, options)
         ) { m =>
           m.io.instruction.setSourceClock(m.clock)
           m.io.memPortA.setSinkClock(m.clock)
@@ -304,7 +305,7 @@ class DecoderSpec extends FunUnitSpec {
 
       it("should not stall when given an invalid instruction") {
         test(
-          new Decoder(layout.arch)
+          new Decoder(layout.arch, options)
         ) { m =>
           m.io.instruction.setSourceClock(m.clock)
 
@@ -318,7 +319,7 @@ class DecoderSpec extends FunUnitSpec {
         val memoryDepth = 256
 
         test(
-          new Decoder(layout.arch)
+          new Decoder(layout.arch, options)
         ) { m =>
           m.io.instruction.setSourceClock(m.clock)
           m.io.memPortA.setSinkClock(m.clock)
@@ -382,7 +383,7 @@ class DecoderSpec extends FunUnitSpec {
         val memoryDepth = 256
 
         test(
-          new Decoder(layout.arch)
+          new Decoder(layout.arch, options)
         ) { m =>
           m.io.instruction.setSourceClock(m.clock)
           m.io.memPortA.setSinkClock(m.clock)
@@ -455,7 +456,7 @@ class DecoderSpec extends FunUnitSpec {
       implicit val arch: Architecture = layout.arch
 
       it("should handle strides") {
-        test(new Decoder(layout.arch)) { m =>
+        test(new Decoder(layout.arch, options)) { m =>
           m.io.instruction.setSourceClock(m.clock)
           m.io.dataflow.setSinkClock(m.clock)
           m.io.memPortA.setSinkClock(m.clock)
@@ -682,7 +683,7 @@ class DecoderSpec extends FunUnitSpec {
         s"should request high DRAM addresses correctly"
       ) {
         test(
-          new Decoder(layout.arch)
+          new Decoder(layout.arch, options)
         ) { m =>
           m.io.instruction.setSourceClock(m.clock)
           m.io.dataflow.setSinkClock(m.clock)
@@ -783,7 +784,7 @@ class DecoderSpec extends FunUnitSpec {
         s"should work"
       ) {
         test(
-          new Decoder(layout.arch)
+          new Decoder(layout.arch, options)
         ) { m =>
           m.io.instruction.setSourceClock(m.clock)
           m.io.dataflow.setSinkClock(m.clock)

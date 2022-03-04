@@ -88,7 +88,7 @@ static error_t run_config(struct driver *driver) {
 
     error = buffer_append_config_instruction(&driver->buffer, &driver->layout,
                                              CONFIG_REGISTER_TIMEOUT,
-                                             driver->arch.decoder_timeout);
+                                             driver->decoder_timeout);
 
     if (error)
         return error;
@@ -234,8 +234,8 @@ error_t driver_init(struct driver *driver) {
     driver->arch.simd_registers_depth =
         TENSIL_ARCHITECTURE_SIMD_REGISTERS_DEPTH;
 
-    driver->arch.sample_block_size = TENSIL_ARCHITECTURE_SAMPLE_BLOCK_SIZE;
-    driver->arch.decoder_timeout = TENSIL_ARCHITECTURE_DECODER_TIMEOUT;
+    driver->sample_block_size = TENSIL_PLATFORM_SAMPLE_BLOCK_SIZE;
+    driver->decoder_timeout = TENSIL_PLATFORM_DECODER_TIMEOUT;
 
     if (!architecture_is_valid(&driver->arch)) {
         return DRIVER_ERROR(ERROR_DRIVER_INVALID_ARCH,
@@ -278,7 +278,7 @@ error_t driver_init(struct driver *driver) {
 #if defined(TENSIL_PLATFORM_SAMPLE_BUFFER_BASE) &&                             \
     defined(TENSIL_PLATFORM_SAMPLE_BUFFER_HIGH)
 
-    if (SAMPLE_SIZE_BYTES * driver->arch.sample_block_size >
+    if (SAMPLE_SIZE_BYTES * driver->sample_block_size >
         TENSIL_PLATFORM_SAMPLE_BUFFER_HIGH -
             TENSIL_PLATFORM_SAMPLE_BUFFER_BASE) {
         return DRIVER_ERROR(ERROR_DRIVER_INSUFFICIENT_BUFFER,
@@ -290,7 +290,7 @@ error_t driver_init(struct driver *driver) {
         TENSIL_PLATFORM_SAMPLE_BUFFER_HIGH - TENSIL_PLATFORM_SAMPLE_BUFFER_BASE;
 #endif
 
-    error_t error = tcu_init(&driver->tcu, driver->arch.sample_block_size);
+    error_t error = tcu_init(&driver->tcu, driver->sample_block_size);
 
     if (error)
         return error;

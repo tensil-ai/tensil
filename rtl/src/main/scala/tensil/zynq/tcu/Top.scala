@@ -30,7 +30,7 @@ case class Args(
     summary: Boolean = false,
 )
 
-class Top(archName: String, arch: Architecture, dramAxiConfig: axi.Config)(
+class Top(archName: String, arch: Architecture, options: AXIWrapperTCUOptions)(
     implicit val environment: Environment = Synthesis
 ) extends RawModule {
   override def desiredName: String = s"top_${archName}"
@@ -48,10 +48,15 @@ class Top(archName: String, arch: Architecture, dramAxiConfig: axi.Config)(
   val clock       = IO(Input(Clock()))
   val reset       = IO(Input(Bool()))
   val instruction = IO(Flipped(new AXI4Stream(layout.instructionSizeBytes * 8)))
-  val status      = IO(new AXI4Stream(64))
-  val m_axi_dram0 = IO(new axi.ExternalMaster(dramAxiConfig))
-  val m_axi_dram1 = IO(new axi.ExternalMaster(dramAxiConfig))
-  val sample      = IO(new AXI4Stream(64))
+  val m_axi_dram0 = IO(new axi.ExternalMaster(options.dramAxiConfig))
+  val m_axi_dram1 = IO(new axi.ExternalMaster(options.dramAxiConfig))
+
+  val sample =
+    if (options.inner.enableSample) Some(IO(new AXI4Stream(64))) else None
+  val status =
+    if (options.inner.enableStatus)
+      Some(IO(new AXI4Stream(layout.instructionSizeBytes * 8)))
+    else None
 
   val envReset = environment match {
     case Simulation => reset
@@ -59,25 +64,38 @@ class Top(archName: String, arch: Architecture, dramAxiConfig: axi.Config)(
     case _          => reset
   }
   implicit val platformConfig: PlatformConfig = environment match {
-    case Simulation => PlatformConfig(MemKind.RegisterBank, dramAxiConfig)
-    case Synthesis  => PlatformConfig(MemKind.XilinxBlockRAM, dramAxiConfig)
-    case _          => PlatformConfig(MemKind.RegisterBank, dramAxiConfig)
+    case Simulation =>
+      PlatformConfig(MemKind.RegisterBank, options.dramAxiConfig)
+    case Synthesis =>
+      PlatformConfig(MemKind.XilinxBlockRAM, options.dramAxiConfig)
+    case _ => PlatformConfig(MemKind.RegisterBank, options.dramAxiConfig)
   }
 
   withClockAndReset(clock, envReset) {
     val tcu = Module(
       new AXIWrapperTCU(
-        dramAxiConfig,
         gen,
-        layout
+        layout,
+        options
       )
     )
 
     connectDownstreamInterface(instruction, tcu.instruction, tcu.error)
-    connectUpstreamInterface(tcu.status, status, tcu.error)
+
+    if (options.inner.enableStatus) {
+      connectUpstreamInterface(tcu.status, status.get, tcu.error)
+    } else {
+      tcu.status.tieOffFlipped()
+    }
+
+    if (options.inner.enableSample) {
+      connectUpstreamInterface(tcu.sample, sample.get, tcu.error)
+    } else {
+      tcu.sample.tieOffFlipped()
+    }
+
     m_axi_dram0.connectMaster(tcu.dram0)
     m_axi_dram1.connectMaster(tcu.dram1)
-    connectUpstreamInterface(tcu.sample, sample, tcu.error)
   }
 
   ArtifactsLogger.log(desiredName)
@@ -120,8 +138,12 @@ object Top extends App {
       val arch     = Architecture.read(args.archFile)
       val archName = args.archFile.getName().split("\\.")(0)
 
+      val options = AXIWrapperTCUOptions(
+        dramAxiConfig = args.dramAxiConfig
+      )
+
       tensil.util.emitTo(
-        new Top(archName, arch, args.dramAxiConfig),
+        new Top(archName, arch, options),
         args.targetDir.getCanonicalPath()
       )
 

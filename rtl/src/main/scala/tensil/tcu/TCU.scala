@@ -19,15 +19,17 @@ import tensil.ArchitectureDataType
 class TCU[T <: Data with Num[T]](
     val gen: T,
     val layout: InstructionLayout,
+    val options: TCUOptions = TCUOptions()
 )(implicit val platformConfig: PlatformConfig)
     extends Module {
-  val instructionWidth     = layout.instructionSizeBytes * 8
-  val width                = layout.arch.arraySize
-  val accDepth             = layout.arch.accumulatorDepth
-  val localDepth           = layout.arch.localDepth
-  val dram0Depth           = layout.arch.dram0Depth
-  val dram1Depth           = layout.arch.dram1Depth
-  val validateInstructions = layout.arch.validateInstructions
+  val instructionWidth = layout.instructionSizeBytes * 8
+  val width            = layout.arch.arraySize
+  val accDepth         = layout.arch.accumulatorDepth
+  val localDepth       = layout.arch.localDepth
+  val dram0Depth       = layout.arch.dram0Depth
+  val dram1Depth       = layout.arch.dram1Depth
+
+  val validateInstructions = options.validateInstructions
 
   val io = IO(new Bundle {
     val instruction = Flipped(Decoupled(new Instruction(instructionWidth)))
@@ -55,7 +57,7 @@ class TCU[T <: Data with Num[T]](
     val sample         = Decoupled(new WithLast(new Sample))
   })
 
-  val decoder = Module(new Decoder(layout.arch))
+  val decoder = Module(new Decoder(layout.arch, options))
   val array = Module(
     new SystolicArray(gen, layout.arch.arraySize, layout.arch.arraySize)
   )

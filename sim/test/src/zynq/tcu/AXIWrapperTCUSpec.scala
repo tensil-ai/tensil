@@ -78,9 +78,9 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
             it(s"should run XOR4 network with $batchSize batch", Slow) {
               test(
                 new AXIWrapperTCU(
-                  axiConfig,
                   gen,
-                  layout
+                  layout,
+                  AXIWrapperTCUOptions(dramAxiConfig = axiConfig)
                 )
               ).withAnnotations(Seq(VerilatorBackendAnnotation)) { m =>
                 m.setClocks()
@@ -203,9 +203,9 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
             ) {
               test(
                 new AXIWrapperTCU(
-                  axiConfig,
                   gen,
-                  layout
+                  layout,
+                  AXIWrapperTCUOptions(dramAxiConfig = axiConfig)
                 )
               ).withAnnotations(Seq(VerilatorBackendAnnotation)) { m =>
                 m.setClocks()
@@ -356,9 +356,9 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
             ) {
               test(
                 new AXIWrapperTCU(
-                  axiConfig,
                   gen,
-                  layout
+                  layout,
+                  AXIWrapperTCUOptions(dramAxiConfig = axiConfig)
                 )
               ).withAnnotations(Seq(VerilatorBackendAnnotation)) { m =>
                 m.setClocks()

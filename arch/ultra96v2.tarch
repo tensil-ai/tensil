@@ -7,8 +7,5 @@
     "accumulator_depth": 4096,
     "simd_registers_depth": 1,
     "stride0_depth": 8,
-    "stride1_depth": 8,
-    "sample_block_size": 0,
-    "decoder_timeout": 100,
-    "validate_instructions": false
+    "stride1_depth": 8
   }

@@ -21,16 +21,16 @@ import tensil.Architecture
 import tensil.InstructionLayout
 
 class AXIWrapperTCU[T <: Data with Num[T]](
-    val dramAxiConfig: axi.Config,
     val gen: T,
     val layout: InstructionLayout,
+    val options: AXIWrapperTCUOptions,
 )(implicit val platformConfig: PlatformConfig)
     extends MultiIOModule {
   val numScalarsPerWord: Int =
-    (dramAxiConfig.dataWidth / 8) / layout.arch.dataType.sizeBytes
+    (options.dramAxiConfig.dataWidth / 8) / layout.arch.dataType.sizeBytes
 
   val tcu = Module(
-    new TCU(gen, layout)
+    new TCU(gen, layout, options.inner)
   )
   // IO
   val instruction = IO(
@@ -39,8 +39,8 @@ class AXIWrapperTCU[T <: Data with Num[T]](
   val status = IO(
     Decoupled(new WithLast(new Instruction(tcu.instructionWidth)))
   )
-  val dram0  = IO(new axi.Master(dramAxiConfig))
-  val dram1  = IO(new axi.Master(dramAxiConfig))
+  val dram0  = IO(new axi.Master(options.dramAxiConfig))
+  val dram1  = IO(new axi.Master(options.dramAxiConfig))
   val error  = IO(Output(Bool()))
   val sample = IO(Decoupled(new WithLast(new Sample)))
 
@@ -54,17 +54,17 @@ class AXIWrapperTCU[T <: Data with Num[T]](
   val maxLen   = 1 << 8  // 256
 
   val dram0BoundarySplitter = Module(
-    new axi.MemBoundarySplitter(dramAxiConfig, boundary, maxLen)
+    new axi.MemBoundarySplitter(options.dramAxiConfig, boundary, maxLen)
   )
   dram0 <> dram0BoundarySplitter.io.out
   val dram1BoundarySplitter = Module(
-    new axi.MemBoundarySplitter(dramAxiConfig, boundary, maxLen)
+    new axi.MemBoundarySplitter(options.dramAxiConfig, boundary, maxLen)
   )
   dram1 <> dram1BoundarySplitter.io.out
 
   val dram0Converter = Module(
     new axi.Converter(
-      dramAxiConfig,
+      options.dramAxiConfig,
       gen,
       layout.arch.arraySize,
       layout.arch.dram0Depth,
@@ -81,7 +81,7 @@ class AXIWrapperTCU[T <: Data with Num[T]](
 
   val dram1Converter = Module(
     new axi.Converter(
-      dramAxiConfig,
+      options.dramAxiConfig,
       gen,
       layout.arch.arraySize,
       layout.arch.dram1Depth,

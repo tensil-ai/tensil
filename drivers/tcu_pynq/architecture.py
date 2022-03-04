@@ -16,9 +16,6 @@ Architecture = namedtuple(
         "simd_registers_depth",  # int
         "stride0_depth",  # int
         "stride1_depth",  # int
-        "sample_block_size",  # int
-        "decoder_timeout",  # int
-        "validate_instructions",  # bool
     ],
 )
 
@@ -32,9 +29,6 @@ tiny = Architecture(
     simd_registers_depth=1,
     stride0_depth=8,
     stride1_depth=8,
-    sample_block_size=0,
-    decoder_timeout=100,
-    validate_instructions=True,
 )
 
 
@@ -48,7 +42,4 @@ ultra96 = Architecture(
     simd_registers_depth=1,
     stride0_depth=8,
     stride1_depth=8,
-    sample_block_size=0,
-    decoder_timeout=100,
-    validate_instructions=False,
 )

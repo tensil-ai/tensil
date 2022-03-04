@@ -24,9 +24,6 @@ struct architecture {
     size_t stride0_depth;
     size_t stride1_depth;
     size_t simd_registers_depth;
-
-    size_t sample_block_size;
-    uint16_t decoder_timeout;
 };
 
 bool architecture_is_valid(const struct architecture *arch);

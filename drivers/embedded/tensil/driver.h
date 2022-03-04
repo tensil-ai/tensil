@@ -19,6 +19,9 @@ enum dram_bank { DRAM0 = 0, DRAM1 = 1 };
 struct driver {
     struct architecture arch;
 
+    size_t sample_block_size;
+    uint16_t decoder_timeout;
+
     uint8_t *dram0_base_ptr;
     uint8_t *dram1_base_ptr;
 

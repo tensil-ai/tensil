@@ -23,9 +23,6 @@ case class Architecture(
     @key("simd_registers_depth") simdRegistersDepth: Int,
     @key("stride0_depth") stride0Depth: Int,
     @key("stride1_depth") stride1Depth: Int,
-    @key("sample_block_size") sampleBlockSize: Int,
-    @key("decoder_timeout") decoderTimeout: Int,
-    @key("validate_instructions") validateInstructions: Boolean,
 ) {
   override def toString() =
     s"Architecture($dataType, ${arraySize}x${arraySize}, acc=$accumulatorDepth, loc=$localDepth, drams=[$dram0Depth,$dram1Depth], strides=[$stride0Depth,$stride1Depth], simdRegs=$simdRegistersDepth)"
@@ -68,15 +65,6 @@ case class Architecture(
     stream.writeBytes(
       s"#define TENSIL_ARCHITECTURE_STRIDE1_DEPTH         $stride1Depth\n"
     );
-    stream.writeBytes(
-      s"#define TENSIL_ARCHITECTURE_SAMPLE_BLOCK_SIZE     $sampleBlockSize\n"
-    );
-    stream.writeBytes(
-      s"#define TENSIL_ARCHITECTURE_DECODER_TIMEOUT       $decoderTimeout\n"
-    );
-    stream.writeBytes(
-      s"#define TENSIL_ARCHITECTURE_VALIDATE_INSTRUCTIONS $validateInstructions\n"
-    );
   }
 }
 
@@ -100,9 +88,6 @@ object Architecture {
       simdRegistersDepth: Int = 1,
       stride0Depth: Int = 1,
       stride1Depth: Int = 1,
-      sampleBlockSize: Int = 0,
-      decoderTimeout: Int = 100,
-      validateInstructions: Boolean = false,
   ): Architecture =
     Architecture(
       dataType = dataType,
@@ -114,9 +99,6 @@ object Architecture {
       simdRegistersDepth = simdRegistersDepth,
       stride0Depth = stride0Depth,
       stride1Depth = stride1Depth,
-      sampleBlockSize = sampleBlockSize,
-      decoderTimeout = decoderTimeout,
-      validateInstructions = validateInstructions
     )
 
   implicit val rw: ReadWriter[Architecture] = macroRW
@@ -131,9 +113,6 @@ object Architecture {
     simdRegistersDepth = 1,
     stride0Depth = 8,
     stride1Depth = 8,
-    sampleBlockSize = 0,
-    decoderTimeout = 100,
-    validateInstructions = true,
   )
 
   val formal = Architecture(
@@ -146,8 +125,5 @@ object Architecture {
     simdRegistersDepth = 1,
     stride0Depth = 2,
     stride1Depth = 2,
-    sampleBlockSize = 0,
-    decoderTimeout = 0,
-    validateInstructions = false,
   )
 }

@@ -20,16 +20,16 @@ import tensil.mem.SizeHandler
 import tensil.util.WithLast
 import tensil.util.decoupled.MultiEnqueue
 
-class Decoder(val arch: Architecture)(implicit
-    val platformConfig: PlatformConfig
+class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
+    implicit val platformConfig: PlatformConfig
 ) extends Module {
   val arrayWidth           = arch.arraySize
   val accDepth             = arch.accumulatorDepth
   val memDepth             = arch.localDepth
   val dram0Depth           = arch.dram0Depth
   val dram1Depth           = arch.dram1Depth
-  val validateInstructions = arch.validateInstructions
-  val defaultTimeout       = arch.decoderTimeout
+  val validateInstructions = options.validateInstructions
+  val defaultTimeout       = options.decoderTimeout
   implicit val layout      = new InstructionLayout(arch)
   implicit val _arch       = arch
 
@@ -86,7 +86,7 @@ class Decoder(val arch: Architecture)(implicit
   io.status <> status.io.deq
 
   // timeout signal for debug
-  val timeout = RegInit(layout.arch.decoderTimeout.U(16.W))
+  val timeout = RegInit(options.decoderTimeout.U(16.W))
   val timer   = RegInit(0.U(16.W))
   when(instruction.ready) {
     timer := 0.U
@@ -546,7 +546,7 @@ class Decoder(val arch: Architecture)(implicit
     io.skipped.valid := true.B
   }
 
-  if (layout.arch.validateInstructions) {
+  if (options.validateInstructions) {
     val validator = Module(new Validator(layout))
     validator.io.instruction.bits := instruction.bits
     validator.io.instruction.valid := instruction.valid
@@ -555,8 +555,8 @@ class Decoder(val arch: Architecture)(implicit
     io.error := false.B
   }
 
-  if (layout.arch.sampleBlockSize > 0) {
-    val sampler = Module(new Sampler(layout.arch.sampleBlockSize))
+  if (options.enableSample) {
+    val sampler = Module(new Sampler(options.sampleBlockSize))
     sampler.io.sampleInterval := sampleInterval
     sampler.io.programCounter := programCounter
     sampler.io.flags.instruction.connect(instruction)

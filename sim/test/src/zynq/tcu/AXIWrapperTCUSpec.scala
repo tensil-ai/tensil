@@ -522,9 +522,9 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
         }
 
       varyDramDelay(0, 0)
-      varyDramDelay(10, 0)
+      /*varyDramDelay(10, 0)
       varyDramDelay(0, 10)
-      varyDramDelay(10, 10)
+      varyDramDelay(10, 10)*/
     }
 
   describe("AXIWrapperTCU") {
@@ -576,13 +576,13 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
     val fp18bp10 = FixedPoint(18.W, 10.BP)
     val fp32bp16 = FixedPoint(32.W, 16.BP)
 
-    varyArchAndAXI(fp16bp8, arch2x2fp16bp8)(axi.Config.Xilinx)
+    /*varyArchAndAXI(fp16bp8, arch2x2fp16bp8)(axi.Config.Xilinx)
     varyArchAndAXI(fp16bp8, arch2x2fp16bp8)(axi.Config.Xilinx64)
 
     varyArchAndAXI(fp16bp8, arch8x8fp16bp8)(axi.Config.Xilinx)
-    varyArchAndAXI(fp16bp8, arch8x8fp16bp8)(axi.Config.Xilinx64)
+    varyArchAndAXI(fp16bp8, arch8x8fp16bp8)(axi.Config.Xilinx64)*/
     varyArchAndAXI(fp16bp8, arch8x8fp16bp8)(axi.Config.Xilinx128)
-    varyArchAndAXI(fp16bp8, arch8x8fp16bp8)(axi.Config.Xilinx256)
+    /*varyArchAndAXI(fp16bp8, arch8x8fp16bp8)(axi.Config.Xilinx256)
 
     varyArchAndAXI(fp18bp10, arch8x8fp18bp10)(axi.Config.Xilinx)
     varyArchAndAXI(fp18bp10, arch8x8fp18bp10)(axi.Config.Xilinx64)
@@ -592,7 +592,7 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
     varyArchAndAXI(fp32bp16, arch8x8fp32bp16)(axi.Config.Xilinx)
     varyArchAndAXI(fp32bp16, arch8x8fp32bp16)(axi.Config.Xilinx64)
     varyArchAndAXI(fp32bp16, arch8x8fp32bp16)(axi.Config.Xilinx128)
-    varyArchAndAXI(fp32bp16, arch8x8fp32bp16)(axi.Config.Xilinx256)
+    varyArchAndAXI(fp32bp16, arch8x8fp32bp16)(axi.Config.Xilinx256)*/
   }
 
   private def assertEqual(

@@ -15,7 +15,7 @@ object ResNet50 {
       arraySize: Int,
       count: Int
   ): InputStream = {
-    val fileName = s"../tensil-models/data/resnet_input_${count}x224x224x${arraySize}.csv"
+    val fileName = s"./models/data/resnet_input_${count}x224x224x${arraySize}.csv"
 
     val inputPrep           = new ByteArrayOutputStream()
     val inputPrepDataStream = new DataOutputStream(inputPrep)

@@ -14,7 +14,7 @@ import tensil.tools.compiler.{MemoryDimensions, MemoryTag}
 class CompilerSpec extends FlatSpec {
   behavior of "Compiler"
 
-  val Models = "../tensil-models"
+  val Models = "./models"
 
   def ConstsFileName(name: String)  = s"$name.tdata"
   def ProgramFileName(name: String) = s"$name.tprog"

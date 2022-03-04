@@ -654,8 +654,6 @@ class OnnxFrontend(
 
     val outputDims = inputVars.dims.transform(permutationOrder)
 
-    println(outputDims)
-
     val outputVars = context.mm.blendObjects(
       transposeProto.output(0),
       outputDims,
@@ -980,8 +978,6 @@ class OnnxFrontend(
       .as1D
       .map(_.toInt)
       .toArray
-
-    println(shape.toList)
 
     var pixelDims = VarsDimensions(1, arch.arraySize)
     val outputDims = VarsDimensions(Shape(if (shape.exists(_ == -1)) {

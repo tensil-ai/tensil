@@ -37,7 +37,7 @@ tensil compile -a /demo/arch/ultra96v2.tarch -m /demo/models/resnet20v2_cifar.on
 tensil compile -a /demo/arch/ultra96v2.tarch -m /demo/models/resnet20v2_cifar.pb -o "Identity" -s true
 ```
 
-#### Other ML frameworks are supported by convering to ONNX
+#### Other ML frameworks are supported by converting to ONNX
 
 - [TensorFlow and Tflite](https://github.com/onnx/tensorflow-onnx/blob/master/README.md)
 - [Pytorch](https://pytorch.org/docs/stable/onnx.html)

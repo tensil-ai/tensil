@@ -97,3 +97,8 @@ rm main.tar.gz
 docker build -t tensilai/tensil .
 docker push tensilai/tensil
 ```
+
+## Get help
+
+- Say hello and ask a question on our [Discord](https://discord.gg/TSw34H3PXr)
+- Email us at [support@tensil.ai](mailto:support@tensil.ai)

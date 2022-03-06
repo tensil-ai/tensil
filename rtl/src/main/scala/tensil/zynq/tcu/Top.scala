@@ -106,39 +106,7 @@ class Top(
 
   if (printSummary) {
     val tb = new TablePrinter(Some("RTL SUMMARY"))
-
-    tb.addNamedLine("Data type", arch.dataType.name)
-    tb.addNamedLine("Array size", arch.arraySize)
-    tb.addNamedLine(
-      "Consts memory size (vectors/scalars/bits)",
-      arch.constsDepth,
-      arch.constsDepth * arch.arraySize,
-      layout.dram1OperandSizeBits
-    )
-    tb.addNamedLine(
-      "Vars memory size (vectors/scalars/bits)",
-      arch.varsDepth,
-      arch.varsDepth * arch.arraySize,
-      layout.dram1OperandSizeBits
-    )
-    tb.addNamedLine(
-      "Local memory size (vectors/scalars/bits)",
-      arch.localDepth,
-      arch.localDepth * arch.arraySize,
-      layout.localOperandSizeBits
-    )
-    tb.addNamedLine(
-      "Accumulator memory size (vectors/scalars/bits)",
-      arch.accumulatorDepth,
-      arch.accumulatorDepth * arch.arraySize,
-      layout.accumulatorOperandSizeBits
-    )
-    tb.addNamedLine("Stride #0 size (bits)", layout.stride0SizeBits)
-    tb.addNamedLine("Stride #1 size (bits)", layout.stride1SizeBits)
-    tb.addNamedLine("Operand #0 size (bits)", layout.operand0SizeBits)
-    tb.addNamedLine("Operand #1 size (bits)", layout.operand1SizeBits)
-    tb.addNamedLine("Operand #2 size (bits)", layout.operand2SizeBits)
-    tb.addNamedLine("Instruction size (bytes)", layout.instructionSizeBytes)
+    layout.addTableLines(tb)
 
     print(tb)
   }

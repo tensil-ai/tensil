@@ -7,7 +7,13 @@ import java.io._
 import scala.collection.mutable
 import org.tensorflow.framework.graph.GraphDef
 import onnx.onnx.ModelProto
-import tensil.{Architecture, ArchitectureDataType, TablePrinter, TableLine, InstructionLayout}
+import tensil.{
+  Architecture,
+  ArchitectureDataType,
+  TablePrinter,
+  TableLine,
+  InstructionLayout
+}
 import tensil.tools.model.{Model, Program, ConstsEntry, InputOutputEntry}
 import tensil.tools.compiler.{
   Backend,
@@ -68,7 +74,7 @@ object Compiler {
       options: CompilerOptions,
       traceContext: TraceContext = TraceContext.empty
   ): CompilerResult = {
-    val modelStream  = new FileInputStream(modelFileName)
+    val modelStream     = new FileInputStream(modelFileName)
     val modelSourceType = getModelSourceType(modelFileName)
 
     compileStreamToFiles(
@@ -77,7 +83,8 @@ object Compiler {
       modelStream,
       outputNames,
       options,
-      traceContext)
+      traceContext
+    )
   }
 
   def compileStreamToFiles(
@@ -305,38 +312,7 @@ object Compiler {
         val tb = new TablePrinter(Some("COMPILER SUMMARY"))
 
         tb.addNamedLine("Model", modelName)
-        tb.addNamedLine("Data type", options.arch.dataType.name)
-        tb.addNamedLine("Array size", options.arch.arraySize)
-        tb.addNamedLine(
-          "Consts memory size (vectors/scalars/bits)",
-          options.arch.constsDepth,
-          options.arch.constsDepth * options.arch.arraySize,
-          layout.dram1OperandSizeBits
-        )
-        tb.addNamedLine(
-          "Vars memory size (vectors/scalars/bits)",
-          options.arch.varsDepth,
-          options.arch.varsDepth * options.arch.arraySize,
-          layout.dram1OperandSizeBits
-        )
-        tb.addNamedLine(
-          "Local memory size (vectors/scalars/bits)",
-          options.arch.localDepth,
-          options.arch.localDepth * options.arch.arraySize,
-          layout.localOperandSizeBits
-        )
-        tb.addNamedLine(
-          "Accumulator memory size (vectors/scalars/bits)",
-          options.arch.accumulatorDepth,
-          options.arch.accumulatorDepth * options.arch.arraySize,
-          layout.accumulatorOperandSizeBits
-        )
-        tb.addNamedLine("Stride #0 size (bits)", layout.stride0SizeBits)
-        tb.addNamedLine("Stride #1 size (bits)", layout.stride1SizeBits)
-        tb.addNamedLine("Operand #0 size (bits)", layout.operand0SizeBits)
-        tb.addNamedLine("Operand #1 size (bits)", layout.operand1SizeBits)
-        tb.addNamedLine("Operand #2 size (bits)", layout.operand2SizeBits)
-        tb.addNamedLine("Instruction size (bytes)", layout.instructionSizeBytes)
+        layout.addTableLines(tb)
         tb.addNamedLine(
           "Consts memory maximum usage (vectors/scalars)",
           mm.constsMaxSize,

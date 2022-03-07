@@ -26,12 +26,16 @@ case class Args(
     archFile: File = new File("."),
     targetDir: File = new File("."),
     dramAxiConfig: axi.Config = axi.Config.Xilinx64,
-    verbose: Boolean = false,
     summary: Boolean = false,
 )
 
-class Top(archName: String, arch: Architecture, options: AXIWrapperTCUOptions)(
-    implicit val environment: Environment = Synthesis
+class Top(
+    archName: String,
+    arch: Architecture,
+    options: AXIWrapperTCUOptions,
+    printSummary: Boolean
+)(implicit
+    val environment: Environment = Synthesis
 ) extends RawModule {
   override def desiredName: String = s"top_${archName}"
 
@@ -99,6 +103,13 @@ class Top(archName: String, arch: Architecture, options: AXIWrapperTCUOptions)(
   }
 
   ArtifactsLogger.log(desiredName)
+
+  if (printSummary) {
+    val tb = new TablePrinter(Some("RTL SUMMARY"))
+    layout.addTableLines(tb)
+
+    print(tb)
+  }
 }
 
 object Top extends App {
@@ -131,6 +142,10 @@ object Top extends App {
         })
       )
       .text("Optional DRAM0 and DRAM1 AXI width, defaults to 64")
+
+    opt[Boolean]('s', "summary")
+      .valueName("true|false")
+      .action((x, c) => c.copy(summary = x)),
   }
 
   argParser.parse(args, Args()) match {
@@ -143,7 +158,7 @@ object Top extends App {
       )
 
       tensil.util.emitTo(
-        new Top(archName, arch, options),
+        new Top(archName, arch, options, args.summary),
         args.targetDir.getCanonicalPath()
       )
 

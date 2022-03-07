@@ -49,7 +49,7 @@ tensil compile -a /demo/arch/ultra96v2.tarch -m /demo/models/resnet20v2_cifar.pb
 Make Verilog RTL for specific TCU architecture and FPGA development platform (Ultra96 v2) and 128-bit AXI interface to DDR memory.
 
 ```
-tensil rtl -a /demo/arch/ultra96v2.tarch -d 128
+tensil rtl -a /demo/arch/ultra96v2.tarch -d 128 -s true
 ```
 
 ## Create Vivado design

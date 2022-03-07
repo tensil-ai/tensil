@@ -97,4 +97,39 @@ case class InstructionLayout(
 
   val instructionSizeBytes =
     (headerSizeBits + operandsSizeBits) / 8
+
+  def addTableLines(tb: TablePrinter) = {
+    tb.addNamedLine("Data type", arch.dataType.name)
+    tb.addNamedLine("Array size", arch.arraySize)
+    tb.addNamedLine(
+      "Consts memory size (vectors/scalars/bits)",
+      arch.constsDepth,
+      arch.constsDepth * arch.arraySize,
+      dram1OperandSizeBits
+    )
+    tb.addNamedLine(
+      "Vars memory size (vectors/scalars/bits)",
+      arch.varsDepth,
+      arch.varsDepth * arch.arraySize,
+      dram1OperandSizeBits
+    )
+    tb.addNamedLine(
+      "Local memory size (vectors/scalars/bits)",
+      arch.localDepth,
+      arch.localDepth * arch.arraySize,
+      localOperandSizeBits
+    )
+    tb.addNamedLine(
+      "Accumulator memory size (vectors/scalars/bits)",
+      arch.accumulatorDepth,
+      arch.accumulatorDepth * arch.arraySize,
+      accumulatorOperandSizeBits
+    )
+    tb.addNamedLine("Stride #0 size (bits)", stride0SizeBits)
+    tb.addNamedLine("Stride #1 size (bits)", stride1SizeBits)
+    tb.addNamedLine("Operand #0 size (bits)", operand0SizeBits)
+    tb.addNamedLine("Operand #1 size (bits)", operand1SizeBits)
+    tb.addNamedLine("Operand #2 size (bits)", operand2SizeBits)
+    tb.addNamedLine("Instruction size (bytes)", instructionSizeBytes)
+  }
 }

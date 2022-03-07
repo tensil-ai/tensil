@@ -17,8 +17,8 @@ Tensil
 ## Pull and run docker container
 
 ```
-docker pull tensilai/tensil:latest
-docker run -v $(pwd):/work -w /work -it tensilai/tensil:latest bash
+docker pull tensilai/tensil
+docker run -v $(pwd):/work -w /work -it tensilai/tensil bash
 ```
 
 ## Compile AI/ML model
@@ -79,23 +79,22 @@ mv tensil-models-main models
 rm main.tar.gz
 ```
 
-### Build command line tools
+### Run RTL tool from source code
 
 ```
-./mill '{rtl,tools}.assembly'
+./mill rtl.run -a ./arch/ultra96v2.tarch -d 128 -s true
+```
+
+### Run compiler from source code
+
+```
+./mill tools.run -a ./arch/ultra96v2.tarch -m ./models/resnet20v2_cifar.onnx -o "Identity:0" -s true
 ```
 
 ### Run full test suite
 
 ```
 ./mill __.test -l org.scalatest.tags.Slow
-```
-
-### Build and push docker image
-
-```
-docker build -t tensilai/tensil .
-docker push tensilai/tensil
 ```
 
 ## Get help

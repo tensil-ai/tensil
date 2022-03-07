@@ -5,7 +5,7 @@ Tensil
 
 ## Tensil toolchain flow
 
-![Flow](/doc/flow.png)
+![Flow](https://s3.us-west-1.amazonaws.com/downloads.tensil.ai/doc/flow.png)
 
 ## Setup
 
@@ -56,13 +56,13 @@ tensil rtl -a /demo/arch/ultra96v2.tarch -d 128 -s true
 
 Create Vivado design for specific FPGA development platform (Ultra96 v2). If this is something you don't know how to do, we can help! Please reach out to us at [contact@tensil.ai](mailto:contact@tensil.ai).
 
-![Ultra96 v2 design](/doc/ultra96v2_design.png)
+![Ultra96 v2 design](https://s3.us-west-1.amazonaws.com/downloads.tensil.ai/doc/ultra96v2_design.png)
 
 ## Run AI/ML model on FPGA
 
 Use PYNQ and Jupyter notebooks to run AI/ML model on FPGA. (See in `notebooks`.)
 
-![Resnet on PYNQ](/doc/resnet20_on_pynq.png)
+![Resnet on PYNQ](https://s3.us-west-1.amazonaws.com/downloads.tensil.ai/doc/resnet20_on_pynq.png)
 
 ## For maintainers
 

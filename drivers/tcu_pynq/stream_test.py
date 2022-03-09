@@ -8,6 +8,7 @@ import unittest
 
 class MockSendChannel:
     def __init__(self):
+        self.axi_data_width = 8
         self.max_buffer_size = 8
         self.dtype = np.uint8
         self.transfer_requested = False
@@ -37,6 +38,7 @@ class MockSendChannel:
 
 class MockRecvChannel:
     def __init__(self):
+        self.axi_data_width = 8
         self.max_buffer_size = 8
         self.dtype = np.uint8
         self.transfer_requested = False
@@ -76,8 +78,18 @@ class DoubleBufferedAdapterWriteTest(unittest.TestCase):
         self.adapter.write(data)
         np.testing.assert_array_equal(self.channel.written, data)
 
-    def test_remainder_write(self):
+    def test_remainder_write_buffer_plus1(self):
         data = np.arange(self.channel.max_buffer_size + 1, dtype=self.channel.dtype)
+        self.adapter.write(data)
+        np.testing.assert_array_equal(self.channel.written, data)
+
+    def test_remainder_write_buffer_x2_plus1(self):
+        data = np.arange(self.channel.max_buffer_size * 2 + 1, dtype=self.channel.dtype)
+        self.adapter.write(data)
+        np.testing.assert_array_equal(self.channel.written, data)
+
+    def test_remainder_write_buffer_x5_plus1(self):
+        data = np.arange(self.channel.max_buffer_size * 5 + 1, dtype=self.channel.dtype)
         self.adapter.write(data)
         np.testing.assert_array_equal(self.channel.written, data)
 
@@ -99,8 +111,22 @@ class DoubleBufferedAdapterReadTest(unittest.TestCase):
         self.adapter.read(data)
         np.testing.assert_array_equal(self.channel.read, data)
 
-    def test_remainder_read(self):
+    def test_remainder_read_plus1(self):
         size = self.channel.max_buffer_size + 1
+        self.channel.read = np.arange(size, dtype=self.channel.dtype)
+        data = np.zeros(size, dtype=self.channel.dtype)
+        self.adapter.read(data)
+        np.testing.assert_array_equal(self.channel.read, data)
+
+    def test_remainder_read_buffer_x2_plus1(self):
+        size = self.channel.max_buffer_size * 2 + 1
+        self.channel.read = np.arange(size, dtype=self.channel.dtype)
+        data = np.zeros(size, dtype=self.channel.dtype)
+        self.adapter.read(data)
+        np.testing.assert_array_equal(self.channel.read, data)
+
+    def test_remainder_read_buffer_x5_plus1(self):
+        size = self.channel.max_buffer_size * 5 + 1
         self.channel.read = np.arange(size, dtype=self.channel.dtype)
         data = np.zeros(size, dtype=self.channel.dtype)
         self.adapter.read(data)

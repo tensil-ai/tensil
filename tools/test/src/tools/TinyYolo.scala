@@ -12,8 +12,8 @@ import tensil.ArchitectureDataType
 
 object TinyYolo {
   val GoldenOutputFileNames = Map(
-    "model/conv2d_17/BiasAdd" -> "./models/data/yolov4_tiny_192_conv17.csv",
-    "model/conv2d_20/BiasAdd" -> "./models/data/yolov4_tiny_192_conv20.csv"
+    "model/conv2d_17/BiasAdd" -> "./models/data/yolov4_tiny_416_conv17.csv",
+    "model/conv2d_20/BiasAdd" -> "./models/data/yolov4_tiny_416_conv20.csv"
   )
 
   def assertOutput(
@@ -45,7 +45,7 @@ object TinyYolo {
       arraySize: Int,
       count: Int
   ): InputStream = {
-    val fileName = s"./models/data/yolov4_tiny_${count}x192x192x${arraySize}.csv"
+    val fileName = s"./models/data/yolov4_tiny_${count}x416x416x${arraySize}.csv"
 
     val inputPrep           = new ByteArrayOutputStream()
     val inputPrepDataStream = new DataOutputStream(inputPrep)

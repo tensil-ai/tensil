@@ -227,7 +227,8 @@ class Driver:
         def timestamp(event):
             nonlocal prev
             now = time.time()
-            print("{}\t{:.3}s\t{:.3}s".format(event, now - prev, now - start))
+            if self.debug:
+                print("{}\t{:.3}s\t{:.3}s".format(event, now - prev, now - start))
             prev = now
 
         if self.model is None:

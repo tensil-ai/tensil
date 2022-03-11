@@ -19,6 +19,7 @@ from tcu_pynq.axi import axi_data_type
 from tcu_pynq.data_type import data_type_numpy
 from tcu_pynq.stream import Stream
 from tcu_pynq.instruction import Layout
+from tcu_pynq.instruction import DataMoveFlag
 from tcu_pynq.config import Register, Constant
 from tcu_pynq.allocator import Allocator
 from tcu_pynq.model import model_from_json
@@ -232,8 +233,21 @@ class Driver:
             prev = now
 
         if self.model is None:
-            raise Exception("model not loaded: please run driver.load_model first")
+            raise Exception("model not loaded: please run driver.load_model first")            
         scalar_address = lambda vec_address: vec_address * self.arch.array_size
+
+        # initialize flush probe
+        probe_source_address = self.arch.dram0_depth - 1
+        probe_target_address = self.arch.dram0_depth - 2
+        probe_source = np.full(self.arch.array_size, np.iinfo(data_type_numpy(self.arch.data_type)).max, dtype=data_type_numpy(self.arch.data_type))
+        probe_target = np.full(self.arch.array_size, 0, dtype=data_type_numpy(self.arch.data_type))
+
+        # flush probe instructions
+        probe_instructions = [
+            self.layout.data_move(DataMoveFlag.dram0_to_memory, 0, probe_source_address, 0),
+            self.layout.data_move(DataMoveFlag.memory_to_dram0, 0, probe_target_address, 0)
+        ]
+
         # load inputs
         for inp in self.model.inputs:
             data = self.to_fixed(inputs[inp.name]).astype(
@@ -241,11 +255,26 @@ class Driver:
             )
             self.dram0.write(scalar_address(inp.base), data)
         timestamp("wrote inputs")
+
+        # write flush probe
+        self.dram0.write(scalar_address(probe_source_address), probe_source)
+        self.dram0.write(scalar_address(probe_target_address), probe_target)
+
+        # append flush probe instructions
+        prog = self.program
+        for i in probe_instructions:
+            prog = prog + self.layout.to_bytes(i)
+
         # write program
         self.instruction_stream.write(
-            self.program, align=self.layout.instruction_size_bytes
+            prog, align=self.layout.instruction_size_bytes
         )
+
+        # wait for flush
+        while not self.dram0.compare(scalar_address(probe_target_address), probe_source):
+            pass
         timestamp("wrote program")
+        
         # return outputs
         outputs = dict()
         for out in self.model.outputs:

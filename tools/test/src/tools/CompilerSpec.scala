@@ -1790,10 +1790,10 @@ class CompilerSpec extends FlatSpec {
       printLayersSummary = true,
       collectBackendStats = true,
       printGraphFileName = Some(s"${name}.dot"),
-      tracepointConditions = List(
+      /*tracepointConditions = List(
         TracepointCondition(MemoryTag.Vars, "model/conv2d_17/BiasAdd"),
         TracepointCondition(MemoryTag.Vars, "model/conv2d_20/BiasAdd")
-      )
+      )*/
     )
 
     Compiler.compile(

@@ -1723,7 +1723,7 @@ class CompilerSpec extends FlatSpec {
     Compiler.compile(
       name,
       s"${Models}/yolov4_tiny_${YoloSize}.pb",
-      TinyYolo.GoldenOutputFileNames.keys.toList,
+      new TinyYolo(YoloSize, false).GoldenOutputFileNames.keys.toList,
       options,
       traceContext
     )
@@ -1746,7 +1746,7 @@ class CompilerSpec extends FlatSpec {
     Compiler.compile(
       name,
       s"${Models}/yolov4_tiny_${YoloSize}.pb",
-      TinyYolo.GoldenOutputFileNames.keys.toList,
+      new TinyYolo(YoloSize, false).GoldenOutputFileNames.keys.toList,
       options,
       traceContext
     )
@@ -1769,7 +1769,7 @@ class CompilerSpec extends FlatSpec {
     Compiler.compile(
       name,
       s"${Models}/yolov4_tiny_${YoloSize}.pb",
-      TinyYolo.GoldenOutputFileNames.keys.toList,
+      new TinyYolo(YoloSize, false).GoldenOutputFileNames.keys.toList,
       options,
       traceContext
     )
@@ -1799,7 +1799,7 @@ class CompilerSpec extends FlatSpec {
     Compiler.compile(
       name,
       s"${Models}/yolov4_tiny_${YoloSize}.pb",
-      TinyYolo.GoldenOutputFileNames.keys.toList,
+      new TinyYolo(YoloSize, false).GoldenOutputFileNames.keys.toList,
       options,
       traceContext
     )
@@ -1994,7 +1994,7 @@ class CompilerSpec extends FlatSpec {
     Compiler.compile(
       name,
       s"${Models}/yolov4_tiny_${YoloSize}.onnx",
-      TinyYoloOnnx.GoldenOutputFileNames.keys.toList,
+      new TinyYolo(YoloSize, true).GoldenOutputFileNames.keys.toList,
       options,
       traceContext
     )
@@ -2020,7 +2020,7 @@ class CompilerSpec extends FlatSpec {
     Compiler.compile(
       name,
       s"${Models}/yolov4_tiny_${YoloSize}.onnx",
-      TinyYoloOnnx.GoldenOutputFileNames.keys.toList,
+      new TinyYolo(YoloSize, true).GoldenOutputFileNames.keys.toList,
       options,
       traceContext
     )

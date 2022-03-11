@@ -63,6 +63,8 @@ object GoldenProcessorHelper {
     }
   }
 
+  val yoloPrefix = "yolov4_tiny_([0-9]+)".r
+
   private def prepareInputStream(
       modelName: String,
       dataType: ArchitectureDataType,
@@ -83,11 +85,15 @@ object GoldenProcessorHelper {
       ResNet.prepareInputStream(dataType, arraySize, count)
     else if (modelName.startsWith("resnet50v2"))
       ResNet50.prepareInputStream(dataType, arraySize, count)
-    else if (modelName.startsWith("yolov4_tiny") && modelName.endsWith("onnx"))
-      TinyYoloOnnx.prepareInputStream(dataType, arraySize, count)
-    else if (modelName.startsWith("yolov4_tiny"))
-      TinyYolo.prepareInputStream(dataType, arraySize, count)
-    else
+    else if (yoloPrefix.findFirstIn(modelName).isDefined) {
+      val yoloPrefix(yoloSize) = modelName
+      new TinyYolo(yoloSize.toInt, modelName.endsWith("onnx"))
+        .prepareInputStream(
+          dataType,
+          arraySize,
+          count
+        )
+    } else
       throw new IllegalArgumentException()
 
   private def assertOutput(
@@ -140,11 +146,11 @@ object GoldenProcessorHelper {
       ResNet.assertOutput(dataType, arraySize, bytes, count)
     else if (modelName.startsWith("resnet50v2"))
       ResNet50.assertOutput(dataType, arraySize, bytes, count)
-    else if (modelName.startsWith("yolov4_tiny") && modelName.endsWith("onnx"))
-      TinyYoloOnnx.assertOutput(outputName, dataType, arraySize, bytes)
-    else if (modelName.startsWith("yolov4_tiny"))
-      TinyYolo.assertOutput(outputName, dataType, arraySize, bytes)
-    else
+    else if (yoloPrefix.findFirstIn(modelName).isDefined) {
+      val yoloPrefix(yoloSize) = modelName
+      new TinyYolo(yoloSize.toInt, modelName.endsWith("onnx"))
+        .assertOutput(outputName, dataType, arraySize, bytes)
+    } else
       throw new IllegalArgumentException()
 
   private def minimumInputCount(modelName: String): Int =

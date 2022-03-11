@@ -63,7 +63,7 @@ object GoldenProcessorHelper {
     }
   }
 
-  val yoloPrefix = "yolov4_tiny_([0-9]+)".r
+  val yoloPattern = "yolov4_tiny_([0-9]+)_.*".r
 
   private def prepareInputStream(
       modelName: String,
@@ -85,8 +85,8 @@ object GoldenProcessorHelper {
       ResNet.prepareInputStream(dataType, arraySize, count)
     else if (modelName.startsWith("resnet50v2"))
       ResNet50.prepareInputStream(dataType, arraySize, count)
-    else if (yoloPrefix.findFirstIn(modelName).isDefined) {
-      val yoloPrefix(yoloSize) = modelName
+    else if (yoloPattern.findFirstIn(modelName).isDefined) {
+      val yoloPattern(yoloSize) = modelName
       new TinyYolo(yoloSize.toInt, modelName.endsWith("onnx"))
         .prepareInputStream(
           dataType,
@@ -146,8 +146,8 @@ object GoldenProcessorHelper {
       ResNet.assertOutput(dataType, arraySize, bytes, count)
     else if (modelName.startsWith("resnet50v2"))
       ResNet50.assertOutput(dataType, arraySize, bytes, count)
-    else if (yoloPrefix.findFirstIn(modelName).isDefined) {
-      val yoloPrefix(yoloSize) = modelName
+    else if (yoloPattern.findFirstIn(modelName).isDefined) {
+      val yoloPattern(yoloSize) = modelName
       new TinyYolo(yoloSize.toInt, modelName.endsWith("onnx"))
         .assertOutput(outputName, dataType, arraySize, bytes)
     } else

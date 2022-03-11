@@ -10,7 +10,7 @@ import scala.collection.mutable
 import scala.io.Source
 import tensil.ArchitectureDataType
 
-class TinyYolo(yoloSize: Int, onnx: Boolean) {
+case class TinyYolo(yoloSize: Int, onnx: Boolean) {
   val GoldenOutputFileNames =
     if (onnx)
       Map(

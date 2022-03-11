@@ -87,7 +87,7 @@ object GoldenProcessorHelper {
       ResNet50.prepareInputStream(dataType, arraySize, count)
     else if (yoloPattern.findFirstIn(modelName).isDefined) {
       val yoloPattern(yoloSize) = modelName
-      new TinyYolo(yoloSize.toInt, onnx = modelName.endsWith("onnx"))
+      TinyYolo(yoloSize.toInt, onnx = modelName.endsWith("onnx"))
         .prepareInputStream(
           dataType,
           arraySize,
@@ -148,7 +148,7 @@ object GoldenProcessorHelper {
       ResNet50.assertOutput(dataType, arraySize, bytes, count)
     else if (yoloPattern.findFirstIn(modelName).isDefined) {
       val yoloPattern(yoloSize) = modelName
-      new TinyYolo(yoloSize.toInt, onnx = modelName.endsWith("onnx"))
+      TinyYolo(yoloSize.toInt, onnx = modelName.endsWith("onnx"))
         .assertOutput(outputName, dataType, arraySize, bytes)
     } else
       throw new IllegalArgumentException()

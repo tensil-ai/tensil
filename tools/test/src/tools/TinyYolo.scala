@@ -10,11 +10,18 @@ import scala.collection.mutable
 import scala.io.Source
 import tensil.ArchitectureDataType
 
-object TinyYolo {
-  val GoldenOutputFileNames = Map(
-    "model/conv2d_17/BiasAdd" -> "./models/data/yolov4_tiny_192_conv17.csv",
-    "model/conv2d_20/BiasAdd" -> "./models/data/yolov4_tiny_192_conv20.csv"
-  )
+case class TinyYolo(yoloSize: Int, onnx: Boolean) {
+  val GoldenOutputFileNames =
+    if (onnx)
+      Map(
+        "model/conv2d_17/BiasAdd:0" -> s"./models/data/yolov4_tiny_${yoloSize}_conv17.csv",
+        "model/conv2d_20/BiasAdd:0" -> s"./models/data/yolov4_tiny_${yoloSize}_conv20.csv"
+      )
+    else
+      Map(
+        "model/conv2d_17/BiasAdd" -> s"./models/data/yolov4_tiny_${yoloSize}_conv17.csv",
+        "model/conv2d_20/BiasAdd" -> s"./models/data/yolov4_tiny_${yoloSize}_conv20.csv"
+      )
 
   def assertOutput(
       outputName: String,
@@ -45,7 +52,8 @@ object TinyYolo {
       arraySize: Int,
       count: Int
   ): InputStream = {
-    val fileName = s"./models/data/yolov4_tiny_${count}x192x192x${arraySize}.csv"
+    val fileName =
+      s"./models/data/yolov4_tiny_${count}x${yoloSize}x${yoloSize}x${arraySize}.csv"
 
     val inputPrep           = new ByteArrayOutputStream()
     val inputPrepDataStream = new DataOutputStream(inputPrep)

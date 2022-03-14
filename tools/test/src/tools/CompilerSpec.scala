@@ -139,7 +139,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/xor.pb",
+      s"${Models}/xor.pb",
       List("Identity"),
       options,
       traceContext
@@ -214,7 +214,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/xor.pb",
+      s"${Models}/xor.pb",
       List("Identity"),
       options
     )
@@ -287,7 +287,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/xor.pb",
+      s"${Models}/xor.pb",
       List("Identity"),
       options
     )
@@ -371,7 +371,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/xor.pb",
+      s"${Models}/xor.pb",
       List("Identity"),
       options
     )
@@ -496,7 +496,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/xor.pb",
+      s"${Models}/xor.pb",
       List("Identity"),
       options
     )
@@ -576,7 +576,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/xor4.pb",
+      s"${Models}/xor4.pb",
       List("Identity"),
       options
     )
@@ -701,7 +701,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/xor4.pb",
+      s"${Models}/xor4.pb",
       List("Identity"),
       options
     )
@@ -842,7 +842,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/xor4.pb",
+      s"${Models}/xor4.pb",
       List("Identity"),
       options,
       traceContext
@@ -951,7 +951,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/xor4.pb",
+      s"${Models}/xor4.pb",
       List("Identity"),
       options
     )
@@ -1132,7 +1132,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/mlp_mnist.pb",
+      s"${Models}/mlp_mnist.pb",
       List("Identity"),
       options
     )
@@ -1150,7 +1150,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/mlp_mnist.pb",
+      s"${Models}/mlp_mnist.pb",
       List("Identity"),
       options
     )
@@ -1167,7 +1167,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/mlp_mnist.pb",
+      s"${Models}/mlp_mnist.pb",
       List("Identity"),
       options
     )
@@ -1185,7 +1185,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/mlp_mnist.pb",
+      s"${Models}/mlp_mnist.pb",
       List("Identity"),
       options
     )
@@ -1202,7 +1202,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/mlp_mnist.pb",
+      s"${Models}/mlp_mnist.pb",
       List("Identity"),
       options
     )
@@ -1221,7 +1221,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/mlp_mnist.pb",
+      s"${Models}/mlp_mnist.pb",
       List("Identity"),
       options
     )
@@ -1260,7 +1260,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/conv2d_4x4_valid.pb",
+      s"${Models}/conv2d_4x4_valid.pb",
       List("Identity_1"),
       options
     )
@@ -1274,7 +1274,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/conv2d_4x4_valid_stride_2.pb",
+      s"${Models}/conv2d_4x4_valid_stride_2.pb",
       List("Identity_1"),
       options
     )
@@ -1288,7 +1288,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/conv2d_4x4_same.pb",
+      s"${Models}/conv2d_4x4_same.pb",
       List("Identity_1"),
       options
     )
@@ -1302,7 +1302,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/conv2d_4x4_same_stride_2.pb",
+      s"${Models}/conv2d_4x4_same_stride_2.pb",
       List("Identity_1"),
       options
     )
@@ -1316,7 +1316,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/conv2d_4x4_valid.pb",
+      s"${Models}/conv2d_4x4_valid.pb",
       List("Identity_1"),
       options
     )
@@ -1330,7 +1330,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/conv2d_4x4_same.pb",
+      s"${Models}/conv2d_4x4_same.pb",
       List("Identity_1"),
       options
     )
@@ -1344,7 +1344,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/conv2d_4x4_valid.pb",
+      s"${Models}/conv2d_4x4_valid.pb",
       List("Identity_1"),
       options
     )
@@ -1358,7 +1358,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/conv2d_4x4_same.pb",
+      s"${Models}/conv2d_4x4_same.pb",
       List("Identity_1"),
       options
     )
@@ -1375,7 +1375,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/conv2d_4x4_same_relu_2x2_maxpool_valid_stride_2.pb",
+      s"${Models}/conv2d_4x4_same_relu_2x2_maxpool_valid_stride_2.pb",
       List("Identity_1"),
       options
     )
@@ -1391,7 +1391,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/conv2d_4x4_same_relu_2x2_maxpool_valid_stride_1.pb",
+      s"${Models}/conv2d_4x4_same_relu_2x2_maxpool_valid_stride_1.pb",
       List("Identity_1"),
       options
     )
@@ -1414,7 +1414,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/conv2d_3_224_64_128.pb",
+      s"${Models}/conv2d_3_224_64_128.pb",
       List("Identity"),
       options
     )
@@ -1434,7 +1434,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/maxpool_2_22_5.pb",
+      s"${Models}/maxpool_2_22_5.pb",
       List("Identity"),
       options
     )
@@ -1451,7 +1451,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/cnn_mnist.pb",
+      s"${Models}/cnn_mnist.pb",
       List("Identity"),
       options
     )
@@ -1469,7 +1469,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/cnn_mnist.pb",
+      s"${Models}/cnn_mnist.pb",
       List("Identity"),
       options
     )
@@ -1486,7 +1486,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/cnn_mnist.pb",
+      s"${Models}/cnn_mnist.pb",
       List("Identity"),
       options
     )
@@ -1503,7 +1503,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/cnn_mnist.pb",
+      s"${Models}/cnn_mnist.pb",
       List("Identity"),
       options
     )
@@ -1522,7 +1522,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/cnn_mnist.pb",
+      s"${Models}/cnn_mnist.pb",
       List("Identity"),
       options
     )
@@ -1540,7 +1540,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/cnn_mnist.pb",
+      s"${Models}/cnn_mnist.pb",
       List("Identity"),
       options
     )
@@ -1576,7 +1576,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/resnet20v2_cifar.pb",
+      s"${Models}/resnet20v2_cifar.pb",
       List("Identity"),
       options,
       traceContext
@@ -1606,7 +1606,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/resnet20v2_cifar.pb",
+      s"${Models}/resnet20v2_cifar.pb",
       List("Identity"),
       options,
       traceContext
@@ -1630,7 +1630,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/resnet20v2_cifar.pb",
+      s"${Models}/resnet20v2_cifar.pb",
       List("Identity"),
       options,
       traceContext
@@ -1661,7 +1661,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/resnet20v2_cifar.pb",
+      s"${Models}/resnet20v2_cifar.pb",
       List("Identity"),
       options,
       traceContext
@@ -1710,8 +1710,10 @@ class CompilerSpec extends FlatSpec {
     stride1Depth = 8,
   )
 
+  val YoloSize = 416
+
   it should "Compile TF float YoloV4-tiny" taggedAs (Slow) in {
-    val name         = "yolov4_tiny_192_8x8_float"
+    val name         = s"yolov4_tiny_${YoloSize}_8x8_float"
     val traceContext = new ExecutiveTraceContext()
     val options = CompilerOptions(
       arch = YoloTinyFloat32Architecture,
@@ -1720,8 +1722,8 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/yolov4_tiny_192.pb",
-      TinyYolo.GoldenOutputFileNames.keys.toList,
+      s"${Models}/yolov4_tiny_${YoloSize}.pb",
+      TinyYolo(YoloSize, onnx = false).GoldenOutputFileNames.keys.toList,
       options,
       traceContext
     )
@@ -1734,7 +1736,7 @@ class CompilerSpec extends FlatSpec {
   }
 
   it should "Compile TF fixed32bp16 YoloV4-tiny" taggedAs (Slow) in {
-    val name         = "yolov4_tiny_192_8x8_fixed32bp16"
+    val name         = s"yolov4_tiny_${YoloSize}_8x8_fixed32bp16"
     val traceContext = new ExecutiveTraceContext()
     val options = CompilerOptions(
       arch = YoloTinyFp32bp16Architecture,
@@ -1743,8 +1745,8 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/yolov4_tiny_192.pb",
-      TinyYolo.GoldenOutputFileNames.keys.toList,
+      s"${Models}/yolov4_tiny_${YoloSize}.pb",
+      TinyYolo(YoloSize, onnx = false).GoldenOutputFileNames.keys.toList,
       options,
       traceContext
     )
@@ -1757,7 +1759,7 @@ class CompilerSpec extends FlatSpec {
   }
 
   it should "Compile TF fixed18bp10 YoloV4-tiny" taggedAs (Slow) in {
-    val name         = "yolov4_tiny_192_8x8_fixed18bp10"
+    val name         = s"yolov4_tiny_${YoloSize}_8x8_fixed18bp10"
     val traceContext = new ExecutiveTraceContext()
     val options = CompilerOptions(
       arch = YoloTinyFp18bp10Architecture,
@@ -1766,8 +1768,8 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/yolov4_tiny_192.pb",
-      TinyYolo.GoldenOutputFileNames.keys.toList,
+      s"${Models}/yolov4_tiny_${YoloSize}.pb",
+      TinyYolo(YoloSize, onnx = false).GoldenOutputFileNames.keys.toList,
       options,
       traceContext
     )
@@ -1780,20 +1782,24 @@ class CompilerSpec extends FlatSpec {
   }
 
   it should "Compile TF fixed16bp8 YoloV4-tiny" in {
-    val name         = "yolov4_tiny_192_8x8_fixed16bp8"
+    val name         = s"yolov4_tiny_${YoloSize}_8x8_fixed16bp8"
     val traceContext = new ExecutiveTraceContext()
     val options = CompilerOptions(
       arch = YoloTinyFp16bp8Architecture,
       printSummary = true,
       printLayersSummary = true,
       collectBackendStats = true,
-      printGraphFileName = Some(s"${name}.dot")
+      printGraphFileName = Some(s"${name}.dot"),
+      /*tracepointConditions = List(
+        TracepointCondition(MemoryTag.Vars, "model/conv2d_17/BiasAdd"),
+        TracepointCondition(MemoryTag.Vars, "model/conv2d_20/BiasAdd")
+      )*/
     )
 
     Compiler.compile(
       name,
-      s"$Models/yolov4_tiny_192.pb",
-      TinyYolo.GoldenOutputFileNames.keys.toList,
+      s"${Models}/yolov4_tiny_${YoloSize}.pb",
+      TinyYolo(YoloSize, onnx = false).GoldenOutputFileNames.keys.toList,
       options,
       traceContext
     )
@@ -1837,7 +1843,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/resnet50v2_imagenet.pb",
+      s"${Models}/resnet50v2_imagenet.pb",
       List("Identity"),
       options,
       traceContext
@@ -1860,7 +1866,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/resnet50v2_imagenet.pb",
+      s"${Models}/resnet50v2_imagenet.pb",
       List("Identity"),
       options,
       traceContext
@@ -1883,7 +1889,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/resnet20v2_cifar.onnx",
+      s"${Models}/resnet20v2_cifar.onnx",
       List("Identity:0"),
       options,
       traceContext
@@ -1912,7 +1918,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/resnet20v2_cifar.onnx",
+      s"${Models}/resnet20v2_cifar.onnx",
       List("Identity:0"),
       options,
       traceContext
@@ -1935,7 +1941,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/resnet50v2_imagenet.onnx",
+      s"${Models}/resnet50v2_imagenet.onnx",
       List("Identity:0"),
       options,
       traceContext
@@ -1964,7 +1970,7 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/resnet50v2_imagenet.onnx",
+      s"${Models}/resnet50v2_imagenet.onnx",
       List("Identity:0"),
       options,
       traceContext
@@ -1978,7 +1984,7 @@ class CompilerSpec extends FlatSpec {
   }
 
   it should "Compile ONNX float YoloV4-tiny" taggedAs (Slow) in {
-    val name         = "yolov4_tiny_192_8x8_float_onnx"
+    val name         = s"yolov4_tiny_${YoloSize}_8x8_float_onnx"
     val traceContext = new ExecutiveTraceContext()
     val options = CompilerOptions(
       arch = YoloTinyFloat32Architecture,
@@ -1987,8 +1993,8 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/yolov4_tiny_192.onnx",
-      TinyYoloOnnx.GoldenOutputFileNames.keys.toList,
+      s"${Models}/yolov4_tiny_${YoloSize}.onnx",
+      TinyYolo(YoloSize, onnx = true).GoldenOutputFileNames.keys.toList,
       options,
       traceContext
     )
@@ -2001,7 +2007,7 @@ class CompilerSpec extends FlatSpec {
   }
 
   it should "Compile ONNX fixed16bp8 YoloV4-tiny" in {
-    val name         = "yolov4_tiny_192_8x8_fixed16bp8_onnx"
+    val name         = s"yolov4_tiny_${YoloSize}_8x8_fixed16bp8_onnx"
     val traceContext = new ExecutiveTraceContext()
     val options = CompilerOptions(
       arch = YoloTinyFp16bp8Architecture,
@@ -2013,8 +2019,8 @@ class CompilerSpec extends FlatSpec {
 
     Compiler.compile(
       name,
-      s"$Models/yolov4_tiny_192.onnx",
-      TinyYoloOnnx.GoldenOutputFileNames.keys.toList,
+      s"${Models}/yolov4_tiny_${YoloSize}.onnx",
+      TinyYolo(YoloSize, onnx = true).GoldenOutputFileNames.keys.toList,
       options,
       traceContext
     )

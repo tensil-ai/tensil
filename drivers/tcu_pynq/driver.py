@@ -220,21 +220,41 @@ class Driver:
         # initialize flush probe
         self.probe_source_address = self.arch.dram0_depth - 1
         self.probe_target_address = self.arch.dram0_depth - 2
-        self.probe_source = np.full(self.arch.array_size, np.iinfo(data_type_numpy(self.arch.data_type)).max, dtype=data_type_numpy(self.arch.data_type))
-        self.probe_target = np.full(self.arch.array_size, 0, dtype=data_type_numpy(self.arch.data_type))
+        self.probe_source = np.full(
+            self.arch.array_size,
+            np.iinfo(data_type_numpy(self.arch.data_type)).max,
+            dtype=data_type_numpy(self.arch.data_type))
+        self.probe_target = np.full(
+            self.arch.array_size,
+            0,
+            dtype=data_type_numpy(self.arch.data_type))
         
         # write flush probe
-        self.dram0.write(self.scalar_address(self.probe_source_address), self.probe_source)
-        self.dram0.write(self.scalar_address(self.probe_target_address), self.probe_target)
+        self.dram0.write(
+            self.scalar_address(self.probe_source_address),
+            self.probe_source)
+        self.dram0.write(
+            self.scalar_address(self.probe_target_address),
+            self.probe_target)
 
         # flush probe instructions
         return [
-            self.layout.data_move(DataMoveFlag.dram0_to_memory, 0, self.probe_source_address, 0),
-            self.layout.data_move(DataMoveFlag.memory_to_dram0, 0, self.probe_target_address, 0)
+            self.layout.data_move(
+                DataMoveFlag.dram0_to_memory,
+                0,
+                self.probe_source_address,
+                0),
+            self.layout.data_move(
+                DataMoveFlag.memory_to_dram0,
+                0,
+                self.probe_target_address,
+                0)
         ]
 
     def wait_for_flush(self):
-        while not self.dram0.compare(self.scalar_address(self.probe_target_address), self.probe_source):
+        while not self.dram0.compare(
+            self.scalar_address(self.probe_target_address),
+            self.probe_source):
             pass
 
     def run(self, inputs):
@@ -258,7 +278,7 @@ class Driver:
             prev = now
 
         if self.model is None:
-            raise Exception("model not loaded: please run driver.load_model first")            
+            raise Exception("model not loaded: please run driver.load_model first")
 
         # load inputs
         for inp in self.model.inputs:

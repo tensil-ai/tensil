@@ -7,6 +7,13 @@ Tensil
 
 ![Flow](https://s3.us-west-1.amazonaws.com/downloads.tensil.ai/doc/flow.png)
 
+## Tutorials
+
+For in-depth end-to-end instructions check our tutorials.
+
+- [Learn Tensil with ResNet and PYNQ Z1](https://www.tensil.ai/docs/tutorials/resnet20-pynqz1/)
+- [Learn Tensil with ResNet and Ultra96](https://www.tensil.ai/docs/tutorials/resnet20-ultra96v2/)
+
 ## Setup
 
 1. Pull and run [Tensil docker container](https://hub.docker.com/r/tensilai/tensil) (see below);
@@ -23,18 +30,18 @@ docker run -v $(pwd):/work -w /work -it tensilai/tensil bash
 
 ## Compile AI/ML model
 
-Compile AI/ML model (ResNet20 v2 CIFAR) for specific TCU architecture and FPGA development platform ([Avnet Ultra96 v2](https://www.avnet.com/wps/portal/us/products/avnet-boards/avnet-board-families/ultra96-v2/)).
+Compile AI/ML model (ResNet20 v2 CIFAR) for specific TCU architecture and FPGA development platform, [PYNQ Z1](https://digilent.com/shop/pynq-z1-python-productivity-for-zynq-7000-arm-fpga-soc/) in this example.
 
 #### From ONNX
 
 ```
-tensil compile -a /demo/arch/ultra96v2.tarch -m /demo/models/resnet20v2_cifar.onnx -o "Identity:0" -s true
+tensil compile -a /demo/arch/pynqz1.tarch -m /demo/models/resnet20v2_cifar.onnx -o "Identity:0" -s true
 ```
 
 #### From frozen TensorFlow graph
 
 ```
-tensil compile -a /demo/arch/ultra96v2.tarch -m /demo/models/resnet20v2_cifar.pb -o "Identity" -s true
+tensil compile -a /demo/arch/pynqz1.tarch -m /demo/models/resnet20v2_cifar.pb -o "Identity" -s true
 ```
 
 #### Other ML frameworks are supported by converting to ONNX
@@ -46,17 +53,17 @@ tensil compile -a /demo/arch/ultra96v2.tarch -m /demo/models/resnet20v2_cifar.pb
 
 ## Make Verilog RTL
 
-Make Verilog RTL for specific TCU architecture and FPGA development platform (Ultra96 v2) and 128-bit AXI interface to DDR memory.
+Make Verilog RTL for specific TCU architecture and FPGA development platform, [PYNQ Z1](https://digilent.com/shop/pynq-z1-python-productivity-for-zynq-7000-arm-fpga-soc/) in this example.
 
 ```
-tensil rtl -a /demo/arch/ultra96v2.tarch -d 128 -s true
+tensil rtl -a /demo/arch/pynqz1.tarch -s true
 ```
 
 ## Create Vivado design
 
-Create Vivado design for specific FPGA development platform (Ultra96 v2). If this is something you don't know how to do, we can help! Please reach out to us at [contact@tensil.ai](mailto:contact@tensil.ai).
+Create Vivado design for specific FPGA development platform. We include detailed steps in our [PYNQ Z1 tutorial](https://www.tensil.ai/docs/tutorials/resnet20-pynqz1/). If you get stuck, we can help! Please reach out to us at [contact@tensil.ai](mailto:contact@tensil.ai) or in [Discord](https://discord.gg/TSw34H3PXr).
 
-![Ultra96 v2 design](https://s3.us-west-1.amazonaws.com/downloads.tensil.ai/doc/ultra96v2_design.png)
+![PYNQ Z1 design](https://s3.us-west-1.amazonaws.com/downloads.tensil.ai/doc/pynqz1_design.png)
 
 ## Run AI/ML model on FPGA
 
@@ -82,13 +89,13 @@ rm main.tar.gz
 ### Run RTL tool from source code
 
 ```
-./mill rtl.run -a ./arch/ultra96v2.tarch -d 128 -s true
+./mill rtl.run -a ./arch/pynqz1.tarch -s true
 ```
 
 ### Run compiler from source code
 
 ```
-./mill tools.run -a ./arch/ultra96v2.tarch -m ./models/resnet20v2_cifar.onnx -o "Identity:0" -s true
+./mill tools.run -a ./arch/pynqz1.tarch -m ./models/resnet20v2_cifar.onnx -o "Identity:0" -s true
 ```
 
 ### Run full test suite

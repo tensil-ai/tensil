@@ -89,7 +89,7 @@ rm main.tar.gz
 ### Run RTL tool from source code
 
 ```
-./mill rtl.run -a ./arch/pynqz1.tarch -d 128 -s true
+./mill rtl.run -a ./arch/pynqz1.tarch -s true
 ```
 
 ### Run compiler from source code

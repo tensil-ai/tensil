@@ -19,7 +19,7 @@ Architecture = namedtuple(
     ],
 )
 
-tiny = Architecture(
+pynqz1 = Architecture(
     data_type=DataType.FP16BP8,
     array_size=8,
     dram0_depth=1048576,

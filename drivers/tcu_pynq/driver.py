@@ -19,6 +19,7 @@ from tcu_pynq.axi import axi_data_type
 from tcu_pynq.data_type import data_type_numpy
 from tcu_pynq.stream import Stream
 from tcu_pynq.instruction import Layout
+from tcu_pynq.instruction import DataMoveFlag
 from tcu_pynq.config import Register, Constant
 from tcu_pynq.allocator import Allocator
 from tcu_pynq.model import model_from_json
@@ -184,8 +185,9 @@ class Driver:
     def configure(self, *pairs):
         program = [
             self.layout.configure(register.value, value) for register, value in pairs
-        ]
+        ] + self.prepare_flush_probe()
         self.write_instructions(program)
+        self.wait_for_flush()
 
     def load_model(self, model_filename):
         self.model_filename = model_filename
@@ -211,6 +213,50 @@ class Driver:
         with open(d + self.model.prog.file_name, "rb") as f:
             self.program = f.read()
 
+    def scalar_address(self, vec_address):
+        return vec_address * self.arch.array_size
+
+    def prepare_flush_probe(self): 
+        # initialize flush probe
+        self.probe_source_address = self.arch.dram0_depth - 1
+        self.probe_target_address = self.arch.dram0_depth - 2
+        self.probe_source = np.full(
+            self.arch.array_size,
+            np.iinfo(data_type_numpy(self.arch.data_type)).max,
+            dtype=data_type_numpy(self.arch.data_type))
+        self.probe_target = np.full(
+            self.arch.array_size,
+            0,
+            dtype=data_type_numpy(self.arch.data_type))
+        
+        # write flush probe
+        self.dram0.write(
+            self.scalar_address(self.probe_source_address),
+            self.probe_source)
+        self.dram0.write(
+            self.scalar_address(self.probe_target_address),
+            self.probe_target)
+
+        # flush probe instructions
+        return [
+            self.layout.data_move(
+                DataMoveFlag.dram0_to_memory,
+                0,
+                self.probe_source_address,
+                0),
+            self.layout.data_move(
+                DataMoveFlag.memory_to_dram0,
+                0,
+                self.probe_target_address,
+                0)
+        ]
+
+    def wait_for_flush(self):
+        while not self.dram0.compare(
+            self.scalar_address(self.probe_target_address),
+            self.probe_source):
+            pass
+
     def run(self, inputs):
         """
         Runs the model and returns outputs as a dict.
@@ -233,24 +279,33 @@ class Driver:
 
         if self.model is None:
             raise Exception("model not loaded: please run driver.load_model first")
-        scalar_address = lambda vec_address: vec_address * self.arch.array_size
+
         # load inputs
         for inp in self.model.inputs:
             data = self.to_fixed(inputs[inp.name]).astype(
                 data_type_numpy(self.arch.data_type)
             )
-            self.dram0.write(scalar_address(inp.base), data)
+            self.dram0.write(self.scalar_address(inp.base), data)
         timestamp("wrote inputs")
+
+        # append flush probe instructions
+        prog = self.program
+        for i in self.prepare_flush_probe():
+            prog = prog + self.layout.to_bytes(i)
+
         # write program
         self.instruction_stream.write(
-            self.program, align=self.layout.instruction_size_bytes
+            prog, align=self.layout.instruction_size_bytes
         )
+
+        self.wait_for_flush()
         timestamp("wrote program")
+        
         # return outputs
         outputs = dict()
         for out in self.model.outputs:
             data = self.from_fixed(
-                self.dram0.read(scalar_address(out.base), scalar_address(out.size))
+                self.dram0.read(self.scalar_address(out.base), self.scalar_address(out.size))
             )
             if out.name in outputs:
                 outputs[out.name] = np.concatenate([outputs[out.name], data])

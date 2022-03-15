@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright © 2019-2022 Tensil AI Company
 
+import math
 import numpy as np
 import pynq
 from tcu_pynq.axi import axi_data_type
@@ -85,8 +86,8 @@ class DoubleBufferedAdapter:
     def _init_buffers(self, total_length, align):
         self.total_length = total_length
 
-        align_data_width_lcm = lcm(align, self.axi_data_width // 8)
-        self.buffer_size = self.max_buffer_size - (self.max_buffer_size % align_data_width_lcm)
+        align_with_axi = align // math.gcd(align, self.axi_data_width // 8)
+        self.buffer_size = self.max_buffer_size - (self.max_buffer_size % align_with_axi)
 
         self.remainder_buffer_size = self.total_length % self.buffer_size
         self.buffer = [
@@ -225,8 +226,8 @@ class Stream:
         align : int (optional) >= 1
             word size in bytes to align the stream on
         """
-        align_data_width_lcm = lcm(align, self.axi_data_width // 8)
-        remainder = align_data_width_lcm - (len(data) % align_data_width_lcm)
+        align_with_axi = lcm(align, self.axi_data_width // 8)
+        remainder = align_with_axi - (len(data) % align_with_axi)
         if remainder != 0:
             data = data + bytes([0 for i in range(remainder)])
         write_data = np.frombuffer(data, dtype=np.uint8).view(self.axi_data_type)

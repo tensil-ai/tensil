@@ -56,6 +56,15 @@ class Mem:
             print("read addr={} size={}".format(offset, size))
         return data
 
+    def compare(self, offset, data):
+        """returns an np.array of type self.data_type_numpy"""
+        if data.dtype != self.data_type_numpy:
+            raise MemException(
+                "data type must be {}, got {}".format(self.data_type_numpy, data.dtype)
+            )
+        data = data.reshape((-1,))
+        return np.array_equal(self.mem[offset : offset + len(data)], data)
+
     def write_bytes(self, offset_bytes, data):
         if offset_bytes % self.data_type_numpy_size_bytes != 0:
             raise MemException(

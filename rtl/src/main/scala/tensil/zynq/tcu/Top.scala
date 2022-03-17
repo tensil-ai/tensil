@@ -51,7 +51,7 @@ class Top(
 
   val clock       = IO(Input(Clock()))
   val reset       = IO(Input(Bool()))
-  val instruction = IO(Flipped(new AXI4Stream(layout.instructionSizeBytes * 8)))
+  val instruction = IO(Flipped(new AXI4Stream(options.dramAxiConfig.dataWidth)))
   val m_axi_dram0 = IO(new axi.ExternalMaster(options.dramAxiConfig))
   val m_axi_dram1 = IO(new axi.ExternalMaster(options.dramAxiConfig))
 

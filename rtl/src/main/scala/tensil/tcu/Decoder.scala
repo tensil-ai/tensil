@@ -515,27 +515,29 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
       ),
     )
   }.elsewhen(instruction.bits.opcode === Opcode.Configure) {
-    val args =
-      Wire(new ConfigureArgs(registerWidth, platformConfig.axi.addrWidth))
+    when(instruction.valid) {
+      val args =
+        Wire(new ConfigureArgs(registerWidth, platformConfig.axi.addrWidth))
 
-    args := instruction.bits.arguments.asTypeOf(args)
+      args := instruction.bits.arguments.asTypeOf(args)
 
-    when(args.register === Configure.dram0AddressOffset) {
-      dram0AddressOffset := (args.value << 16)
-    }.elsewhen(args.register === Configure.dram0CacheBehaviour) {
-      dram0CacheBehaviour := args.value
-    }.elsewhen(args.register === Configure.dram1AddressOffset) {
-      dram1AddressOffset := (args.value << 16)
-    }.elsewhen(args.register === Configure.dram1CacheBehaviour) {
-      dram1CacheBehaviour := args.value
-    }.elsewhen(args.register === Configure.timeout) {
-      timeout := args.value
-    }.elsewhen(args.register === Configure.tracepoint) {
-      tracepoint := args.value
-    }.elsewhen(args.register === Configure.programCounter) {
-      programCounter := args.value
-    }.elsewhen(args.register === Configure.sampleInterval) {
-      sampleInterval := args.value
+      when(args.register === Configure.dram0AddressOffset) {
+        dram0AddressOffset := (args.value << 16)
+      }.elsewhen(args.register === Configure.dram0CacheBehaviour) {
+        dram0CacheBehaviour := args.value
+      }.elsewhen(args.register === Configure.dram1AddressOffset) {
+        dram1AddressOffset := (args.value << 16)
+      }.elsewhen(args.register === Configure.dram1CacheBehaviour) {
+        dram1CacheBehaviour := args.value
+      }.elsewhen(args.register === Configure.timeout) {
+        timeout := args.value
+      }.elsewhen(args.register === Configure.tracepoint) {
+        tracepoint := args.value
+      }.elsewhen(args.register === Configure.programCounter) {
+        programCounter := args.value
+      }.elsewhen(args.register === Configure.sampleInterval) {
+        sampleInterval := args.value
+      }
     }
 
     instruction.ready := true.B

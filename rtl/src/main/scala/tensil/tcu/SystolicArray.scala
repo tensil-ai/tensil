@@ -39,7 +39,8 @@ class SystolicArray[T <: Data with Num[T]](
   val arrayPropagationDelay = height + width - 1
   val array                 = Module(new InnerSystolicArray(gen, height, width))
 
-  val input = io.input
+  val input = Queue(io.input, 2)
+  // val input = io.input
   // val input = QueueWithReporting(io.input, 1 << 1) // 4
   // val input = QueueWithReporting(io.input, 1 << 4)
   // val weight = QueueWithReporting(io.weight, 2) // 1 + width

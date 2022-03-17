@@ -14,6 +14,10 @@ For in-depth end-to-end instructions check our tutorials.
 - [Learn Tensil with ResNet and PYNQ Z1](https://www.tensil.ai/docs/tutorials/resnet20-pynqz1/)
 - [Learn Tensil with ResNet and Ultra96](https://www.tensil.ai/docs/tutorials/resnet20-ultra96v2/)
 
+## Documentation
+
+For reference documentation see our [website](https://www.tensil.ai/docs/).
+
 ## Setup
 
 1. Pull and run [Tensil docker container](https://hub.docker.com/r/tensilai/tensil) (see below);

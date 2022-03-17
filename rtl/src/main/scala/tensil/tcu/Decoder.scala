@@ -69,7 +69,8 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
   dontTouch(io.programCounter)
 
   // val instruction = QueueWithReporting(io.instruction, 1 << 1) // 4
-  val instruction = io.instruction
+  val instruction = Queue(io.instruction, 2)
+  // val instruction = io.instruction
 
   // only enqueues when instruction is done. we're just assuming
   // status.io.enq.ready will always be true, hence the 50 element buffer

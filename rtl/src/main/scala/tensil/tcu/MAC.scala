@@ -29,7 +29,8 @@ class MAC[T <: Data with Num[T]](val gen: T) extends Module {
     weight := io.addInput
     io.output := weight
   }.otherwise {
-    output := util.plus(gen, util.times(gen, io.mulInput, weight), io.addInput)
+    output := util.mac(gen, io.mulInput, weight, io.addInput)
+    // output := util.plus(gen, util.times(gen, io.mulInput, weight), io.addInput)
     io.output := output
   }
 }

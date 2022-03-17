@@ -103,6 +103,31 @@ package object util {
     Mux(x > max, max, Mux(x < min, min, x))
   }
 
+  def macFixedPoint(gen: FixedPoint, x: SInt, y: SInt, z: SInt): FixedPoint = {
+    val width       = gen.getWidth
+    val binaryPoint = gen.binaryPoint.get
+
+    val mul = x * y
+
+    val mask0 = 1.S << (binaryPoint - 1)
+    val mask1 = (1.S << (binaryPoint - 1)) - 1.S
+    val mask2 = 1.S << binaryPoint
+
+    val adjustment =
+      Mux(
+        (((mul & mask0) =/= 0.S) && (((mul & mask1) =/= 0.S) || ((mul & mask2) =/= 0.S))),
+        1.S,
+        0.S
+      )
+
+    val adjusted = (mul >> binaryPoint) + adjustment
+    // Add extra bit to detect over-/underflow
+    val sum       = adjusted +& z
+    val saturated = saturateFixedPoint(width, sum)
+
+    saturated.asFixedPoint(gen.binaryPoint)
+  }
+
   /**
     * timesFixedPoint returns the product of two fixed point values with a
     * "round-to-nearest-even" rounding policy.
@@ -145,6 +170,14 @@ package object util {
     val saturated = saturateFixedPoint(width, sum)
 
     saturated.asFixedPoint(gen.binaryPoint)
+  }
+
+  def mac[T <: Data with Num[T]](gen: T, x: T, y: T, z: T): T = {
+    (gen, x, y, z) match {
+      case (gen: FixedPoint, x: FixedPoint, y: FixedPoint, z: FixedPoint) =>
+        macFixedPoint(gen, x.asSInt(), y.asSInt(), z.asSInt()).asInstanceOf[T]
+      case _ => x * y
+    }
   }
 
   def times[T <: Data with Num[T]](gen: T, x: T, y: T): T = {

@@ -79,6 +79,8 @@ class DecoderSpec extends FunUnitSpec {
           m.clock.step()
           m.io.tracepoint.expect(false.B)
           m.clock.step()
+          m.io.tracepoint.expect(false.B)
+          m.clock.step()
           m.io.tracepoint.expect(true.B)
         // m.clock.step()
         // m.io.tracepoint.expect(true.B)

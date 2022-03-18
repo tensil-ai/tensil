@@ -19,10 +19,10 @@ class StrideHandler[
     val out = Decoupled(outGen.cloneType)
   })
 
-  // what happens when size = 0 but stride > 0?
-  // what happens when size * stride > depth?
+  // TODO
+  //  what happens when size = 0 but stride > 0?
+  //  what happens when size * stride > depth?
 
-  // val in = QueueWithReporting(io.in, 2, name = name)
   val in = io.in
   val handler = Module(
     new SizeAndStrideHandler(

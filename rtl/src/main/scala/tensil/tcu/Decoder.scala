@@ -19,6 +19,7 @@ import tensil.mem.SizeAndStrideHandler
 import tensil.mem.SizeHandler
 import tensil.util.WithLast
 import tensil.util.decoupled.MultiEnqueue
+import tensil.mem.OutQueue
 
 class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
     implicit val platformConfig: PlatformConfig
@@ -176,8 +177,8 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
   )
   io.memPortA <> memPortAHandler.io.out
   io.memPortB <> memPortBHandler.io.out
-  val memPortA = memPortAHandler.io.in
-  val memPortB = memPortBHandler.io.in
+  val memPortA = OutQueue(memPortAHandler.io.in, 2)
+  val memPortB = OutQueue(memPortBHandler.io.in, 2)
   //// accumulator
   val accInGen  = new AccumulatorMemControlWithSizeWithStride(layout)
   val accOutGen = new AccumulatorMemControl(layout)

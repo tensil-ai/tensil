@@ -26,9 +26,7 @@ class SizeAndStrideHandler[
     val out = Decoupled(outGen.cloneType)
   })
 
-  // val in =
-  //   if (inputQueue) QueueWithReporting(io.in, 1 << 5, name = name) else io.in
-  val in     = Queue(io.in, 2)
+  val in     = io.in
   val stride = 1.U << in.bits.stride
 
   val sizeCounter    = Counter(depth)

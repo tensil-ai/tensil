@@ -39,13 +39,7 @@ class SystolicArray[T <: Data with Num[T]](
   val arrayPropagationDelay = height + width - 1
   val array                 = Module(new InnerSystolicArray(gen, height, width))
 
-  val input = Queue(io.input, 2)
-  // val input = io.input
-  // val input = QueueWithReporting(io.input, 1 << 1) // 4
-  // val input = QueueWithReporting(io.input, 1 << 4)
-  // val weight = QueueWithReporting(io.weight, 2) // 1 + width
-  // val weight  = QueueWithReporting(io.weight, 1 + width)
-  // val control = QueueWithReporting(io.control, 2 + width) // 1 << 5
+  val input   = Queue(io.input, 2)
   val weight  = io.weight
   val control = io.control
   val output = Module(
@@ -64,9 +58,6 @@ class SystolicArray[T <: Data with Num[T]](
   io.ran.bits <> ran.io.deq.bits
   io.ran.valid := ran.io.deq.valid
   ran.io.deq.ready := io.ran.ready && output.io.deq.valid
-
-  // reportThroughput(control, 100, "Array.control")
-  // reportThroughput(input, 100, "Array.input")
 
   val runInput  = control.valid && !control.bits.load && !control.bits.zeroes
   val runZeroes = control.valid && !control.bits.load && control.bits.zeroes

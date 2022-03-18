@@ -176,7 +176,7 @@ package object util {
     (gen, x, y, z) match {
       case (gen: FixedPoint, x: FixedPoint, y: FixedPoint, z: FixedPoint) =>
         macFixedPoint(gen, x.asSInt(), y.asSInt(), z.asSInt()).asInstanceOf[T]
-      case _ => x * y
+      case _ => x * y + z
     }
   }
 

@@ -222,17 +222,17 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
                 )
 
                 // setup compiler output streams
-                val modelFileName = "./models/resnet20v2_cifar.pb"
+                val modelFileName = "./models/resnet20v2_cifar.onnx"
                 val model         = new FileInputStream(modelFileName)
                 val consts        = new ByteArrayOutputStream()
                 val program       = new ByteArrayOutputStream()
 
                 // run the compiler
                 val compilerResult = Compiler.compileStreamToStreams(
-                  "resnet20v2_cifar_pb",
+                  "resnet20v2_cifar_onnx",
                   Compiler.getModelSourceType(modelFileName),
                   model,
-                  List("Identity"),
+                  List("Identity:0"),
                   program,
                   consts,
                   options
@@ -500,13 +500,13 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
               .filter(_ <= arch.accumulatorDepth)
 
           val tests = Seq(
-            () => xor4(batchSize = 1),
+            /*() => xor4(batchSize = 1),
             () => xor4(batchSize = 2),
-            () => xor4(batchSize = 4),
+            () => xor4(batchSize = 4),*/
             () => resnet(batchSize = 1, inputSize = 1),
-            () => resnet(batchSize = 10, inputSize = 10),
-          ) ++ dataMoveSizes.map(size => () => dataMove(size, 4, true)) ++
-            dataMoveSizes.map(size => () => dataMove(size, 4, false))
+            /*() => resnet(batchSize = 10, inputSize = 10),*/
+          ) /*++ dataMoveSizes.map(size => () => dataMove(size, 4, true)) ++
+            dataMoveSizes.map(size => () => dataMove(size, 4, false))*/
 
           for (t <- tests) {
             if (randomizeDrams) {

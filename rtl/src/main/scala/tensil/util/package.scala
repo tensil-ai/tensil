@@ -173,7 +173,8 @@ package object util {
   def minus[T <: Data with Num[T]](gen: T, x: T, y: T): T = {
     (gen, x, y) match {
       case (gen: FixedPoint, x: FixedPoint, y: FixedPoint) =>
-        plusFixedPoint(gen, x.asSInt(), -y.asSInt()).asInstanceOf[T]
+        plusFixedPoint(gen, x.asSInt(), 0.S -& y.asSInt())
+          .asInstanceOf[T]
       case _ => x - y
     }
   }

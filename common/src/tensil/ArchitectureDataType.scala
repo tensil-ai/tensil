@@ -35,7 +35,7 @@ class ArchitectureDataTypeWithBase[T](
   def writeFloatConst(f: Float, stream: DataOutputStream): Unit =
     writeConst(base.fromFloat(f), stream)
   def readFloatConst(stream: DataInputStream): Float =
-    base.numeric.toFloat(readConst(stream))
+    base.numericWithMAC.toFloat(readConst(stream))
 
   def writeConst(v: T, stream: DataOutputStream): Unit =
     stream.write(base.toBytes(v))

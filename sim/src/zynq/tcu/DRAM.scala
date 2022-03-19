@@ -222,7 +222,7 @@ class DRAMWithBase[T](
   }
 
   def readFloatScalar(address: Long): Float = {
-    base.numeric.toFloat(readScalar(address))
+    base.numericWithMAC.toFloat(readScalar(address))
   }
 
   def writeFloatScalar(address: Long, scalar: Float): Unit = {

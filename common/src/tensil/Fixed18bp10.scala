@@ -16,5 +16,5 @@ object Fixed18bp10
       toLongBits = (fixed: Fixed18bp10) => fixed.bits.toLong
     ) {
 
-  implicit val numeric = mkNumeric
+  implicit val numericWithMAC = mkNumericWithMAC
 }

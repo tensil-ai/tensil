@@ -60,14 +60,18 @@ abstract class FixedBase[TFixed](
     underflowStat.report("FIXED POINT UNDERFLOW SUMMARY")
   }
 
-  def mkNumeric =
-    new Numeric[TFixed] {
+  def mkNumericWithMAC =
+    new NumericWithMAC[TFixed] {
       override def plus(x: TFixed, y: TFixed): TFixed =
-        mkFixed(toLongBits(x) + toLongBits(y))
+        mac(y, fromInt(1), x)
       override def minus(x: TFixed, y: TFixed): TFixed =
-        mkFixed(toLongBits(x) - toLongBits(y))
-      override def times(x: TFixed, y: TFixed): TFixed = {
-        val mul = toLongBits(x) * toLongBits(y)
+        mac(y, fromInt(-1), x)
+
+      override def times(x: TFixed, y: TFixed): TFixed =
+        mac(x, y, fromInt(0))
+
+      override def mac(x: TFixed, y: TFixed, z: TFixed): TFixed = {
+        val mac = toLongBits(x) * toLongBits(y) + (toLongBits(z) << basePoint)
 
         /*
          * TDOD: Multiple rounding policies can be employed. Currently
@@ -84,24 +88,24 @@ abstract class FixedBase[TFixed](
 
         /*
         // round-to-nearest-up
-        val adj = if ((mul & (1L << (BasePoint - 1))) != 0) 1 else 0
+        val adj = if ((mac & (1L << (BasePoint - 1))) != 0) 1 else 0
          */
 
         // round-to-nearest-even
         val adj = if (
-          (mul & (1L << (basePoint - 1))) != 0 && ((mul & ((1L << (basePoint - 1)) - 1)) != 0 || (mul & (1L << (basePoint))) != 0)
+          (mac & (1L << (basePoint - 1))) != 0 && ((mac & ((1L << (basePoint - 1)) - 1)) != 0 || (mac & (1L << (basePoint))) != 0)
         ) 1
         else 0
 
         /*
         // round-to-odd
         val adj = if (
-          (mul & (1L << (BasePoint))) == 0 && (mul & ((1L << (BasePoint)) - 1)) != 0
+          (mac & (1L << (BasePoint))) == 0 && (mac & ((1L << (BasePoint)) - 1)) != 0
         ) 1
         else 0
          */
 
-        mkFixed((mul >> basePoint) + adj)
+        mkFixed((mac >> basePoint) + adj)
       }
       override def negate(x: TFixed): TFixed =
         mkFixed(-toLongBits(x))

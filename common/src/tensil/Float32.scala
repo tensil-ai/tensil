@@ -11,6 +11,17 @@ import java.io.{
   DataInputStream
 }
 
+trait FloatAsIfIntegralWithMAC
+    extends FloatAsIfIntegral
+    with NumericWithMAC[Float] {
+  def mac(x: Float, y: Float, z: Float): Float =
+    x * y + z
+}
+
+object FloatAsIfIntegralWithMAC
+    extends FloatAsIfIntegralWithMAC
+    with Ordering.FloatOrdering {}
+
 object Float32 extends DataTypeBase[Float] {
   def sizeBytes: Int = 4
 
@@ -28,7 +39,7 @@ object Float32 extends DataTypeBase[Float] {
   def fromFloat(f: Float): Float   = f
   def fromDouble(d: Double): Float = d.toFloat
 
-  implicit val numeric = FloatAsIfIntegral
+  implicit val numericWithMAC = FloatAsIfIntegralWithMAC
 
   def resetOverUnderflowStats(): Unit = {}
   def reportOverUnderflowStats(): Unit = {}

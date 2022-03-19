@@ -63,15 +63,18 @@ abstract class FixedBase[TFixed](
   def mkNumericWithMAC =
     new NumericWithMAC[TFixed] {
       override def plus(x: TFixed, y: TFixed): TFixed =
-        mac(y, fromInt(1), x)
+        mkFixed(doMAC(toLongBits(x), 1L << basePoint, toLongBits(y)))
       override def minus(x: TFixed, y: TFixed): TFixed =
-        mac(y, fromInt(-1), x)
+        mkFixed(doMAC(toLongBits(x), 1L << basePoint, -toLongBits(y)))
 
       override def times(x: TFixed, y: TFixed): TFixed =
-        mac(x, y, fromInt(0))
+        mkFixed(doMAC(toLongBits(x), toLongBits(y), 0L))
 
-      override def mac(x: TFixed, y: TFixed, z: TFixed): TFixed = {
-        val mac = toLongBits(x) * toLongBits(y) + (toLongBits(z) << basePoint)
+      override def mac(x: TFixed, y: TFixed, z: TFixed): TFixed =
+        mkFixed(doMAC(toLongBits(x), toLongBits(y), toLongBits(z)))
+
+      private def doMAC(x: Long, y: Long, z: Long): Long = {
+        val mac = (x * y) + (z << basePoint)
 
         /*
          * TDOD: Multiple rounding policies can be employed. Currently
@@ -105,7 +108,7 @@ abstract class FixedBase[TFixed](
         else 0
          */
 
-        mkFixed((mac >> basePoint) + adj)
+        (mac >> basePoint) + adj
       }
       override def negate(x: TFixed): TFixed =
         mkFixed(-toLongBits(x))

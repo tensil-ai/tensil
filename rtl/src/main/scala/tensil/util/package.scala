@@ -103,46 +103,23 @@ package object util {
     Mux(x > max, max, Mux(x < min, min, x))
   }
 
-  def macFixedPoint(gen: FixedPoint, x: SInt, y: SInt, z: SInt): FixedPoint = {
-    val width       = gen.getWidth
-    val binaryPoint = gen.binaryPoint.get
-
-    val mul = x * y
-
-    val mask0 = 1.S << (binaryPoint - 1)
-    val mask1 = (1.S << (binaryPoint - 1)) - 1.S
-    val mask2 = 1.S << binaryPoint
-
-    val adjustment =
-      Mux(
-        (((mul & mask0) =/= 0.S) && (((mul & mask1) =/= 0.S) || ((mul & mask2) =/= 0.S))),
-        1.S,
-        0.S
-      )
-
-    val adjusted = (mul >> binaryPoint) + adjustment
-    // Add extra bit to detect over-/underflow
-    val sum       = adjusted +& z
-    val saturated = saturateFixedPoint(width, sum)
-
-    saturated.asFixedPoint(gen.binaryPoint)
-  }
-
   /**
-    * timesFixedPoint returns the product of two fixed point values with a
+    * macFixedPoint returns the multiply-accumulate of three fixed point values with a
     * "round-to-nearest-even" rounding policy.
     *
     * See: https://docs.google.com/spreadsheets/d/14U3z-yJsnC1whWWuBmbnL9ZggzcdP-VvrKsp4Y4ztPg/edit#gid=0
     *
     * @param x
     * @param y
-    * @return
+    * @param z
+    * @return x * y + z
     */
-  def timesFixedPoint(gen: FixedPoint, x: SInt, y: SInt): FixedPoint = {
+  def macFixedPoint(gen: FixedPoint, x: SInt, y: SInt, z: SInt): FixedPoint = {
     val width       = gen.getWidth
     val binaryPoint = gen.binaryPoint.get
 
-    val mul = x * y
+    // Add extra bit to detect over-/underflow
+    val mac = (x * y) +& (z << binaryPoint)
 
     val mask0 = 1.S << (binaryPoint - 1)
     val mask1 = (1.S << (binaryPoint - 1)) - 1.S
@@ -150,26 +127,23 @@ package object util {
 
     val adjustment =
       Mux(
-        (((mul & mask0) =/= 0.S) && (((mul & mask1) =/= 0.S) || ((mul & mask2) =/= 0.S))),
+        (((mac & mask0) =/= 0.S) && (((mac & mask1) =/= 0.S) || ((mac & mask2) =/= 0.S))),
         1.S,
         0.S
       )
 
-    val adjusted  = (mul >> binaryPoint) + adjustment
+    val adjusted  = (mac >> binaryPoint) + adjustment
     val saturated = saturateFixedPoint(width, adjusted)
 
     saturated.asFixedPoint(gen.binaryPoint)
   }
 
+  def timesFixedPoint(gen: FixedPoint, x: SInt, y: SInt): FixedPoint =
+    macFixedPoint(gen, x, y, 0.S)
+
   def plusFixedPoint(gen: FixedPoint, x: SInt, y: SInt): FixedPoint = {
-    val width       = gen.getWidth
     val binaryPoint = gen.binaryPoint.get
-
-    // Add extra bit to detect over-/underflow
-    val sum       = x +& y
-    val saturated = saturateFixedPoint(width, sum)
-
-    saturated.asFixedPoint(gen.binaryPoint)
+    macFixedPoint(gen, x, 1.S << binaryPoint, y)
   }
 
   def mac[T <: Data with Num[T]](gen: T, x: T, y: T, z: T): T = {

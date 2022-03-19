@@ -8,9 +8,52 @@ import chisel3.experimental.FixedPoint
 import chisel3.util.{Decoupled, Queue}
 import chiseltest._
 import tensil.{FixedDriver, FixedPeekPokeTester, Scratch, Treadle, UnitSpec}
+import tensil.Fixed16bp8
+
+import Numeric.Implicits._
 
 class UtilPackageTests extends UnitSpec {
+  "mac (fixed point)" should "work" in {
+    class TimesFixedPointModule extends Module {
+      val gen = FixedPoint(16.W, 8.BP)
+      val io = IO(new Bundle {
+        val x      = Input(gen)
+        val y      = Input(gen)
+        val z      = Input(gen)
+        val result = Output(gen)
+        val old    = Output(gen)
+      })
 
+      io.result := mac(gen, io.x, io.y, io.z)
+      io.old := io.x * io.y
+    }
+    val testCases = Array(
+      (-0.1, 0.265625, -0.125),
+      (-0.125, 0.25, 0.265625),
+      (0.1, 0.265625, 0.25),
+      (100.0, 2.65625, -0.1), // overflow saturation
+      (100.0, -2.65625, 0.1), // underflow saturation
+    )
+
+    test(new TimesFixedPointModule) { m =>
+      for (tc <- testCases) {
+        m.io.x.poke(tc._1.F(16.W, 8.BP))
+        m.io.y.poke(tc._2.F(16.W, 8.BP))
+        m.io.z.poke(tc._3.F(16.W, 8.BP))
+        m.io.result.expect(
+          (Fixed16bp8.numericWithMAC
+            .mac(
+              Fixed16bp8.fromDouble(tc._1),
+              Fixed16bp8.fromDouble(tc._2),
+              Fixed16bp8.fromDouble(tc._3)
+            ))
+            .toFloat
+            .F(16.W, 8.BP)
+        )
+        println(m.io.old.peek())
+      }
+    }
+  }
   "times (fixed point)" should "work" in {
     class TimesFixedPointModule extends Module {
       val gen = FixedPoint(16.W, 8.BP)
@@ -25,18 +68,21 @@ class UtilPackageTests extends UnitSpec {
       io.old := io.x * io.y
     }
     val testCases = Array(
-      (-0.1, 0.265625, -0.02734375),
-      (-0.125, 0.25, -0.03125),
-      (0.1, 0.265625, 0.02734375),
-      (100.0, 2.65625, 127.99609), // overflow saturation
-      (100.0, -2.65625, -128.0),   // underflow saturation
+      (-0.1, 0.265625),
+      (-0.125, 0.25),
+      (0.1, 0.265625),
+      (100.0, 2.65625),  // overflow saturation
+      (100.0, -2.65625), // underflow saturation
     )
 
     test(new TimesFixedPointModule) { m =>
       for (tc <- testCases) {
         m.io.x.poke(tc._1.F(16.W, 8.BP))
         m.io.y.poke(tc._2.F(16.W, 8.BP))
-        m.io.result.expect(tc._3.F(16.W, 8.BP))
+        m.io.result.expect(
+          (Fixed16bp8.fromDouble(tc._1) * Fixed16bp8.fromDouble(tc._2)).toFloat
+            .F(16.W, 8.BP)
+        )
         println(m.io.old.peek())
       }
     }
@@ -56,18 +102,21 @@ class UtilPackageTests extends UnitSpec {
       io.old := io.x + io.y
     }
     val testCases = Array(
-      (-0.1, 0.265625, 0.1640625),
-      (-0.125, 0.25, 0.125),
-      (0.1, 0.265625, 0.3671875),
-      (100.0, 100.0, 127.99609), // overflow saturation
-      (-100.0, -100.0, -128.0),  // underflow saturation
+      (-0.1, 0.265625),
+      (-0.125, 0.25),
+      (0.1, 0.265625),
+      (100.0, 100.0),   // overflow saturation
+      (-100.0, -100.0), // underflow saturation
     )
 
     test(new PlusFixedPointModule) { m =>
       for (tc <- testCases) {
         m.io.x.poke(tc._1.F(16.W, 8.BP))
         m.io.y.poke(tc._2.F(16.W, 8.BP))
-        m.io.result.expect(tc._3.F(16.W, 8.BP))
+        m.io.result.expect(
+          (Fixed16bp8.fromDouble(tc._1) + Fixed16bp8.fromDouble(tc._2)).toFloat
+            .F(16.W, 8.BP)
+        )
         println(m.io.old.peek())
       }
     }
@@ -87,18 +136,21 @@ class UtilPackageTests extends UnitSpec {
       io.old := io.x - io.y
     }
     val testCases = Array(
-      (-0.1, 0.265625, -0.3671875),
-      (-0.125, 0.25, -0.375),
-      (0.1, 0.265625, -0.1640625),
-      (100.0, -100.0, 127.99609), // overflow saturation
-      (-100.0, 100.0, -128.0),    // underflow saturation
+      (-0.1, 0.265625),
+      (-0.125, 0.25),
+      (0.1, 0.265625),
+      (100.0, -100.0), // overflow saturation
+      (-100.0, 100.0), // underflow saturation
     )
 
     test(new MinusFixedPointModule) { m =>
       for (tc <- testCases) {
         m.io.x.poke(tc._1.F(16.W, 8.BP))
         m.io.y.poke(tc._2.F(16.W, 8.BP))
-        m.io.result.expect(tc._3.F(16.W, 8.BP))
+        m.io.result.expect(
+          (Fixed16bp8.fromDouble(tc._1) - Fixed16bp8.fromDouble(tc._2)).toFloat
+            .F(16.W, 8.BP)
+        )
         println(m.io.old.peek())
       }
     }

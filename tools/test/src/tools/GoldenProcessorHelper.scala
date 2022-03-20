@@ -7,7 +7,13 @@ import java.io._
 import scala.reflect.ClassTag
 import tensil.tools.golden.{Processor, ExecutiveTraceContext}
 import scala.collection.mutable
-import tensil.{Architecture, ArchitectureDataType, ArchitectureDataTypeWithBase}
+import tensil.{
+  Architecture,
+  ArchitectureDataType,
+  ArchitectureDataTypeWithBase,
+  NumericWithMAC,
+  FloatAsIfIntegralWithMAC
+}
 import tensil.tools.model.Model
 import tensil.tools.golden.ExecutiveTrace
 
@@ -22,6 +28,8 @@ object GoldenProcessorHelper {
 
     model.arch.dataType.name match {
       case ArchitectureDataType.FLOAT32.name =>
+        implicit val numericWithMAC = FloatAsIfIntegralWithMAC
+
         doTest(
           ArchitectureDataType.FLOAT32,
           model,
@@ -163,7 +171,7 @@ object GoldenProcessorHelper {
     else
       1
 
-  private def doTest[T : Numeric : ClassTag](
+  private def doTest[T : NumericWithMAC : ClassTag](
       dataType: ArchitectureDataTypeWithBase[T],
       model: Model,
       inputBatchSize: Int,

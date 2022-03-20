@@ -13,28 +13,6 @@ class FixedSpec extends FlatSpec {
 
   implicit val numeric = FloatAsIfIntegralWithMAC
 
-  def goldenMatMatMul[T : NumericWithMAC : ClassTag](
-      a: Array[Array[T]],
-      b: Array[Array[T]]
-  ): Array[Array[T]] = {
-    if (a.length == 0) return Array.empty[Array[T]]
-    if (a.head.length != b.length)
-      throw new Exception("Dimension size mismatch")
-    if (a.head.length == 0) return Array.empty[Array[T]]
-    if (b.head.length == 0) return Array.empty[Array[T]]
-    val result =
-      Array.fill(a.length, b.head.length)(implicitly[NumericWithMAC[T]].zero)
-    for (i <- a.indices) {
-      for (j <- a.head.indices) {
-        for (k <- b.head.indices) {
-          result(i)(k) =
-            implicitly[NumericWithMAC[T]].mac(a(i)(j), b(j)(k), result(i)(k))
-        }
-      }
-    }
-    result
-  }
-
   it should "Fixed16bp8 matrix multiplication within error" in {
     val a =
       Array(
@@ -45,12 +23,12 @@ class FixedSpec extends FlatSpec {
     val b =
       Array(Array(.1f, .2f, .3f), Array(.4f, .5f, .6f), Array(.7f, .8f, .9f))
 
-    val yExpected = goldenMatMatMul(a, b).flatten
+    val yExpected = golden.Ops.matMul(a, b).flatten
 
     val af = a.map(_.map(Fixed16bp8.fromDouble(_)))
     val bf = b.map(_.map(Fixed16bp8.fromDouble(_)))
 
-    val yf = goldenMatMatMul(af, bf)
+    val yf = golden.Ops.matMul(af, bf)
 
     val y = yf.map(_.map(_.toDouble())).flatten
 
@@ -74,12 +52,12 @@ class FixedSpec extends FlatSpec {
     val b =
       Array(Array(.1f, .2f, .3f), Array(.4f, .5f, .6f), Array(.7f, .8f, .9f))
 
-    val yExpected = goldenMatMatMul(a, b).flatten
+    val yExpected = golden.Ops.matMul(a, b).flatten
 
     val af = a.map(_.map(Fixed18bp10.fromDouble(_)))
     val bf = b.map(_.map(Fixed18bp10.fromDouble(_)))
 
-    val yf = goldenMatMatMul(af, bf)
+    val yf = golden.Ops.matMul(af, bf)
 
     val y = yf.map(_.map(_.toDouble())).flatten
 
@@ -103,12 +81,12 @@ class FixedSpec extends FlatSpec {
     val b =
       Array(Array(.1f, .2f, .3f), Array(.4f, .5f, .6f), Array(.7f, .8f, .9f))
 
-    val yExpected = goldenMatMatMul(a, b).flatten
+    val yExpected = golden.Ops.matMul(a, b).flatten
 
     val af = a.map(_.map(Fixed32bp16.fromDouble(_)))
     val bf = b.map(_.map(Fixed32bp16.fromDouble(_)))
 
-    val yf = goldenMatMatMul(af, bf)
+    val yf = golden.Ops.matMul(af, bf)
 
     val y = yf.map(_.map(_.toDouble())).flatten
 

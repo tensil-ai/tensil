@@ -92,6 +92,8 @@ object sim extends ScalaModule { m =>
   object test extends Tests with ScalaTest {
     def moduleDeps = super.moduleDeps ++ Seq(rtl.test, tools.test)
 
+    def forkArgs = Seq("-Xmx48g", "-Xmx48g")
+
     override def ivyDeps =
       m.ivyDeps() ++ Agg(ivy"org.scalatest::scalatest:3.0.4")
   }

@@ -500,13 +500,13 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
               .filter(_ <= arch.accumulatorDepth)
 
           val tests = Seq(
-            /*() => xor4(batchSize = 1),
+            () => xor4(batchSize = 1),
             () => xor4(batchSize = 2),
-            () => xor4(batchSize = 4),*/
+            () => xor4(batchSize = 4),
             () => resnet(batchSize = 1, inputSize = 1),
-            /*() => resnet(batchSize = 10, inputSize = 10),*/
-          ) /*++ dataMoveSizes.map(size => () => dataMove(size, 4, true)) ++
-            dataMoveSizes.map(size => () => dataMove(size, 4, false))*/
+            () => resnet(batchSize = 10, inputSize = 10),
+          ) ++ dataMoveSizes.map(size => () => dataMove(size, 4, true)) ++
+            dataMoveSizes.map(size => () => dataMove(size, 4, false))
 
           for (t <- tests) {
             if (randomizeDrams) {

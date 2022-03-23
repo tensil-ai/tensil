@@ -60,14 +60,21 @@ abstract class FixedBase[TFixed](
     underflowStat.report("FIXED POINT UNDERFLOW SUMMARY")
   }
 
-  def mkNumeric =
-    new Numeric[TFixed] {
+  def mkNumericWithMAC =
+    new NumericWithMAC[TFixed] {
       override def plus(x: TFixed, y: TFixed): TFixed =
-        mkFixed(toLongBits(x) + toLongBits(y))
+        mkFixed(doMAC(toLongBits(x), 1L << basePoint, toLongBits(y)))
       override def minus(x: TFixed, y: TFixed): TFixed =
-        mkFixed(toLongBits(x) - toLongBits(y))
-      override def times(x: TFixed, y: TFixed): TFixed = {
-        val mul = toLongBits(x) * toLongBits(y)
+        mkFixed(doMAC(toLongBits(x), 1L << basePoint, -toLongBits(y)))
+
+      override def times(x: TFixed, y: TFixed): TFixed =
+        mkFixed(doMAC(toLongBits(x), toLongBits(y), 0L))
+
+      override def mac(x: TFixed, y: TFixed, z: TFixed): TFixed =
+        mkFixed(doMAC(toLongBits(x), toLongBits(y), toLongBits(z)))
+
+      private def doMAC(x: Long, y: Long, z: Long): Long = {
+        val mac = (x * y) + (z << basePoint)
 
         /*
          * TDOD: Multiple rounding policies can be employed. Currently
@@ -84,24 +91,24 @@ abstract class FixedBase[TFixed](
 
         /*
         // round-to-nearest-up
-        val adj = if ((mul & (1L << (BasePoint - 1))) != 0) 1 else 0
+        val adj = if ((mac & (1L << (BasePoint - 1))) != 0) 1 else 0
          */
 
         // round-to-nearest-even
         val adj = if (
-          (mul & (1L << (basePoint - 1))) != 0 && ((mul & ((1L << (basePoint - 1)) - 1)) != 0 || (mul & (1L << (basePoint))) != 0)
+          (mac & (1L << (basePoint - 1))) != 0 && ((mac & ((1L << (basePoint - 1)) - 1)) != 0 || (mac & (1L << (basePoint))) != 0)
         ) 1
         else 0
 
         /*
         // round-to-odd
         val adj = if (
-          (mul & (1L << (BasePoint))) == 0 && (mul & ((1L << (BasePoint)) - 1)) != 0
+          (mac & (1L << (BasePoint))) == 0 && (mac & ((1L << (BasePoint)) - 1)) != 0
         ) 1
         else 0
          */
 
-        mkFixed((mul >> basePoint) + adj)
+        (mac >> basePoint) + adj
       }
       override def negate(x: TFixed): TFixed =
         mkFixed(-toLongBits(x))

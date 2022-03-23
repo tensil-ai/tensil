@@ -11,7 +11,7 @@ import scala.reflect.ClassTag
 
 import tensil.tools.data.Tensor
 import tensil.tools.{TraceContext}
-import tensil.{Architecture, ArchitectureDataTypeWithBase, TablePrinter}
+import tensil.{Architecture, ArchitectureDataTypeWithBase, TablePrinter, golden}
 import tensil.tools.compiler.{
   LoadWeightsFlags,
   SIMDFlags,
@@ -22,8 +22,9 @@ import tensil.tools.compiler.{
   SIMDDestination,
   MemoryAddressRaw
 }
+import tensil.NumericWithMAC
 
-class Processor[T : Numeric : ClassTag](
+class Processor[T : NumericWithMAC : ClassTag](
     dataType: ArchitectureDataTypeWithBase[T],
     arch: Architecture
 ) {
@@ -184,7 +185,7 @@ class Processor[T : Numeric : ClassTag](
                               })
           )
 
-        val y = Tensor.goldenMatMatMul(x, currentWeights)
+        val y = golden.Ops.matMul(x, currentWeights)
 
         for (j <- 0 until arch.arraySize)
           if ((flags & MatMulFlags.Accumulate) != 0)

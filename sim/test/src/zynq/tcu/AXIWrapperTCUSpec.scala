@@ -222,17 +222,17 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
                 )
 
                 // setup compiler output streams
-                val modelFileName = "./models/resnet20v2_cifar.pb"
+                val modelFileName = "./models/resnet20v2_cifar.onnx"
                 val model         = new FileInputStream(modelFileName)
                 val consts        = new ByteArrayOutputStream()
                 val program       = new ByteArrayOutputStream()
 
                 // run the compiler
                 val compilerResult = Compiler.compileStreamToStreams(
-                  "resnet20v2_cifar_pb",
+                  "resnet20v2_cifar_onnx",
                   Compiler.getModelSourceType(modelFileName),
                   model,
-                  List("Identity"),
+                  List("Identity:0"),
                   program,
                   consts,
                   options

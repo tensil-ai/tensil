@@ -12,7 +12,7 @@ abstract class DataTypeBase[T] {
   def fromFloat(f: Float): T
   def fromDouble(d: Double): T
 
-  implicit def numeric: Numeric[T]
+  implicit def numericWithMAC: NumericWithMAC[T]
 
   def resetOverUnderflowStats(): Unit
   def reportOverUnderflowStats(): Unit

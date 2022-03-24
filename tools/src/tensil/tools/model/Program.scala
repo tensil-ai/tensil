@@ -7,7 +7,8 @@ import upickle.default.{ReadWriter, macroRW}
 import upickle.implicits.key
 
 case class Program(
-    @key("file_name") fileName: String
+    @key("file_name") fileName: String,
+    @key("size") size: Long
 )
 
 object Program {

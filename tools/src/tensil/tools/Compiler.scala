@@ -154,7 +154,10 @@ object Compiler {
 
     val model = Model(
       name = modelName,
-      program = Program(fileName = programFileName),
+      program = Program(
+        fileName = programFileName,
+        size = result.stats.programSizeBytes
+      ),
       consts = Seq(
         ConstsEntry(
           fileName = constsFileName,

@@ -44,7 +44,8 @@ error_t buffer_append_program_from_file(struct instruction_buffer *buffer,
 #ifdef TENSIL_PLATFORM_FLASH_READ
 
 error_t buffer_append_program_from_flash(struct instruction_buffer *buffer,
-                                         size_t size, uint32_t *flash_address);
+                                         size_t size,
+                                         TENSIL_PLATFORM_FLASH_TYPE flash);
 
 #endif
 

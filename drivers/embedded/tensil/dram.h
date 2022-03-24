@@ -44,6 +44,6 @@ error_t dram_write_scalars_from_file(uint8_t *bank_ptr, enum data_type type,
 
 error_t dram_write_scalars_from_flash(uint8_t *bank_ptr, enum data_type type,
                                       size_t offset, size_t size,
-                                      uint32_t *flash_address);
+                                      TENSIL_PLATFORM_FLASH_TYPE flash);
 
 #endif

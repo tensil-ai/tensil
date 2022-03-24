@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "xil_cache.h"
+#include "xstatus.h"
 
 #include "instruction.h"
 
@@ -101,23 +102,22 @@ error_t buffer_append_program(struct instruction_buffer *buffer,
 #ifdef TENSIL_PLATFORM_FLASH_READ
 
 error_t buffer_append_program_from_flash(struct instruction_buffer *buffer,
-                                         size_t size, uint32_t *flash_address) {
+                                         size_t size,
+                                         TENSIL_PLATFORM_FLASH_TYPE flash) {
     if (size > buffer->size - buffer->offset)
         return DRIVER_ERROR(ERROR_DRIVER_INSUFFICIENT_BUFFER,
                             "Program is too big");
 
     while (size) {
-        uint8_t *flash_buffer = 0;
-        size_t flash_page_size = 0;
-        TENSIL_PLATFORM_FLASH_READ(*flash_address, &flash_page_size,
-                                   &flash_buffer);
+        size_t flash_read_size = 0;
+        int status = TENSIL_PLATFORM_FLASH_READ(
+            flash, buffer->ptr + buffer->offset, size, &flash_read_size);
 
-        size_t read_size = flash_page_size <= size ? flash_page_size : size;
-        size -= read_size;
-        *flash_address += read_size;
+        if (status != XST_SUCCESS)
+            return XILINX_ERROR(status);
 
-        memcpy(buffer->ptr + buffer->offset, flash_buffer, read_size);
-        buffer->offset += read_size;
+        size -= flash_read_size;
+        buffer->offset += flash_read_size;
     }
 
     return ERROR_NONE;

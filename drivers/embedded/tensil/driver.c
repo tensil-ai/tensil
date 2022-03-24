@@ -353,16 +353,15 @@ static error_t setup_buffer_preamble(struct driver *driver) {
 #ifdef TENSIL_PLATFORM_FLASH_READ
 
 error_t driver_load_program_from_flash(struct driver *driver, size_t size,
-                                       uint32_t *flash_address) {
-    printf("Loading program from flash at 0x%lx...\n", flash_address);
+                                       TENSIL_PLATFORM_FLASH_TYPE flash) {
+    printf("Loading program from flash...\n");
 
     error_t error = setup_buffer_preamble(driver);
 
     if (error)
         return error;
 
-    error =
-        buffer_append_program_from_flash(&driver->buffer, size, flash_address);
+    error = buffer_append_program_from_flash(&driver->buffer, size, flash);
 
     if (error)
         return error;
@@ -465,20 +464,19 @@ error_t driver_load_model_input_from_file(struct driver *driver,
 
 error_t driver_load_model_from_flash(struct driver *driver,
                                      const struct model *model,
-                                     uint32_t flash_address) {
+                                     TENSIL_PLATFORM_FLASH_TYPE flash) {
     if (!architecture_is_compatible(&driver->arch, &model->arch))
         return DRIVER_ERROR(ERROR_DRIVER_INCOMPATIBLE_MODEL,
                             "Incompatible model");
 
-    error_t error = driver_load_program_from_flash(driver, model->prog.size,
-                                                   &flash_address);
+    error_t error =
+        driver_load_program_from_flash(driver, model->prog.size, flash);
     if (error)
         return error;
 
     for (size_t i = 0; i < model->consts_size; i++) {
         error = driver_load_dram_vectors_from_flash(
-            driver, DRAM1, model->consts[i].base, model->consts[i].size,
-            &flash_address);
+            driver, DRAM1, model->consts[i].base, model->consts[i].size, flash);
 
         if (error)
             return error;
@@ -490,8 +488,8 @@ error_t driver_load_model_from_flash(struct driver *driver,
 error_t driver_load_dram_vectors_from_flash(struct driver *driver,
                                             enum dram_bank dram_bank,
                                             size_t offset, size_t size,
-                                            uint32_t *flash_address) {
-    printf("Loading DRAM%d from flash at 0x%lx...\n", dram_bank, flash_address);
+                                            TENSIL_PLATFORM_FLASH_TYPE flash) {
+    printf("Loading DRAM%d from flash...\n", dram_bank);
 
     uint8_t *bank_ptr = get_dram_bank_base_ptr(driver, dram_bank);
     size_t bank_size = get_dram_bank_size(driver, dram_bank);
@@ -502,9 +500,9 @@ error_t driver_load_dram_vectors_from_flash(struct driver *driver,
         return DRIVER_ERROR(ERROR_DRIVER_INSUFFICIENT_BUFFER,
                             "Consts data too big");
 
-    return dram_write_scalars_from_flash(
-        bank_ptr, driver->arch.data_type, offset * driver->arch.array_size,
-        size * driver->arch.array_size, flash_address);
+    return dram_write_scalars_from_flash(bank_ptr, driver->arch.data_type,
+                                         offset * driver->arch.array_size,
+                                         size * driver->arch.array_size, flash);
 }
 
 #endif

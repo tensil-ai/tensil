@@ -43,7 +43,7 @@ error_t driver_init(struct driver *driver);
 
 #ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
 
-error_t driver_load_program_from_file(struct driver *driver,
+error_t driver_load_program_from_file(struct driver *driver, size_t size,
                                       const char *file_name);
 
 error_t driver_load_dram_vectors_from_file(struct driver *driver,
@@ -57,6 +57,19 @@ error_t driver_load_model_input_from_file(struct driver *driver,
                                           const char *file_name);
 
 error_t driver_load_model(struct driver *driver, const struct model *model);
+
+#endif
+
+#ifdef TENSIL_PLATFORM_FLASH_READ
+
+error_t driver_load_dram_vectors_from_flash(struct driver *driver,
+                                            enum dram_bank dram_bank,
+                                            size_t offset, size_t size,
+                                            uint32_t *flash_address);
+
+error_t driver_load_model_from_flash(struct driver *driver,
+                                     const struct model *model,
+                                     uint32_t flash_address);
 
 #endif
 
@@ -100,5 +113,12 @@ error_t driver_run_simd_test(struct driver *driver, bool verbose);
 #ifdef TENSIL_PLATFORM_SAMPLE_AXI_DMA_DEVICE_ID
 
 error_t driver_run_sampling_test(struct driver *driver, bool verbose);
+
+#endif
+
+#ifdef TENSIL_PLATFORM_FLASH_READ
+
+error_t driver_load_program_from_flash(struct driver *driver, size_t size,
+                                       uint32_t *flash_address);
 
 #endif

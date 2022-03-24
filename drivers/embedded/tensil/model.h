@@ -21,6 +21,7 @@ struct program {
 #ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
     char file_name[MAX_STRING_SIZE];
 #endif
+    size_t size;
 };
 
 struct consts_entry {

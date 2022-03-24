@@ -170,3 +170,33 @@ error_t dram_write_scalars_from_file(uint8_t *bank_ptr, enum data_type type,
 }
 
 #endif
+
+#ifdef TENSIL_PLATFORM_FLASH_READ
+
+error_t dram_write_scalars_from_flash(uint8_t *bank_ptr, enum data_type type,
+                                      size_t offset, size_t size,
+                                      uint32_t *flash_address) {
+    size_t sizeof_scalar = dram_sizeof_scalar(type);
+    uint8_t *current_ptr = bank_ptr + offset * sizeof_scalar;
+
+    size_t size_bytes = size * sizeof_scalar;
+
+    while (size_bytes) {
+        uint8_t *flash_buffer = 0;
+        size_t flash_page_size = 0;
+        TENSIL_PLATFORM_FLASH_READ(*flash_address, &flash_page_size,
+                                   &flash_buffer);
+
+        size_t read_size =
+            flash_page_size <= size_bytes ? flash_page_size : size_bytes;
+        size_bytes -= read_size;
+        *flash_address += read_size;
+
+        memcpy(current_ptr, flash_buffer, read_size);
+        current_ptr += read_size;
+    }
+
+    return ERROR_NONE;
+}
+
+#endif

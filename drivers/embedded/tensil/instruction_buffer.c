@@ -98,10 +98,37 @@ error_t buffer_append_program(struct instruction_buffer *buffer,
     return ERROR_NONE;
 }
 
+#ifdef TENSIL_PLATFORM_FLASH_READ
+
+error_t buffer_append_program_from_flash(struct instruction_buffer *buffer,
+                                         size_t size, uint32_t *flash_address) {
+    if (size > buffer->size - buffer->offset)
+        return DRIVER_ERROR(ERROR_DRIVER_INSUFFICIENT_BUFFER,
+                            "Program is too big");
+
+    while (size) {
+        uint8_t *flash_buffer = 0;
+        size_t flash_page_size = 0;
+        TENSIL_PLATFORM_FLASH_READ(*flash_address, &flash_page_size,
+                                   &flash_buffer);
+
+        size_t read_size = flash_page_size <= size ? flash_page_size : size;
+        size -= read_size;
+        *flash_address += read_size;
+
+        memcpy(buffer->ptr + buffer->offset, flash_buffer, read_size);
+        buffer->offset += read_size;
+    }
+
+    return ERROR_NONE;
+}
+
+#endif
+
 #ifdef TENSIL_PLATFORM_ENABLE_FATFS
 
 error_t buffer_append_program_from_file(struct instruction_buffer *buffer,
-                                        const char *file_name) {
+                                        size_t size, const char *file_name) {
     FIL fil;
     FILINFO fno;
     FRESULT res;
@@ -111,6 +138,10 @@ error_t buffer_append_program_from_file(struct instruction_buffer *buffer,
     res = f_stat(file_name, &fno);
     if (res)
         return FS_ERROR(res);
+
+    if (fno.fsize != size)
+        return DRIVER_ERROR(ERROR_DRIVER_UNEXPECTED_PROGRAM_SIZE,
+                            "Unexpected program size in %s", file_name);
 
     if (fno.fsize > buffer->size - buffer->offset)
         return DRIVER_ERROR(ERROR_DRIVER_INSUFFICIENT_BUFFER,

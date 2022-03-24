@@ -505,6 +505,22 @@ error_t driver_load_dram_vectors_from_flash(struct driver *driver,
                                          size * driver->arch.array_size, flash);
 }
 
+error_t driver_load_model_input_from_flash(struct driver *driver,
+                                           const struct model *model,
+                                           const char *input_name,
+                                           TENSIL_PLATFORM_FLASH_TYPE flash) {
+    for (size_t i = 0; i < model->inputs_size; i++) {
+        if (strcmp(model->inputs[i].name, input_name) == 0)
+            // TODO: Support non-continuous inputs and outputs
+            return driver_load_dram_vectors_from_flash(
+                driver, DRAM0, model->inputs[i].base, model->inputs[i].size,
+                flash);
+    }
+
+    return DRIVER_ERROR(ERROR_DRIVER_UNEXPECTED_INPUT_NAME,
+                        "Unexpected input name %s", input_name);
+}
+
 #endif
 
 error_t driver_load_model_input_scalars(struct driver *driver,

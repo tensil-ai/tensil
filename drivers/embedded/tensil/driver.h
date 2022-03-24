@@ -74,6 +74,11 @@ error_t driver_load_model_from_flash(struct driver *driver,
 error_t driver_load_program_from_flash(struct driver *driver, size_t size,
                                        TENSIL_PLATFORM_FLASH_TYPE flash);
 
+error_t driver_load_model_input_from_flash(struct driver *driver,
+                                           const struct model *model,
+                                           const char *input_name,
+                                           TENSIL_PLATFORM_FLASH_TYPE flash);
+
 #endif
 
 error_t driver_load_model_input_scalars(struct driver *driver,

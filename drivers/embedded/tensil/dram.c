@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "xil_cache.h"
+#include "xstatus.h"
 
 #ifdef TENSIL_PLATFORM_ENABLE_FATFS
 #include "fatfs.h"
@@ -165,6 +166,32 @@ error_t dram_write_scalars_from_file(uint8_t *bank_ptr, enum data_type type,
         return FS_ERROR(res);
 
     Xil_DCacheFlushRange((UINTPTR)base_ptr, fno.fsize);
+
+    return ERROR_NONE;
+}
+
+#endif
+
+#ifdef TENSIL_PLATFORM_FLASH_READ
+
+error_t dram_write_scalars_from_flash(uint8_t *bank_ptr, enum data_type type,
+                                      size_t offset, size_t size,
+                                      TENSIL_PLATFORM_FLASH_TYPE flash) {
+    size_t sizeof_scalar = dram_sizeof_scalar(type);
+    uint8_t *current_ptr = bank_ptr + offset * sizeof_scalar;
+    size_t size_bytes = size * sizeof_scalar;
+
+    while (size_bytes) {
+        size_t flash_read_size = 0;
+        int status = TENSIL_PLATFORM_FLASH_READ(flash, current_ptr, size_bytes,
+                                                &flash_read_size);
+
+        if (status != XST_SUCCESS)
+            return XILINX_ERROR(status);
+
+        size_bytes -= flash_read_size;
+        current_ptr += flash_read_size;
+    }
 
     return ERROR_NONE;
 }

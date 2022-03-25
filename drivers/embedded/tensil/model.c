@@ -62,6 +62,7 @@ static void parse_prog(struct program *program, const cJSON *json) {
         config_parse_object_item_as_string(json, "file_name",
                                            program->file_name);
 #endif
+        config_parse_object_item_as_size(json, "size", &program->size);
     }
 }
 

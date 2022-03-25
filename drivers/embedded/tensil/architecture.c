@@ -11,8 +11,8 @@
 #include "config.h"
 #include "error.h"
 
-#ifdef TENSIL_PLATFORM_ENABLE_FATFS
-#include "fatfs.h"
+#ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
+#include "ff.h"
 #endif
 
 #define JSMN_TOKEN_POOL_SIZE 64

@@ -12,8 +12,8 @@
 
 #define JSMN_TOKEN_POOL_SIZE 256
 
-#ifdef TENSIL_PLATFORM_ENABLE_FATFS
-#include "fatfs.h"
+#ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
+#include "ff.h"
 #endif
 
 static bool
@@ -131,13 +131,13 @@ void model_parse(struct model *model, const cJSON *json) {
     }
 }
 
-#ifdef TENSIL_PLATFORM_ENABLE_FATFS
+#ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
 
 error_t model_from_file(struct model *model, const char *file_name) {
     FIL fil;
     FILINFO fno;
     FRESULT res;
-    FATFS_UINT bytes_read;
+    UINT bytes_read;
     error_t error = ERROR_NONE;
     char *buffer = NULL;
     cJSON *json = NULL;

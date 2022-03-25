@@ -112,7 +112,7 @@ static error_t test_resnet20v2_on_cifar(struct driver *driver,
                                         bool print_images) {
     FIL fil;
     FILINFO fno;
-    FATFS_UINT bytes_read;
+    UINT bytes_read;
     error_t error = ERROR_NONE;
 
     FRESULT res = f_stat(file_name, &fno);
@@ -276,7 +276,7 @@ static error_t load_imagenet_classes_from_file(const char *file_name) {
     FIL fil;
     FILINFO fno;
     FRESULT res;
-    FATFS_UINT bytes_read;
+    UINT bytes_read;
 
     memset(&fno, 0, sizeof(FILINFO));
     res = f_stat(file_name, &fno);

@@ -22,7 +22,7 @@ error_t error_set_driver(struct error *error, enum error_code code,
     return error;
 }
 
-#ifdef TENSIL_PLATFORM_ENABLE_FATFS
+#ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
 
 error_t error_set_fs(struct error *error, FRESULT fresult, const char *format,
                      ...) {

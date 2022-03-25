@@ -14,8 +14,8 @@
 #include "stopwatch.h"
 #include "tcu.h"
 
-#ifdef TENSIL_PLATFORM_ENABLE_FATFS
-#include "fatfs.h"
+#ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
+#include "ff.h"
 #endif
 
 #include "../architecture_params.h"
@@ -376,7 +376,7 @@ error_t driver_load_program_from_flash(struct driver *driver, size_t size,
 
 #endif
 
-#ifdef TENSIL_PLATFORM_ENABLE_FATFS
+#ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
 
 error_t driver_load_program_from_file(struct driver *driver, size_t size,
                                       const char *file_name) {

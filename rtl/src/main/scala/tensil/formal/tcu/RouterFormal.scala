@@ -52,8 +52,8 @@ class RouterFormal extends Formal {
     m.io.mem.output,
     filter = m.io.control.bits.kind === DataFlowControl.memoryToDram0
   )
-  val hostInput  = Node(m.io.host.dataOut)
-  val hostOutput = Node(m.io.host.dataIn)
+  // val hostInput  = Node(m.io.host.dataOut)
+  // val hostOutput = Node(m.io.host.dataIn)
 
   depends(accInput, control(DataFlowControl._arrayToAcc))
   depends(accInput, control(DataFlowControl._memoryToArrayToAcc))
@@ -68,10 +68,10 @@ class RouterFormal extends Formal {
   depends(memInputFromAcc, control(DataFlowControl.accumulatorToMemory))
   depends(memInputFromAcc, accOutput)
   depends(memInputFromHost, control(DataFlowControl.dram0ToMemory))
-  depends(memInputFromHost, hostOutput)
+  // depends(memInputFromHost, hostOutput)
 
-  depends(hostInput, control(DataFlowControl.memoryToDram0))
-  depends(hostInput, memOutputForHost)
+  // depends(hostInput, control(DataFlowControl.memoryToDram0))
+  // depends(hostInput, memOutputForHost)
 
   assertNoDeadlock()
 }

@@ -16,7 +16,7 @@ import tensil.util.{WithLast, DecoupledHelper}
 import tensil.Architecture
 import tensil.ArchitectureDataType
 import tensil.util.decoupled
-import tensil.mem.{Port, PortMux}
+import tensil.mem.Port
 
 class TCU[T <: Data with Num[T]](
     val gen: T,

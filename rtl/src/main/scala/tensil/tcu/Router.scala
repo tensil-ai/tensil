@@ -31,10 +31,6 @@ class Router[T <: Data](
       val output = Flipped(Decoupled(gen))
       val input  = Decoupled(gen)
     }
-    // val host = new Bundle {
-    //   val dataIn  = Flipped(Decoupled(gen))
-    //   val dataOut = Decoupled(gen)
-    // }
     val array = new Bundle {
       val input  = Decoupled(gen)
       val output = Flipped(Decoupled(gen))
@@ -54,8 +50,6 @@ class Router[T <: Data](
 
   val control = io.control
 
-  // reportThroughput(control, 100, "Router")
-
   // routing control muxes
   val memReadDataDemuxModule = Module(
     new decoupled.Demux(
@@ -65,7 +59,6 @@ class Router[T <: Data](
     )
   )
   memReadDataDemuxModule.io.in <> io.mem.output
-  // io.host.dataOut <> memReadDataDemuxModule.io.out(0)
   memReadDataDemuxModule.io.out(0).tieOffFlipped()
   io.array.input <> memReadDataDemuxModule.io.out(1)
 
@@ -76,7 +69,6 @@ class Router[T <: Data](
       name = "router.memWriteData"
     )
   )
-  // memWriteDataMuxModule.io.in(0) <> io.host.dataIn
   memWriteDataMuxModule.io.in(0).tieOff()
   memWriteDataMuxModule.io.in(1) <> io.acc.output
   io.mem.input <> memWriteDataMuxModule.io.out
@@ -156,18 +148,6 @@ class Router[T <: Data](
       accWriteDataMux,
       accWriteDataMuxSel(1.U),
     )
-    // }.elsewhen(control.bits.kind === DataFlowControl.dram0ToMemory) {
-    //   control.ready := enqueuer1.enqueue(
-    //     control.valid,
-    //     memWriteDataMux,
-    //     memWriteDataMuxSel(0.U),
-    //   )
-    // }.elsewhen(control.bits.kind === DataFlowControl.memoryToDram0) {
-    //   control.ready := enqueuer1.enqueue(
-    //     control.valid,
-    //     memReadDataDemux,
-    //     memReadDataDemuxSel(0.U),
-    //   )
   }.otherwise {
     control.ready := true.B
   }

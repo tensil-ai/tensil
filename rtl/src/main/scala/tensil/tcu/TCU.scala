@@ -15,6 +15,8 @@ import tensil.util.decoupled.QueueWithReporting
 import tensil.util.{WithLast, DecoupledHelper}
 import tensil.Architecture
 import tensil.ArchitectureDataType
+import tensil.util.decoupled
+import tensil.mem.{Port, PortMux}
 
 class TCU[T <: Data with Num[T]](
     val gen: T,
@@ -73,16 +75,20 @@ class TCU[T <: Data with Num[T]](
     )
   )
   val router = Module(
-    // new Router(Vec(layout.arch.arraySize, gen), layout.arch, controlQueueSize = 50)
     new Router(
       Vec(layout.arch.arraySize, gen),
       layout.arch,
       controlQueueSize = 2
     )
   )
-
-  val dataPort    = mem.io.portA
-  val weightsPort = mem.io.portB
+  val hostRouter = Module(
+    new HostRouter(
+      Vec(layout.arch.arraySize, gen),
+      layout.arch,
+    )
+  )
+  val portA = mem.io.portA
+  val portB = mem.io.portB
 
   //// Decoder ////
   decoder.io.instruction <> io.instruction
@@ -106,41 +112,46 @@ class TCU[T <: Data with Num[T]](
   acc.io.wrote.ready := true.B
   //// Array ////
   array.io.control <> QueueWithReporting(decoder.io.array, 1 << 1) // 4
-  array.io.weight <> weightsPort.output
+  array.io.weight <> portB.output
   array.io.loaded.ready := true.B
   array.io.ran.ready := true.B
   //// Mem ////
+  // port A
   mem.io.tracepoint := decoder.io.tracepoint
   mem.io.programCounter := decoder.io.programCounter
-  dataPort.control <> decoder.io.memPortA
-  dataPort.status.ready := true.B
-  dataPort.inputStatus.ready := true.B
-  dataPort.wrote.ready := true.B
-  //// WeightMem ////
-  weightsPort.control <> decoder.io.memPortB
-  weightsPort.input <> io.dram1.dataIn
-  weightsPort.status.ready := true.B
-  weightsPort.inputStatus.ready := true.B
-  weightsPort.wrote.ready := true.B
-  ///// Router ////
+  portA.control <> decoder.io.memPortA
+  portA.status.ready := true.B
+  portA.inputStatus.ready := true.B
+  portA.wrote.ready := true.B
+  //// Router ////
   router.io.timeout := decoder.io.timeout
   router.io.tracepoint := decoder.io.tracepoint
   router.io.programCounter := decoder.io.programCounter
   // control
   router.io.control <> decoder.io.dataflow
-  // mem
-  router.io.mem.output <> dataPort.output
-  dataPort.input <> router.io.mem.input
+  // port A
+  router.io.mem.output <> portA.output
+  portA.input <> router.io.mem.input
   // array
   array.io.input <> router.io.array.input
   router.io.array.output <> array.io.output
   // acc
   acc.io.input <> router.io.acc.input
   router.io.acc.output <> acc.io.output
-  // host
-  router.io.host.dataIn <> io.dram0.dataIn
-  io.dram0.dataOut <> router.io.host.dataOut
-  // TODO add an output mux for the weightsPort and connect to dram1 port
-//  io.dram1.dataOut <> weightsPort.output
-  io.dram1.dataOut.tieOff()
+  //// Host Router ////
+  // control
+  hostRouter.io.control <> decoder.io.hostDataflow
+  // port B
+  portB.control <> decoder.io.memPortB
+  portB.input <> hostRouter.io.mem.input
+  hostRouter.io.mem.output <> portB.output
+  portB.status.ready := true.B
+  portB.inputStatus.ready := true.B
+  portB.wrote.ready := true.B
+  // dram0
+  hostRouter.io.dram0.dataIn <> io.dram0.dataIn
+  io.dram0.dataOut <> hostRouter.io.dram0.dataOut
+  // dram1
+  hostRouter.io.dram1.dataIn <> io.dram1.dataIn
+  io.dram1.dataOut <> hostRouter.io.dram1.dataOut
 }

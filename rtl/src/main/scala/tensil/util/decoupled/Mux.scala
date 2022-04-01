@@ -45,17 +45,12 @@ class Mux[T <: Data](
   })
 
   val in = VecInit(
-    // for (i <- 0 until n) yield QueueWithReporting(io.in(i), 1 << 1, name=name) // 5
     for (i <- 0 until n)
-      // yield QueueWithReporting(io.in(i), 1 << 5, name = name) // 5
-      // yield Queue(io.in(i), 2, flow = true)
       yield io.in(i)
   )
   for (i <- 0 until n) {
     in(i.U).ready := false.B
   }
-  // val sel = QueueWithReporting(io.sel, controlQueueSize, name = name)
-  // val sel = Queue(io.sel, 2, flow = true)
   val sel = io.sel
 
   val inS = in(sel.bits)

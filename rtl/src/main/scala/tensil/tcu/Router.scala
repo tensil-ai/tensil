@@ -6,7 +6,12 @@ package tensil.tcu
 import chisel3._
 import chisel3.util.{Decoupled, DecoupledIO, Queue}
 import tensil.util.{DecoupledHelper, decoupled, reportThroughput}
-import tensil.util.decoupled.{MultiEnqueue, MuxSel, MuxSelWithSize}
+import tensil.util.decoupled.{
+  MultiEnqueue,
+  MuxSel,
+  MuxSelWithSize,
+  makeSizeHandler
+}
 import tensil.util.decoupled.QueueWithReporting
 import tensil.Architecture
 import tensil.mem.SizeHandler
@@ -26,10 +31,10 @@ class Router[T <: Data](
       val output = Flipped(Decoupled(gen))
       val input  = Decoupled(gen)
     }
-    val host = new Bundle {
-      val dataIn  = Flipped(Decoupled(gen))
-      val dataOut = Decoupled(gen)
-    }
+    // val host = new Bundle {
+    //   val dataIn  = Flipped(Decoupled(gen))
+    //   val dataOut = Decoupled(gen)
+    // }
     val array = new Bundle {
       val input  = Decoupled(gen)
       val output = Flipped(Decoupled(gen))
@@ -86,31 +91,30 @@ class Router[T <: Data](
   io.acc.input <> accWriteDataMuxModule.io.out
 
   // size handlers
-  def makeSizeHandler(
-      n: Int,
-      name: String,
-      muxSel: DecoupledIO[UInt]
-  ): (DecoupledIO[MuxSelWithSize], UInt => MuxSelWithSize) = {
-    val inGen  = new MuxSelWithSize(n, arch.localDepth)
-    val outGen = new MuxSel(n)
-    val sizeHandler = Module(
-      new SizeHandler(inGen, outGen, arch.localDepth, name = name)
-    )
-    val muxSelWithSize = sizeHandler.io.in
-    muxSel.bits := sizeHandler.io.out.bits.sel
-    muxSel.valid := sizeHandler.io.out.valid
-    sizeHandler.io.out.ready := muxSel.ready
-
-    def muxSelLit(sel: UInt): MuxSelWithSize =
-      MuxSelWithSize(n, arch.localDepth, sel, control.bits.size)
-    (muxSelWithSize, muxSelLit)
-  }
   val (memReadDataDemux, memReadDataDemuxSel) =
-    makeSizeHandler(3, "memReadDataDemux", memReadDataDemuxModule.io.sel)
+    makeSizeHandler(
+      3,
+      "memReadDataDemux",
+      memReadDataDemuxModule.io.sel,
+      arch.localDepth,
+      control.bits.size
+    )
   val (memWriteDataMux, memWriteDataMuxSel) =
-    makeSizeHandler(2, "memWriteDataMux", memWriteDataMuxModule.io.sel)
+    makeSizeHandler(
+      2,
+      "memWriteDataMux",
+      memWriteDataMuxModule.io.sel,
+      arch.localDepth,
+      control.bits.size
+    )
   val (accWriteDataMux, accWriteDataMuxSel) =
-    makeSizeHandler(2, "accWriteDataMux", accWriteDataMuxModule.io.sel)
+    makeSizeHandler(
+      2,
+      "accWriteDataMux",
+      accWriteDataMuxModule.io.sel,
+      arch.localDepth,
+      control.bits.size
+    )
   memReadDataDemux.tieOff()
   memWriteDataMux.tieOff()
   accWriteDataMux.tieOff()
@@ -150,18 +154,18 @@ class Router[T <: Data](
       accWriteDataMux,
       accWriteDataMuxSel(1.U),
     )
-  }.elsewhen(control.bits.kind === DataFlowControl.dram0ToMemory) {
-    control.ready := enqueuer1.enqueue(
-      control.valid,
-      memWriteDataMux,
-      memWriteDataMuxSel(0.U),
-    )
-  }.elsewhen(control.bits.kind === DataFlowControl.memoryToDram0) {
-    control.ready := enqueuer1.enqueue(
-      control.valid,
-      memReadDataDemux,
-      memReadDataDemuxSel(0.U),
-    )
+    // }.elsewhen(control.bits.kind === DataFlowControl.dram0ToMemory) {
+    //   control.ready := enqueuer1.enqueue(
+    //     control.valid,
+    //     memWriteDataMux,
+    //     memWriteDataMuxSel(0.U),
+    //   )
+    // }.elsewhen(control.bits.kind === DataFlowControl.memoryToDram0) {
+    //   control.ready := enqueuer1.enqueue(
+    //     control.valid,
+    //     memReadDataDemux,
+    //     memReadDataDemuxSel(0.U),
+    //   )
   }.otherwise {
     control.ready := true.B
   }

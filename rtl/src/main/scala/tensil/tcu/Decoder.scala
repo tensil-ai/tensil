@@ -43,6 +43,8 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
     val dram1    = Decoupled(new MemControl(layout.arch.dram1Depth))
     val dataflow =
       Decoupled(new DataFlowControlWithSize(arch.localDepth))
+    val hostDataflow =
+      Decoupled(new HostDataFlowControl)
     val acc = Decoupled(
       new AccumulatorWithALUArrayControl(layout)
     )
@@ -69,9 +71,7 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
   dontTouch(io.tracepoint)
   dontTouch(io.programCounter)
 
-  // val instruction = QueueWithReporting(io.instruction, 1 << 1) // 4
   val instruction = Queue(io.instruction, 2)
-  // val instruction = io.instruction
 
   // only enqueues when instruction is done. we're just assuming
   // status.io.enq.ready will always be true, hence the 50 element buffer
@@ -211,14 +211,17 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
   io.array <> arrayHandler.io.out
   val array = arrayHandler.io.in
   //// router
-  // val routerInGen  = new DataFlowControlWithSize(arch.localDepth)
-  // val routerOutGen = new DataFlowControl
-  // val routerHandler = Module(
-  //   new SizeHandler(routerInGen, routerOutGen, arch.localDepth, name = "router")
-  // )
-  // io.dataflow <> routerHandler.io.out
-  // val dataflow = routerHandler.io.in
   val dataflow = io.dataflow
+  //// host router
+  val hostDataflowHandler = Module(
+    new SizeHandler(
+      new HostDataFlowControlWithSize(arch.localDepth),
+      new HostDataFlowControl,
+      arch.localDepth
+    )
+  )
+  io.hostDataflow <> hostDataflowHandler.io.out
+  val hostDataflow = hostDataflowHandler.io.in
 
   setDefault(memPortA)
   setDefault(memPortB)
@@ -237,7 +240,6 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
   enqueuer3.tieOff()
   enqueuer4.tieOff()
 
-  // when(instruction.valid) {
   when(instruction.bits.opcode === Opcode.MatMul) {
     val flags = Wire(new MatMulFlags)
     val args = Wire(
@@ -332,12 +334,12 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
       // data in
       instruction.ready := enqueuer3.enqueue(
         instruction.valid,
-        dataflow,
-        DataFlowControlWithSize(arch.localDepth)(
-          DataFlowControl.dram0ToMemory,
+        hostDataflow,
+        HostDataFlowControlWithSize(arch.localDepth)(
+          HostDataFlowControl.In0.U,
           args.size
         ),
-        memPortA,
+        memPortB,
         MemControlWithStride(memDepth, arch.stride0Depth)(
           args.memAddress,
           args.size,
@@ -358,12 +360,12 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
       // data out
       instruction.ready := enqueuer3.enqueue(
         instruction.valid,
-        dataflow,
-        DataFlowControlWithSize(arch.localDepth)(
-          DataFlowControl.memoryToDram0,
+        hostDataflow,
+        HostDataFlowControlWithSize(arch.localDepth)(
+          HostDataFlowControl.Out0.U,
           args.size
         ),
-        memPortA,
+        memPortB,
         MemControlWithStride(memDepth, arch.stride0Depth)(
           args.memAddress,
           args.size,
@@ -382,8 +384,13 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
       )
     }.elsewhen(flags.dataFlowControl === DataFlowControl.dram1ToMemory) {
       // weights in
-      instruction.ready := enqueuer2.enqueue(
+      instruction.ready := enqueuer3.enqueue(
         instruction.valid,
+        hostDataflow,
+        HostDataFlowControlWithSize(arch.localDepth)(
+          HostDataFlowControl.In1.U,
+          args.size
+        ),
         memPortB,
         MemControlWithStride(memDepth, arch.stride0Depth)(
           args.memAddress,
@@ -402,9 +409,13 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
         ),
       )
     }.elsewhen(flags.dataFlowControl === DataFlowControl.memoryToDram1) {
-      // weights out (new)
-      instruction.ready := enqueuer2.enqueue(
+      instruction.ready := enqueuer3.enqueue(
         instruction.valid,
+        hostDataflow,
+        HostDataFlowControlWithSize(arch.localDepth)(
+          HostDataFlowControl.Out1.U,
+          args.size
+        ),
         memPortB,
         MemControlWithStride(memDepth, arch.stride0Depth)(
           args.memAddress,

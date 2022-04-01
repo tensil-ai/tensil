@@ -215,8 +215,6 @@ object GoldenProcessorHelper {
       prepareInputStream(model.name, dataType, model.arch.arraySize, count)
 
     for (_ <- 0 until count / inputBatchSize) {
-      println(input.size)
-
       processor.writeDRAM0(
         input.base until input.base + input.size,
         new DataInputStream(inputStream)

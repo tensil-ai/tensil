@@ -1296,6 +1296,20 @@ class CompilerSpec extends FlatSpec {
     GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
   }
 
+  it should "Compile TF Conv2D (SAME padding, 2x2 strides) 3x3x4 image with 2x2x4x4 kernel" in {
+    val name    = "conv2d_4x4_same_stride_2"
+    val options = CompilerOptions(arch = Conv2DTiny4x4Architecure)
+
+    Compiler.compile(
+      name,
+      s"${Models}/conv2d_4x4_same_stride_2.pb",
+      List("Identity_1"),
+      options
+    )
+
+    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+  }
+
   it should "Compile TF tiled Conv2D (VALID padding) 3x3x4 image with 2x2x4x4 kernel" in {
     val name    = "conv2d_4x4_valid_tiled"
     val options = CompilerOptions(arch = Conv2DTiny2x2Architecure)

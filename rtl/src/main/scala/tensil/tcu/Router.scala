@@ -66,7 +66,7 @@ class Router[T <: Data](
   )
   memReadDataDemuxModule.io.in <> io.mem.output
   // io.host.dataOut <> memReadDataDemuxModule.io.out(0)
-  memReadDataDemuxModule.io.out(0).tieOff()
+  memReadDataDemuxModule.io.out(0).tieOffFlipped()
   io.array.input <> memReadDataDemuxModule.io.out(1)
 
   val memWriteDataMuxModule = Module(

@@ -85,8 +85,10 @@ object GoldenProcessorHelper {
       Mnist.prepareInputStream(arraySize, count, false)
     else if (modelName.startsWith("maxpool"))
       MaxPool.prepareInputStream(dataType, arraySize)
+    else if (modelName.startsWith("conv2d_non_square"))
+      Conv2D.prepareInputStream(dataType, arraySize, 3, 5)
     else if (modelName.startsWith("conv2d"))
-      Conv2D.prepareInputStream(dataType, arraySize)
+      Conv2D.prepareInputStream(dataType, arraySize, 3, 3)
     else if (modelName.startsWith("cnn_mnist"))
       Mnist.prepareInputStream(arraySize, count, true)
     else if (modelName.startsWith("resnet20v2"))
@@ -119,11 +121,29 @@ object GoldenProcessorHelper {
     else if (modelName.matches("conv2d_4x4_valid((_tiled)|(_oversized))?"))
       Conv2D.assertOutput(dataType, arraySize, bytes, Conv2D.ValidStride1Pixels)
     else if (
+      modelName.matches("conv2d_non_square_4x4_valid((_tiled)|(_oversized))?")
+    )
+      Conv2D.assertOutput(
+        dataType,
+        arraySize,
+        bytes,
+        Conv2D.ValidNonSquareStride1Pixels
+      )
+    else if (
       modelName.matches("conv2d_4x4_valid_stride_2((_tiled)|(_oversized))?")
     )
       Conv2D.assertOutput(dataType, arraySize, bytes, Conv2D.ValidStride2Pixels)
     else if (modelName.matches("conv2d_4x4_same((_tiled)|(_oversized))?"))
       Conv2D.assertOutput(dataType, arraySize, bytes, Conv2D.SameStride1Pixels)
+    else if (
+      modelName.matches("conv2d_non_square_4x4_same((_tiled)|(_oversized))?")
+    )
+      Conv2D.assertOutput(
+        dataType,
+        arraySize,
+        bytes,
+        Conv2D.SameNonSquareStride1Pixels
+      )
     else if (
       modelName.matches("conv2d_4x4_same_stride_2((_tiled)|(_oversized))?")
     )
@@ -195,6 +215,8 @@ object GoldenProcessorHelper {
       prepareInputStream(model.name, dataType, model.arch.arraySize, count)
 
     for (_ <- 0 until count / inputBatchSize) {
+      println(input.size)
+
       processor.writeDRAM0(
         input.base until input.base + input.size,
         new DataInputStream(inputStream)

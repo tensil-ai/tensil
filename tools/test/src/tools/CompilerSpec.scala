@@ -1296,20 +1296,6 @@ class CompilerSpec extends FlatSpec {
     GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
   }
 
-  it should "Compile TF Conv2D (SAME padding, 2x2 strides) 3x3x4 image with 2x2x4x4 kernel" in {
-    val name    = "conv2d_4x4_same_stride_2"
-    val options = CompilerOptions(arch = Conv2DTiny4x4Architecure)
-
-    Compiler.compile(
-      name,
-      s"${Models}/conv2d_4x4_same_stride_2.pb",
-      List("Identity_1"),
-      options
-    )
-
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
-  }
-
   it should "Compile TF tiled Conv2D (VALID padding) 3x3x4 image with 2x2x4x4 kernel" in {
     val name    = "conv2d_4x4_valid_tiled"
     val options = CompilerOptions(arch = Conv2DTiny2x2Architecure)
@@ -1393,6 +1379,222 @@ class CompilerSpec extends FlatSpec {
       name,
       s"${Models}/conv2d_4x4_same_relu_2x2_maxpool_valid_stride_1.pb",
       List("Identity_1"),
+      options
+    )
+
+    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+  }
+
+  it should "Compile TF Conv2D (VALID padding) 3x5x4 image with 2x2x4x4 kernel" in {
+    val name = "conv2d_non_square_4x4_valid"
+    val options = CompilerOptions(
+      arch = Conv2DTiny4x4Architecure,
+      printSummary = true
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/conv2d_non_square_4x4_valid.pb",
+      List("Identity_1"),
+      options
+    )
+
+    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+  }
+
+  it should "Compile TF Conv2D (SAME padding) 3x5x4 image with 2x2x4x4 kernel" in {
+    val name    = "conv2d_non_square_4x4_same"
+    val options = CompilerOptions(arch = Conv2DTiny4x4Architecure)
+
+    Compiler.compile(
+      name,
+      s"${Models}/conv2d_non_square_4x4_same.pb",
+      List("Identity_1"),
+      options
+    )
+
+    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+  }
+
+  it should "Compile tiled TF Conv2D (VALID padding) 3x5x4 image with 2x2x4x4 kernel" in {
+    val name = "conv2d_non_square_4x4_valid_tiled"
+    val options = CompilerOptions(
+      arch = Conv2DTiny2x2Architecure,
+      printSummary = true
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/conv2d_non_square_4x4_valid.pb",
+      List("Identity_1"),
+      options
+    )
+
+    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+  }
+
+  it should "Compile tiled TF Conv2D (SAME padding) 3x5x4 image with 2x2x4x4 kernel" in {
+    val name    = "conv2d_non_square_4x4_same_tiled"
+    val options = CompilerOptions(arch = Conv2DTiny2x2Architecure)
+
+    Compiler.compile(
+      name,
+      s"${Models}/conv2d_non_square_4x4_same.pb",
+      List("Identity_1"),
+      options
+    )
+
+    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+  }
+
+  it should "Compile oversized TF Conv2D (VALID padding) 3x5x4 image with 2x2x4x4 kernel" in {
+    val name = "conv2d_non_square_4x4_valid_oversized"
+    val options = CompilerOptions(
+      arch = Conv2DTiny8x8Architecure,
+      printSummary = true
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/conv2d_non_square_4x4_valid.pb",
+      List("Identity_1"),
+      options
+    )
+
+    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+  }
+
+  it should "Compile oversized TF Conv2D (SAME padding) 3x5x4 image with 2x2x4x4 kernel" in {
+    val name    = "conv2d_non_square_4x4_same_oversized"
+    val options = CompilerOptions(arch = Conv2DTiny8x8Architecure)
+
+    Compiler.compile(
+      name,
+      s"${Models}/conv2d_non_square_4x4_same.pb",
+      List("Identity_1"),
+      options
+    )
+
+    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+  }
+
+  it should "Compile ONNX Conv2D (VALID padding) 3x3x4 image with 2x2x4x4 kernel" in {
+    val name = "conv2d_4x4_valid"
+    val options = CompilerOptions(
+      arch = Conv2DTiny4x4Architecure,
+      printSummary = true
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/conv2d_4x4_valid.onnx",
+      List("Identity_1:0"),
+      options
+    )
+
+    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+  }
+
+  it should "Compile ONNX Conv2D (VALID padding, 2x2 strides) 3x3x4 image with 2x2x4x4 kernel" in {
+    val name    = "conv2d_4x4_valid_stride_2"
+    val options = CompilerOptions(arch = Conv2DTiny4x4Architecure)
+
+    Compiler.compile(
+      name,
+      s"${Models}/conv2d_4x4_valid_stride_2.onnx",
+      List("Conv2D:0"), // Skip Reshape added by ONNX converter
+      options
+    )
+
+    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+  }
+
+  it should "Compile ONNX Conv2D (SAME padding) 3x3x4 image with 2x2x4x4 kernel" in {
+    val name    = "conv2d_4x4_same"
+    val options = CompilerOptions(arch = Conv2DTiny4x4Architecure)
+
+    Compiler.compile(
+      name,
+      s"${Models}/conv2d_4x4_same.onnx",
+      List("Identity_1:0"),
+      options
+    )
+
+    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+  }
+
+  it should "Compile ONNX Conv2D (SAME padding, 2x2 strides) 3x3x4 image with 2x2x4x4 kernel" in {
+    val name    = "conv2d_4x4_same_stride_2"
+    val options = CompilerOptions(arch = Conv2DTiny4x4Architecure)
+
+    Compiler.compile(
+      name,
+      s"${Models}/conv2d_4x4_same_stride_2.onnx",
+      List("Identity_1:0"),
+      options
+    )
+
+    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+  }
+
+  it should "Compile ONNX Conv2D (SAME padding) 3x3x4 image with 2x2x4x4 kernel, Relu, MaxPool (VALID padding)" in {
+    val name = "conv2d_4x4_same_relu_2x2_maxpool_valid_stride_2"
+    val options = CompilerOptions(
+      arch = Conv2DTiny4x4Architecure,
+      printSummary = true
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/conv2d_4x4_same_relu_2x2_maxpool_valid_stride_2.onnx",
+      List("MaxPool2d:0"), // Skip Reshape added by ONNX converter
+      options
+    )
+
+    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+  }
+
+  it should "Compile ONNX Conv2D (SAME padding) 3x3x4 image with 2x2x4x4 kernel, Relu, MaxPool (VALID padding, 1x1 stride)" in {
+    val name = "conv2d_4x4_same_relu_2x2_maxpool_valid_stride_1"
+    val options = CompilerOptions(
+      arch = Conv2DTiny4x4Architecure,
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/conv2d_4x4_same_relu_2x2_maxpool_valid_stride_1.onnx",
+      List("Identity_1:0"),
+      options
+    )
+
+    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+  }
+
+  it should "Compile ONNX Conv2D (VALID padding) 3x5x4 image with 2x2x4x4 kernel" in {
+    val name = "conv2d_non_square_4x4_valid"
+    val options = CompilerOptions(
+      arch = Conv2DTiny4x4Architecure,
+      printSummary = true
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/conv2d_non_square_4x4_valid.onnx",
+      List("Identity_1:0"),
+      options
+    )
+
+    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+  }
+
+  it should "Compile ONNX Conv2D (SAME padding) 3x5x4 image with 2x2x4x4 kernel" in {
+    val name    = "conv2d_non_square_4x4_same"
+    val options = CompilerOptions(arch = Conv2DTiny4x4Architecure)
+
+    Compiler.compile(
+      name,
+      s"${Models}/conv2d_non_square_4x4_same.onnx",
+      List("Identity_1:0"),
       options
     )
 

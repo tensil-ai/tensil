@@ -1385,7 +1385,7 @@ class CompilerSpec extends FlatSpec {
     GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
   }
 
-  it should "Compile TF Conv2D (VALID padding) 3x5x4 image with 2x2x4x4 kernel" in {
+  it should "Compile TF Conv2D (VALID padding) 3x5x4 image with 3x2x4x4 kernel" in {
     val name = "conv2d_non_square_4x4_valid"
     val options = CompilerOptions(
       arch = Conv2DTiny4x4Architecure,
@@ -1402,7 +1402,7 @@ class CompilerSpec extends FlatSpec {
     GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
   }
 
-  it should "Compile TF Conv2D (SAME padding) 3x5x4 image with 2x2x4x4 kernel" in {
+  it should "Compile TF Conv2D (SAME padding) 3x5x4 image with 3x2x4x4 kernel" in {
     val name    = "conv2d_non_square_4x4_same"
     val options = CompilerOptions(arch = Conv2DTiny4x4Architecure)
 
@@ -1416,7 +1416,7 @@ class CompilerSpec extends FlatSpec {
     GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
   }
 
-  it should "Compile tiled TF Conv2D (VALID padding) 3x5x4 image with 2x2x4x4 kernel" in {
+  it should "Compile tiled TF Conv2D (VALID padding) 3x5x4 image with 3x2x4x4 kernel" in {
     val name = "conv2d_non_square_4x4_valid_tiled"
     val options = CompilerOptions(
       arch = Conv2DTiny2x2Architecure,
@@ -1433,7 +1433,7 @@ class CompilerSpec extends FlatSpec {
     GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
   }
 
-  it should "Compile tiled TF Conv2D (SAME padding) 3x5x4 image with 2x2x4x4 kernel" in {
+  it should "Compile tiled TF Conv2D (SAME padding) 3x5x4 image with 3x2x4x4 kernel" in {
     val name    = "conv2d_non_square_4x4_same_tiled"
     val options = CompilerOptions(arch = Conv2DTiny2x2Architecure)
 
@@ -1447,7 +1447,7 @@ class CompilerSpec extends FlatSpec {
     GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
   }
 
-  it should "Compile oversized TF Conv2D (VALID padding) 3x5x4 image with 2x2x4x4 kernel" in {
+  it should "Compile oversized TF Conv2D (VALID padding) 3x5x4 image with 3x2x4x4 kernel" in {
     val name = "conv2d_non_square_4x4_valid_oversized"
     val options = CompilerOptions(
       arch = Conv2DTiny8x8Architecure,
@@ -1464,7 +1464,7 @@ class CompilerSpec extends FlatSpec {
     GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
   }
 
-  it should "Compile oversized TF Conv2D (SAME padding) 3x5x4 image with 2x2x4x4 kernel" in {
+  it should "Compile oversized TF Conv2D (SAME padding) 3x5x4 image with 3x2x4x4 kernel" in {
     val name    = "conv2d_non_square_4x4_same_oversized"
     val options = CompilerOptions(arch = Conv2DTiny8x8Architecure)
 
@@ -1570,7 +1570,7 @@ class CompilerSpec extends FlatSpec {
     GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
   }
 
-  it should "Compile ONNX Conv2D (VALID padding) 3x5x4 image with 2x2x4x4 kernel" in {
+  it should "Compile ONNX Conv2D (VALID padding) 3x5x4 image with 3x2x4x4 kernel" in {
     val name = "conv2d_non_square_4x4_valid"
     val options = CompilerOptions(
       arch = Conv2DTiny4x4Architecure,
@@ -1587,7 +1587,7 @@ class CompilerSpec extends FlatSpec {
     GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
   }
 
-  it should "Compile ONNX Conv2D (SAME padding) 3x5x4 image with 2x2x4x4 kernel" in {
+  it should "Compile ONNX Conv2D (SAME padding) 3x5x4 image with 3x2x4x4 kernel" in {
     val name    = "conv2d_non_square_4x4_same"
     val options = CompilerOptions(arch = Conv2DTiny4x4Architecure)
 

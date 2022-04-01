@@ -15,7 +15,9 @@ object Conv2D {
       height: Int,
       width: Int
   ): InputStream =
-    new ByteArrayInputStream(prepareInputBytes(dataType, arraySize, height, width))
+    new ByteArrayInputStream(
+      prepareInputBytes(dataType, arraySize, height, width)
+    )
 
   def prepareInputBytes(
       dataType: ArchitectureDataType,
@@ -102,26 +104,27 @@ object Conv2D {
 
   val ValidNonSquareStride1Pixels = Array(
     Array(
-      Array(17152.0f, 17368.0f, 17584.0f, 17800.0f),
-      Array(21376.0f, 21656.0f, 21936.0f, 22216.0f),
-      Array(25600.0f, 25944.0f, 26288.0f, 26632.0f),
-      Array(29824.0f, 30232.0f, 30640.0f, 31048.0f)
-    ),
-    Array(
-      Array(38272.0f, 38808.0f, 39344.0f, 39880.0f),
-      Array(42496.0f, 43096.0f, 43696.0f, 44296.0f),
-      Array(46720.0f, 47384.0f, 48048.0f, 48712.0f),
-      Array(50944.0f, 51672.0f, 52400.0f, 53128.0f)
+      Array(56992.0f, 57514.0f, 58120.0f, 58684.0f),
+      Array(64864.0f, 65478.0f, 66184.0f, 66844.0f),
+      Array(72736.0f, 73442.0f, 74248.0f, 75004.0f),
+      Array(80608.0f, 81406.0f, 82312.0f, 83164.0f)
     )
   )
 
   val SameNonSquareStride1Pixels = Array(
     Array(
-      Array(17152.0f, 17368.0f, 17584.0f, 17800.0f),
-      Array(21376.0f, 21656.0f, 21936.0f, 22216.0f),
-      Array(25600.0f, 25944.0f, 26288.0f, 26632.0f),
-      Array(29824.0f, 30232.0f, 30640.0f, 31048.0f),
-      Array(14080.0f, 14300.0f, 14520.0f, 14740.0f)
+      Array(24064.0f, 24258.0f, 24496.0f, 24712.0f),
+      Array(30336.0f, 30590.0f, 30896.0f, 31176.0f),
+      Array(36608.0f, 36922.0f, 37296.0f, 37640.0f),
+      Array(42880.0f, 43254.0f, 43696.0f, 44104.0f),
+      Array(21120.0f, 21302.0f, 21560.0f, 21780.0f)
+    ),
+    Array(
+      Array(56992.0f, 57514.0f, 58120.0f, 58684.0f),
+      Array(64864.0f, 65478.0f, 66184.0f, 66844.0f),
+      Array(72736.0f, 73442.0f, 74248.0f, 75004.0f),
+      Array(80608.0f, 81406.0f, 82312.0f, 83164.0f),
+      Array(38480.0f, 38872.0f, 39380.0f, 39830.0f)
     ),
     Array(
       Array(38272.0f, 38808.0f, 39344.0f, 39880.0f),
@@ -129,13 +132,6 @@ object Conv2D {
       Array(46720.0f, 47384.0f, 48048.0f, 48712.0f),
       Array(50944.0f, 51672.0f, 52400.0f, 53128.0f),
       Array(23360.0f, 23740.0f, 24120.0f, 24500.0f)
-    ),
-    Array(
-      Array(17568.0f, 17916.0f, 18264.0f, 18612.0f),
-      Array(19168.0f, 19548.0f, 19928.0f, 20308.0f),
-      Array(20768.0f, 21180.0f, 21592.0f, 22004.0f),
-      Array(22368.0f, 22812.0f, 23256.0f, 23700.0f),
-      Array(9680.0f, 9910.0f, 10140.0f, 10370.0f)
     )
   )
 

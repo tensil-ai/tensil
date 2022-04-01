@@ -226,6 +226,7 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
   setDefault(memPortA)
   setDefault(memPortB)
   setDefault(dataflow)
+  setDefault(hostDataflow)
   setDefault(acc)
   setDefault(array)
   setDefault(dram0)
@@ -336,7 +337,7 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
         instruction.valid,
         hostDataflow,
         HostDataFlowControlWithSize(arch.localDepth)(
-          HostDataFlowControl.In0.U,
+          HostDataFlowControl.In0,
           args.size
         ),
         memPortB,
@@ -362,7 +363,7 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
         instruction.valid,
         hostDataflow,
         HostDataFlowControlWithSize(arch.localDepth)(
-          HostDataFlowControl.Out0.U,
+          HostDataFlowControl.Out0,
           args.size
         ),
         memPortB,
@@ -388,7 +389,7 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
         instruction.valid,
         hostDataflow,
         HostDataFlowControlWithSize(arch.localDepth)(
-          HostDataFlowControl.In1.U,
+          HostDataFlowControl.In1,
           args.size
         ),
         memPortB,
@@ -413,7 +414,7 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
         instruction.valid,
         hostDataflow,
         HostDataFlowControlWithSize(arch.localDepth)(
-          HostDataFlowControl.Out1.U,
+          HostDataFlowControl.Out1,
           args.size
         ),
         memPortB,

@@ -48,17 +48,17 @@ class HostRouter[T <: Data](val gen: T, val arch: Architecture) extends Module {
 }
 
 object HostDataFlowControl {
-  val In0  = 0
-  val Out0 = 1
-  val In1  = 2
-  val Out1 = 3
+  val In0  = 0x0.U
+  val Out0 = 0x1.U
+  val In1  = 0x2.U
+  val Out1 = 0x3.U
 
   def isDataIn(kind: UInt): Bool = {
-    kind === In0.U || kind === In1.U
+    kind === In0 || kind === In1
   }
 
   def isDataOut(kind: UInt): Bool = {
-    kind === Out0.U || kind === Out1.U
+    kind === Out0 || kind === Out1
   }
 
   def apply(kind: UInt): HostDataFlowControl = {

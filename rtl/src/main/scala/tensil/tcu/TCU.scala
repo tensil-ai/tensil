@@ -112,6 +112,7 @@ class TCU[T <: Data with Num[T]](
   acc.io.wrote.ready := true.B
   //// Array ////
   array.io.control <> QueueWithReporting(decoder.io.array, 1 << 1) // 4
+  // TODO need to add weights to router so that port B is exclusively for host IO
   array.io.weight <> portB.output
   array.io.loaded.ready := true.B
   array.io.ran.ready := true.B

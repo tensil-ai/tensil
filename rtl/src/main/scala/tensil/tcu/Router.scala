@@ -32,8 +32,9 @@ class Router[T <: Data](
       val input  = Decoupled(gen)
     }
     val array = new Bundle {
-      val input  = Decoupled(gen)
-      val output = Flipped(Decoupled(gen))
+      val input       = Decoupled(gen)
+      val output      = Flipped(Decoupled(gen))
+      val weightInput = Decoupled(gen)
     }
     val acc = new Bundle {
       val output = Flipped(Decoupled(gen))
@@ -59,7 +60,7 @@ class Router[T <: Data](
     )
   )
   memReadDataDemuxModule.io.in <> io.mem.output
-  memReadDataDemuxModule.io.out(0).tieOffFlipped()
+  io.array.weightInput <> memReadDataDemuxModule.io.out(0)
   io.array.input <> memReadDataDemuxModule.io.out(1)
 
   val memWriteDataMuxModule = Module(
@@ -118,7 +119,13 @@ class Router[T <: Data](
   enqueuer1.tieOff()
   enqueuer2.tieOff()
 
-  when(control.bits.kind === DataFlowControl._memoryToArrayToAcc) {
+  when(control.bits.kind === DataFlowControl.memoryToArrayWeight) {
+    control.ready := enqueuer1.enqueue(
+      control.valid,
+      memReadDataDemux,
+      memReadDataDemuxSel(0.U),
+    )
+  }.elsewhen(control.bits.kind === DataFlowControl._memoryToArrayToAcc) {
     control.ready := enqueuer2.enqueue(
       control.valid,
       memReadDataDemux,
@@ -139,7 +146,8 @@ class Router[T <: Data](
       memWriteDataMuxSel(1.U),
     )
   }.elsewhen(
-    control.bits.kind === DataFlowControl.memoryToAccumulator || control.bits.kind === DataFlowControl.memoryToAccumulatorAccumulate
+    // control.bits.kind === DataFlowControl.memoryToAccumulator || control.bits.kind === DataFlowControl.memoryToAccumulatorAccumulate
+    control.bits.kind === DataFlowControl.memoryToAccumulator
   ) {
     control.ready := enqueuer2.enqueue(
       control.valid,
@@ -155,12 +163,10 @@ class Router[T <: Data](
 
 object Router {
   val dataflows = Array(
+    DataFlowControl.memoryToArrayWeight,
     DataFlowControl._memoryToArrayToAcc,
     DataFlowControl._arrayToAcc,
     DataFlowControl.accumulatorToMemory,
     DataFlowControl.memoryToAccumulator,
-    DataFlowControl.memoryToAccumulatorAccumulate,
-    DataFlowControl.dram0ToMemory,
-    DataFlowControl.memoryToDram0,
   )
 }

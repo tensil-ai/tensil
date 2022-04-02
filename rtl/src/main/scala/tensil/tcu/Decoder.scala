@@ -307,11 +307,16 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
       )
     }.otherwise {
       val stride = 1.U << args.stride
-      instruction.ready := enqueuer2.enqueue(
+      instruction.ready := enqueuer3.enqueue(
         instruction.valid,
+        dataflow,
+        DataFlowControlWithSize(memDepth)(
+          DataFlowControl.memoryToArrayWeight,
+          args.size
+        ),
         array,
         arrayBundle(true.B, flags.zeroes, args.size),
-        memPortB,
+        memPortA,
         MemControlWithStride(memDepth, arch.stride0Depth)(
           args.address + (args.size * stride),
           args.size,
@@ -331,7 +336,7 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
     args := instruction.bits.arguments.asTypeOf(args)
     flags := instruction.bits.flags.asTypeOf(flags)
 
-    when(flags.dataFlowControl === DataFlowControl.dram0ToMemory) {
+    when(flags.kind === DataMoveKind.dram0ToMemory) {
       // data in
       instruction.ready := enqueuer3.enqueue(
         instruction.valid,
@@ -357,7 +362,7 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
           false.B,
         ),
       )
-    }.elsewhen(flags.dataFlowControl === DataFlowControl.memoryToDram0) {
+    }.elsewhen(flags.kind === DataMoveKind.memoryToDram0) {
       // data out
       instruction.ready := enqueuer3.enqueue(
         instruction.valid,
@@ -383,7 +388,7 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
           true.B,
         ),
       )
-    }.elsewhen(flags.dataFlowControl === DataFlowControl.dram1ToMemory) {
+    }.elsewhen(flags.kind === DataMoveKind.dram1ToMemory) {
       // weights in
       instruction.ready := enqueuer3.enqueue(
         instruction.valid,
@@ -409,7 +414,7 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
           false.B,
         ),
       )
-    }.elsewhen(flags.dataFlowControl === DataFlowControl.memoryToDram1) {
+    }.elsewhen(flags.kind === DataMoveKind.memoryToDram1) {
       instruction.ready := enqueuer3.enqueue(
         instruction.valid,
         hostDataflow,
@@ -435,7 +440,7 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
         ),
       )
     }.elsewhen(
-      flags.dataFlowControl === DataFlowControl.accumulatorToMemory
+      flags.kind === DataMoveKind.accumulatorToMemory
     ) {
       // data move acc=>mem
       instruction.ready := enqueuer3.enqueue(
@@ -457,7 +462,7 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
         accRead(args.accAddress, args.size, args.accStride),
       )
     }.elsewhen(
-      flags.dataFlowControl === DataFlowControl.memoryToAccumulator
+      flags.kind === DataMoveKind.memoryToAccumulator
     ) {
       // data move mem=>acc
       instruction.ready := enqueuer3.enqueue(
@@ -479,7 +484,7 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
         accWrite(args.accAddress, false.B, args.size, args.accStride),
       )
     }.elsewhen(
-      flags.dataFlowControl === DataFlowControl.memoryToAccumulatorAccumulate
+      flags.kind === DataMoveKind.memoryToAccumulatorAccumulate
     ) {
       // data move mem=>acc(acc)
       instruction.ready := enqueuer3.enqueue(

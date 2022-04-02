@@ -26,46 +26,51 @@ class RouterFormal extends Formal {
     )
     .toMap
 
-  val accInput    = Node(m.io.acc.input)
-  val accOutput   = Node(m.io.acc.output)
-  val arrayInput  = Node(m.io.array.input)
-  val arrayOutput = Node(m.io.array.output)
+  val accInput         = Node(m.io.acc.input)
+  val accOutput        = Node(m.io.acc.output)
+  val arrayInput       = Node(m.io.array.input)
+  val arrayOutput      = Node(m.io.array.output)
+  val arrayWeightInput = Node(m.io.array.weightInput)
   val memInputFromAcc = Node(
     m.io.mem.input,
     filter = m.io.control.bits.kind === DataFlowControl.accumulatorToMemory
   )
-  val memInputFromHost = Node(
-    m.io.mem.input,
-    filter = m.io.control.bits.kind === DataFlowControl.dram0ToMemory
-  )
+  // val memInputFromHost = Node(
+  //   m.io.mem.input,
+  //   filter = m.io.control.bits.kind === DataFlowControl.dram0ToMemory
+  // )
   val memOutputForAcc = Node(
     m.io.mem.output,
     filter =
-      m.io.control.bits.kind === DataFlowControl.memoryToAccumulator ||
-        m.io.control.bits.kind === DataFlowControl.memoryToAccumulatorAccumulate
+      m.io.control.bits.kind === DataFlowControl.memoryToAccumulator //||
+    // m.io.control.bits.kind === DataFlowControl.memoryToAccumulatorAccumulate
   )
   val memOutputForArray = Node(
     m.io.mem.output,
-    filter = m.io.control.bits.kind === DataFlowControl._memoryToArrayToAcc
+    filter = m.io.control.bits.kind === DataFlowControl._memoryToArrayToAcc ||
+      m.io.control.bits.kind === DataFlowControl.memoryToArrayWeight
   )
-  val memOutputForHost = Node(
-    m.io.mem.output,
-    filter = m.io.control.bits.kind === DataFlowControl.memoryToDram0
-  )
+  // val memOutputForHost = Node(
+  //   m.io.mem.output,
+  //   filter = m.io.control.bits.kind === DataFlowControl.memoryToDram0
+  // )
 
   depends(accInput, control(DataFlowControl._arrayToAcc))
   depends(accInput, control(DataFlowControl._memoryToArrayToAcc))
   depends(accInput, control(DataFlowControl.memoryToAccumulator))
-  depends(accInput, control(DataFlowControl.memoryToAccumulatorAccumulate))
+  // depends(accInput, control(DataFlowControl.memoryToAccumulatorAccumulate))
   depends(accInput, memOutputForAcc)
   depends(accInput, arrayOutput)
 
   depends(arrayInput, control(DataFlowControl._memoryToArrayToAcc))
   depends(arrayInput, memOutputForArray)
 
+  depends(arrayWeightInput, control(DataFlowControl.memoryToArrayWeight))
+  depends(arrayWeightInput, memOutputForArray)
+
   depends(memInputFromAcc, control(DataFlowControl.accumulatorToMemory))
   depends(memInputFromAcc, accOutput)
-  depends(memInputFromHost, control(DataFlowControl.dram0ToMemory))
+  // depends(memInputFromHost, control(DataFlowControl.dram0ToMemory))
 
   assertNoDeadlock()
 }

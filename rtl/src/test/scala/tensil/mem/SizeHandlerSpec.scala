@@ -25,7 +25,7 @@ class SizeHandlerSpec extends FunUnitSpec {
           m.io.out.setSinkClock(m.clock)
 
           val size = 99
-          val kind = DataFlowControl.dram0ToMemory
+          val kind = DataFlowControl._memoryToArrayToAcc
 
           val t = fork {
             m.io.in.enqueue(

@@ -24,6 +24,7 @@ import scala.collection.mutable
 import chiseltest.internal.TesterThreadList
 import tensil.tcu.instruction.LoadWeightFlags
 import tensil.tcu.instruction.LoadWeightArgs
+import tensil.tcu.instruction.DataMoveKind
 
 class DecoderSpec extends FunUnitSpec {
   val options = TCUOptions(decoderTimeout = 10)
@@ -98,35 +99,35 @@ class DecoderSpec extends FunUnitSpec {
             m.io.instruction.enqueue(
               Instruction(
                 Opcode.DataMove,
-                DataMoveFlags(DataFlowControl.memoryToAccumulatorAccumulate),
+                DataMoveFlags(DataMoveKind.memoryToAccumulatorAccumulate),
                 DataMoveArgs(0, 0, 0)
               )
             )
             m.io.instruction.enqueue(
               Instruction(
                 Opcode.DataMove,
-                DataMoveFlags(DataFlowControl.memoryToAccumulatorAccumulate),
+                DataMoveFlags(DataMoveKind.memoryToAccumulatorAccumulate),
                 DataMoveArgs(0, 0, 0)
               )
             )
             m.io.instruction.enqueue(
               Instruction(
                 Opcode.DataMove,
-                DataMoveFlags(DataFlowControl.memoryToAccumulatorAccumulate),
+                DataMoveFlags(DataMoveKind.memoryToAccumulatorAccumulate),
                 DataMoveArgs(0, 0, 0)
               )
             )
             m.io.instruction.enqueue(
               Instruction(
                 Opcode.DataMove,
-                DataMoveFlags(DataFlowControl.memoryToAccumulatorAccumulate),
+                DataMoveFlags(DataMoveKind.memoryToAccumulatorAccumulate),
                 DataMoveArgs(0, 0, 0)
               )
             )
             m.io.instruction.enqueue(
               Instruction(
                 Opcode.DataMove,
-                DataMoveFlags(DataFlowControl.memoryToAccumulatorAccumulate),
+                DataMoveFlags(DataMoveKind.memoryToAccumulatorAccumulate),
                 DataMoveArgs(0, 0, 0)
               )
             )
@@ -182,8 +183,8 @@ class DecoderSpec extends FunUnitSpec {
       describe("should move data from memory to accumulators") {
         for (accumulate <- Array(false, true)) {
           val flag =
-            if (accumulate) DataFlowControl.memoryToAccumulatorAccumulate
-            else DataFlowControl.memoryToAccumulator
+            if (accumulate) DataMoveKind.memoryToAccumulatorAccumulate
+            else DataMoveKind.memoryToAccumulator
           it(
             s"with accumulate = $accumulate"
           ) {
@@ -291,7 +292,7 @@ class DecoderSpec extends FunUnitSpec {
               .enqueue(
                 Instruction(
                   Opcode.DataMove,
-                  DataMoveFlags(DataFlowControl.memoryToDram0),
+                  DataMoveFlags(DataMoveKind.memoryToDram0),
                   DataMoveArgs(
                     i % layout.arch.localDepth,
                     i % layout.arch.localDepth
@@ -366,7 +367,7 @@ class DecoderSpec extends FunUnitSpec {
               .enqueue(
                 Instruction(
                   Opcode.DataMove,
-                  DataMoveFlags(DataFlowControl.memoryToDram0),
+                  DataMoveFlags(DataMoveKind.memoryToDram0),
                   DataMoveArgs(
                     i % layout.arch.localDepth,
                     i % layout.arch.localDepth
@@ -419,14 +420,14 @@ class DecoderSpec extends FunUnitSpec {
           m.io.instruction.enqueue(
             Instruction(
               Opcode.DataMove,
-              DataMoveFlags(DataFlowControl.dram0ToMemory),
+              DataMoveFlags(DataMoveKind.dram0ToMemory),
               DataMoveArgs(0, 0, 0)
             )
           )
           m.io.instruction.enqueue(
             Instruction(
               Opcode.DataMove,
-              DataMoveFlags(DataFlowControl.memoryToDram0),
+              DataMoveFlags(DataMoveKind.memoryToDram0),
               DataMoveArgs(0, 0, 0)
             )
           )
@@ -503,7 +504,7 @@ class DecoderSpec extends FunUnitSpec {
             m.io.instruction.enqueue(
               Instruction(
                 Opcode.DataMove,
-                DataMoveFlags(DataFlowControl.dram0ToMemory),
+                DataMoveFlags(DataMoveKind.dram0ToMemory),
                 DataMoveArgs(
                   memAddress,
                   accAddress,
@@ -516,7 +517,7 @@ class DecoderSpec extends FunUnitSpec {
             m.io.instruction.enqueue(
               Instruction(
                 Opcode.DataMove,
-                DataMoveFlags(DataFlowControl.dram1ToMemory),
+                DataMoveFlags(DataMoveKind.dram1ToMemory),
                 DataMoveArgs(
                   memAddress,
                   accAddress,
@@ -648,9 +649,9 @@ class DecoderSpec extends FunUnitSpec {
             // loadweights
             // datamove (dram0 -> mem)
             // for (i <- 0 until size) {
-            m.io.dataflow.expectDequeue(
-              DataFlowControlWithSize(m.arch.localDepth)(
-                DataFlowControl.dram0ToMemory,
+            m.io.hostDataflow.expectDequeue(
+              HostDataFlowControlWithSize(m.arch.localDepth)(
+                HostDataFlowControl.In0,
                 (size - 1).U
               )
             )
@@ -690,6 +691,7 @@ class DecoderSpec extends FunUnitSpec {
         ) { m =>
           m.io.instruction.setSourceClock(m.clock)
           m.io.dataflow.setSinkClock(m.clock)
+          m.io.hostDataflow.setSinkClock(m.clock)
           m.io.memPortA.setSinkClock(m.clock)
           m.io.memPortB.setSinkClock(m.clock)
           m.io.acc.setSinkClock(m.clock)
@@ -699,9 +701,9 @@ class DecoderSpec extends FunUnitSpec {
 
           {
             val t0 = fork {
-              m.io.dataflow.expectDequeue(
-                DataFlowControlWithSize(m.arch.localDepth)(
-                  DataFlowControl.dram0ToMemory,
+              m.io.hostDataflow.expectDequeue(
+                HostDataFlowControlWithSize(m.arch.localDepth)(
+                  HostDataFlowControl.In0,
                   0.U
                 )
               )
@@ -719,7 +721,7 @@ class DecoderSpec extends FunUnitSpec {
             m.io.instruction.enqueue(
               Instruction(
                 Opcode.DataMove,
-                DataMoveFlags(DataFlowControl.dram0ToMemory),
+                DataMoveFlags(DataMoveKind.dram0ToMemory),
                 DataMoveArgs(0, 0xfffff, 0x0)
               )
             )
@@ -730,9 +732,9 @@ class DecoderSpec extends FunUnitSpec {
 
           {
             val t0 = fork {
-              m.io.dataflow.expectDequeue(
-                DataFlowControlWithSize(m.arch.localDepth)(
-                  DataFlowControl.memoryToDram0,
+              m.io.hostDataflow.expectDequeue(
+                HostDataFlowControlWithSize(m.arch.localDepth)(
+                  HostDataFlowControl.Out0,
                   0.U
                 )
               )
@@ -750,7 +752,7 @@ class DecoderSpec extends FunUnitSpec {
             m.io.instruction.enqueue(
               Instruction(
                 Opcode.DataMove,
-                DataMoveFlags(DataFlowControl.memoryToDram0),
+                DataMoveFlags(DataMoveKind.memoryToDram0),
                 DataMoveArgs(0, 0xfffff, 0x0)
               )
             )
@@ -773,7 +775,7 @@ class DecoderSpec extends FunUnitSpec {
             m.io.instruction.enqueue(
               Instruction(
                 Opcode.DataMove,
-                DataMoveFlags(DataFlowControl.dram1ToMemory),
+                DataMoveFlags(DataMoveKind.dram1ToMemory),
                 DataMoveArgs(0, 0xfffff, 0x0)
               )
             )

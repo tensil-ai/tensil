@@ -266,10 +266,7 @@ class DecoderSpec extends FunUnitSpec {
           for (i <- 0 until 1000) {
             val thread0 = fork {
               m.io.hostDataflow.expectDequeue(
-                HostDataFlowControlWithSize(m.arch.localDepth)(
-                  HostDataFlowControl.Out0,
-                  0.U
-                )
+                HostDataFlowControl(HostDataFlowControl.Out0)
               )
             }
             val thread1 = fork {
@@ -341,10 +338,7 @@ class DecoderSpec extends FunUnitSpec {
           for (i <- 0 until 1000) {
             val thread0 = fork {
               m.io.hostDataflow.expectDequeue(
-                HostDataFlowControlWithSize(m.arch.localDepth)(
-                  HostDataFlowControl.Out0,
-                  0.U
-                )
+                HostDataFlowControl(HostDataFlowControl.Out0)
               )
             }
             val thread1 = fork {
@@ -396,16 +390,10 @@ class DecoderSpec extends FunUnitSpec {
 
           val thread0 = fork {
             m.io.hostDataflow.expectDequeue(
-              HostDataFlowControlWithSize(m.arch.localDepth)(
-                HostDataFlowControl.In0,
-                0.U
-              )
+              HostDataFlowControl(HostDataFlowControl.In0)
             )
             m.io.hostDataflow.expectDequeue(
-              HostDataFlowControlWithSize(m.arch.localDepth)(
-                HostDataFlowControl.Out0,
-                0.U
-              )
+              HostDataFlowControl(HostDataFlowControl.Out0)
             )
           }
           val thread1 = fork {
@@ -564,6 +552,11 @@ class DecoderSpec extends FunUnitSpec {
               )
             }
             // loadweights
+            for (i <- (size - 1) * ms to 0 by -ms) {
+              m.io.memPortA.expectDequeue(
+                MemControl(arch.localDepth)((memAddress + i).U, false.B)
+              )
+            }
             // datamove (dram0 -> mem)
             // datamove (dram1 -> mem)
           }
@@ -572,11 +565,6 @@ class DecoderSpec extends FunUnitSpec {
           threads += fork {
             // matmul
             // loadweights
-            for (i <- (size - 1) * ms to 0 by -ms) {
-              m.io.memPortB.expectDequeue(
-                MemControl(arch.localDepth)((memAddress + i).U, false.B)
-              )
-            }
             // datamove (dram0 -> mem)
             for (i <- 0 until size * ms by ms) {
               m.io.memPortB.expectDequeue(
@@ -638,25 +626,35 @@ class DecoderSpec extends FunUnitSpec {
           // dataflow
           threads += fork {
             // matmul
-            // for (i <- 0 until size) {
             m.io.dataflow.expectDequeue(
               DataFlowControlWithSize(m.arch.localDepth)(
                 DataFlowControl._memoryToArrayToAcc,
                 (size - 1).U
               )
             )
-            // }
             // loadweights
-            // datamove (dram0 -> mem)
-            // for (i <- 0 until size) {
-            m.io.hostDataflow.expectDequeue(
-              HostDataFlowControlWithSize(m.arch.localDepth)(
-                HostDataFlowControl.In0,
+            m.io.dataflow.expectDequeue(
+              DataFlowControlWithSize(m.arch.localDepth)(
+                DataFlowControl.memoryToArrayWeight,
                 (size - 1).U
               )
             )
-            // }
+            // datamove (dram0 -> mem)
             // datamove (dram1 -> mem)
+          }
+
+          // host dataflow
+          threads += fork {
+            // datamove (dram0 -> mem)
+            for (i <- 0 until size)
+              m.io.hostDataflow.expectDequeue(
+                HostDataFlowControl(HostDataFlowControl.In0)
+              )
+            // datamove (dram1 -> mem)
+            for (i <- 0 until size)
+              m.io.hostDataflow.expectDequeue(
+                HostDataFlowControl(HostDataFlowControl.In1)
+              )
           }
 
           threads.map(_.join())
@@ -702,10 +700,7 @@ class DecoderSpec extends FunUnitSpec {
           {
             val t0 = fork {
               m.io.hostDataflow.expectDequeue(
-                HostDataFlowControlWithSize(m.arch.localDepth)(
-                  HostDataFlowControl.In0,
-                  0.U
-                )
+                HostDataFlowControl(HostDataFlowControl.In0)
               )
             }
             val t1 = fork {
@@ -714,7 +709,7 @@ class DecoderSpec extends FunUnitSpec {
               )
             }
             val t2 = fork {
-              m.io.memPortA.expectDequeue(
+              m.io.memPortB.expectDequeue(
                 MemControl(layout.arch.localDepth.toInt)(0.U, true.B)
               )
             }
@@ -733,10 +728,7 @@ class DecoderSpec extends FunUnitSpec {
           {
             val t0 = fork {
               m.io.hostDataflow.expectDequeue(
-                HostDataFlowControlWithSize(m.arch.localDepth)(
-                  HostDataFlowControl.Out0,
-                  0.U
-                )
+                HostDataFlowControl(HostDataFlowControl.Out0)
               )
             }
             val t1 = fork {
@@ -745,7 +737,7 @@ class DecoderSpec extends FunUnitSpec {
               )
             }
             val t2 = fork {
-              m.io.memPortA.expectDequeue(
+              m.io.memPortB.expectDequeue(
                 MemControl(layout.arch.localDepth.toInt)(0.U, false.B)
               )
             }

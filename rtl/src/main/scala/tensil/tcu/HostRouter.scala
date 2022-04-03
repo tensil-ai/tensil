@@ -14,7 +14,7 @@ import tensil.util.decoupled
 class HostRouter[T <: Data](val gen: T, val arch: Architecture) extends Module {
   val io = IO(new Bundle {
     val control =
-      Flipped(Decoupled(new HostDataFlowControlWithSize(arch.localDepth)))
+      Flipped(Decoupled(new HostDataFlowControl))
     val dram0 = new Bundle {
       val dataIn  = Flipped(Decoupled(gen))
       val dataOut = Decoupled(gen)

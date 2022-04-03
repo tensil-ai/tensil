@@ -35,30 +35,20 @@ class RouterFormal extends Formal {
     m.io.mem.input,
     filter = m.io.control.bits.kind === DataFlowControl.accumulatorToMemory
   )
-  // val memInputFromHost = Node(
-  //   m.io.mem.input,
-  //   filter = m.io.control.bits.kind === DataFlowControl.dram0ToMemory
-  // )
   val memOutputForAcc = Node(
     m.io.mem.output,
     filter =
       m.io.control.bits.kind === DataFlowControl.memoryToAccumulator //||
-    // m.io.control.bits.kind === DataFlowControl.memoryToAccumulatorAccumulate
   )
   val memOutputForArray = Node(
     m.io.mem.output,
     filter = m.io.control.bits.kind === DataFlowControl._memoryToArrayToAcc ||
       m.io.control.bits.kind === DataFlowControl.memoryToArrayWeight
   )
-  // val memOutputForHost = Node(
-  //   m.io.mem.output,
-  //   filter = m.io.control.bits.kind === DataFlowControl.memoryToDram0
-  // )
 
   depends(accInput, control(DataFlowControl._arrayToAcc))
   depends(accInput, control(DataFlowControl._memoryToArrayToAcc))
   depends(accInput, control(DataFlowControl.memoryToAccumulator))
-  // depends(accInput, control(DataFlowControl.memoryToAccumulatorAccumulate))
   depends(accInput, memOutputForAcc)
   depends(accInput, arrayOutput)
 
@@ -70,7 +60,6 @@ class RouterFormal extends Formal {
 
   depends(memInputFromAcc, control(DataFlowControl.accumulatorToMemory))
   depends(memInputFromAcc, accOutput)
-  // depends(memInputFromHost, control(DataFlowControl.dram0ToMemory))
 
   assertNoDeadlock()
 }

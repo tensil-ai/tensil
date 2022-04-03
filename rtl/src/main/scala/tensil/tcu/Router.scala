@@ -146,7 +146,6 @@ class Router[T <: Data](
       memWriteDataMuxSel(1.U),
     )
   }.elsewhen(
-    // control.bits.kind === DataFlowControl.memoryToAccumulator || control.bits.kind === DataFlowControl.memoryToAccumulatorAccumulate
     control.bits.kind === DataFlowControl.memoryToAccumulator
   ) {
     control.ready := enqueuer2.enqueue(

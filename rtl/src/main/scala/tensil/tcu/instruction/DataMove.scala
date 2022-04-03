@@ -88,18 +88,6 @@ object DataMoveKind {
 
   def apply(kind: UInt): DataMoveKind = kind
 
-  // def apply(kind: UInt): DataMoveKind = {
-  //   if (kind.isLit()) {
-  //     new DataMoveKind().Lit(
-  //       _.kind -> kind,
-  //     )
-  //   } else {
-  //     val w = Wire(new DataFlowControl())
-  //     w.kind := kind
-  //     w
-  //   }
-  // }
-
   def isValid(kind: UInt): Bool = {
     kind <= memoryToDram1 ||
     kind === accumulatorToMemory ||

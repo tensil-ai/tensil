@@ -37,17 +37,6 @@ object DataFlowControl {
   val accumulatorToMemory = 0x4.U
   val memoryToAccumulator = 0x5.U
   val _unused             = 0x6.U
-  // val memoryToAccumulatorAccumulate = 0x7.U
-
-  // val all = Array(
-  //   dram0ToMemory,
-  //   memoryToDram0,
-  //   dram1ToMemory,
-  //   memoryToDram1,
-  //   accumulatorToMemory,
-  //   memoryToAccumulator,
-  //   memoryToAccumulatorAccumulate
-  // )
 
   def apply(kind: UInt): DataFlowControl = {
     if (kind.isLit()) {
@@ -60,11 +49,4 @@ object DataFlowControl {
       w
     }
   }
-
-  // def isValid(kind: UInt): Bool = {
-  //   kind <= memoryToDram1 ||
-  //   kind === accumulatorToMemory ||
-  //   kind === memoryToAccumulator ||
-  //   kind === memoryToAccumulatorAccumulate
-  // }
 }

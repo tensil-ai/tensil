@@ -10,6 +10,7 @@ import tensil.formal._
 import tensil.tcu.instruction.Opcode
 import tensil.mem.OutQueue
 import chisel3.util.Queue
+import tensil.tcu.instruction.DataMoveKind
 
 class DecoderFormal extends Formal {
   val arch = tensil.Architecture.formal
@@ -46,7 +47,7 @@ class DecoderFormal extends Formal {
     filter = m.io.instruction.bits.opcode === Opcode.LoadWeights,
     suffix = "loadWeights",
   )
-  val dataMove = DataFlowControl.all
+  val dataMove = DataMoveKind.all
     .map(kind =>
       kind ->
         Node(
@@ -83,9 +84,9 @@ class DecoderFormal extends Formal {
   depends(nooped, noop)
 
   depends(acc, matmul)
-  depends(acc, dataMove(DataFlowControl.accumulatorToMemory))
-  depends(acc, dataMove(DataFlowControl.memoryToAccumulator))
-  depends(acc, dataMove(DataFlowControl.memoryToAccumulatorAccumulate))
+  depends(acc, dataMove(DataMoveKind.accumulatorToMemory))
+  depends(acc, dataMove(DataMoveKind.memoryToAccumulator))
+  depends(acc, dataMove(DataMoveKind.memoryToAccumulatorAccumulate))
   depends(acc, simd)
 
   depends(array, matmul)
@@ -94,16 +95,20 @@ class DecoderFormal extends Formal {
   dataMove.map({ case (kind, node) => depends(router, node) })
 
   depends(memPortA, matmul)
-  dataMove.map({ case (kind, node) => depends(memPortA, node) })
+  depends(memPortA, loadWeights)
+  depends(memPortA, dataMove(DataMoveKind.memoryToAccumulator))
+  depends(memPortA, dataMove(DataMoveKind.memoryToAccumulatorAccumulate))
+  depends(memPortA, dataMove(DataMoveKind.accumulatorToMemory))
 
-  depends(memPortB, loadWeights)
-  depends(memPortB, dataMove(DataFlowControl.dram1ToMemory))
-  // depends(memPortB, dataMove(DataFlowControl.memoryToDram1))
+  depends(memPortB, dataMove(DataMoveKind.dram0ToMemory))
+  depends(memPortB, dataMove(DataMoveKind.memoryToDram0))
+  depends(memPortB, dataMove(DataMoveKind.dram1ToMemory))
+  depends(memPortB, dataMove(DataMoveKind.memoryToDram1))
 
-  depends(dram0, dataMove(DataFlowControl.memoryToDram0))
-  depends(dram0, dataMove(DataFlowControl.dram0ToMemory))
-  depends(dram1, dataMove(DataFlowControl.dram1ToMemory))
-  // depends(dram1, dataMove(DataFlowControl.memoryToDram1))
+  depends(dram0, dataMove(DataMoveKind.memoryToDram0))
+  depends(dram0, dataMove(DataMoveKind.dram0ToMemory))
+  depends(dram1, dataMove(DataMoveKind.memoryToDram1))
+  depends(dram1, dataMove(DataMoveKind.dram1ToMemory))
 
   assertNoDeadlock()
 }

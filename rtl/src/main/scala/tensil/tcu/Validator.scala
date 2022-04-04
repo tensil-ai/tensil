@@ -10,6 +10,7 @@ import tensil.InstructionLayout
 import tensil.tcu.instruction.{
   DataMoveArgs,
   DataMoveFlags,
+  DataMoveKind,
   Instruction,
   LoadWeightArgs,
   LoadWeightFlags,
@@ -80,10 +81,10 @@ class Validator(val layout: InstructionLayout) extends Module {
       flags := instruction.bits.flags.asTypeOf(flags)
 
       when(
-        flags.dataFlowControl === DataFlowControl.dram0ToMemory ||
-          flags.dataFlowControl === DataFlowControl.memoryToDram0 ||
-          flags.dataFlowControl === DataFlowControl.dram1ToMemory ||
-          flags.dataFlowControl === DataFlowControl.memoryToDram1
+        flags.kind === DataMoveKind.dram0ToMemory ||
+          flags.kind === DataMoveKind.memoryToDram0 ||
+          flags.kind === DataMoveKind.dram1ToMemory ||
+          flags.kind === DataMoveKind.memoryToDram1
       ) {
         when(args.size >= layout.arch.localDepth.U) {
           io.error := true.B
@@ -95,9 +96,9 @@ class Validator(val layout: InstructionLayout) extends Module {
           io.error := false.B
         }
       }.elsewhen(
-        flags.dataFlowControl === DataFlowControl.accumulatorToMemory ||
-          flags.dataFlowControl === DataFlowControl.memoryToAccumulator ||
-          flags.dataFlowControl === DataFlowControl.memoryToAccumulatorAccumulate
+        flags.kind === DataMoveKind.accumulatorToMemory ||
+          flags.kind === DataMoveKind.memoryToAccumulator ||
+          flags.kind === DataMoveKind.memoryToAccumulatorAccumulate
       ) {
         when(args.size >= layout.arch.accumulatorDepth.U) {
           io.error := true.B

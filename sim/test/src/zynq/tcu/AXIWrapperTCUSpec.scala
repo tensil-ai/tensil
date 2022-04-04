@@ -30,8 +30,14 @@ import tensil.tools.compiler.MemoryAddressHelper
 import tensil.{InstructionLayout}
 
 import tensil.axi
-import tensil.tcu.DataFlowControl
-import tensil.tcu.instruction.{Opcode, Instruction, DataMoveFlags, DataMoveArgs}
+import tensil.tcu.LocalDataFlowControl
+import tensil.tcu.instruction.{
+  Opcode,
+  Instruction,
+  DataMoveFlags,
+  DataMoveArgs,
+  DataMoveKind
+}
 import tensil.mem.MemKind
 import tensil.tools.{Util, ResNet}
 import tensil.util.divCeil
@@ -425,7 +431,7 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
                   m.instruction.enqueue(
                     Instruction(
                       Opcode.DataMove,
-                      DataMoveFlags(DataFlowControl.dram0ToMemory),
+                      DataMoveFlags(DataMoveKind.dram0ToMemory),
                       DataMoveArgs(
                         fromLocalAddress,
                         fromDramAddress,
@@ -436,7 +442,7 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
                   m.instruction.enqueue(
                     Instruction(
                       Opcode.DataMove,
-                      DataMoveFlags(DataFlowControl.memoryToAccumulator),
+                      DataMoveFlags(DataMoveKind.memoryToAccumulator),
                       DataMoveArgs(
                         fromLocalAddress,
                         0,
@@ -447,7 +453,7 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
                   m.instruction.enqueue(
                     Instruction(
                       Opcode.DataMove,
-                      DataMoveFlags(DataFlowControl.accumulatorToMemory),
+                      DataMoveFlags(DataMoveKind.accumulatorToMemory),
                       DataMoveArgs(
                         toLocalAddress,
                         0,
@@ -458,7 +464,7 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
                   m.instruction.enqueue(
                     Instruction(
                       Opcode.DataMove,
-                      DataMoveFlags(DataFlowControl.memoryToDram0),
+                      DataMoveFlags(DataMoveKind.memoryToDram0),
                       DataMoveArgs(
                         toLocalAddress,
                         toDramAddress,

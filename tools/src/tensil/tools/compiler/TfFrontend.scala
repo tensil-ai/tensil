@@ -11,10 +11,7 @@ import org.tensorflow.framework.graph.GraphDef
 import org.tensorflow.framework.node_def.NodeDef
 import org.tensorflow.framework.types.DataType
 
-import _root_.tensil.tools.{
-  CompilerException,
-  TracepointCondition
-}
+import _root_.tensil.tools.{CompilerException, TracepointCondition}
 import _root_.tensil.tools.data.{Shape, TensorData}
 import _root_.tensil.tools.util
 import _root_.tensil.{TablePrinter, Architecture}
@@ -1045,16 +1042,13 @@ class TfFrontend(
     if (paddings.data.size != 8 || inputVars.dims.order != 4)
       throw new CompilerException("Only 4D padding is supported")
 
-    if (
-      paddings.data(0) != 0 || paddings.data(1) != 0 || paddings
-        .data(6) != 0 || paddings.data(7) != 0
-    )
-      throw new CompilerException("Only height/width padding is supported")
-
-    val paddingTop    = paddings.data(2)
-    val paddingBottom = paddings.data(3)
-    val paddingLeft   = paddings.data(4)
-    val paddingRight  = paddings.data(5)
+    val (paddingTop, paddingLeft, paddingBottom, paddingRight) =
+      paddings.data match {
+        case Seq(0, 0, t, b, l, r, 0, 0) =>
+          (t, l, b, r)
+        case _ =>
+          throw new CompilerException("Only height/width padding is supported")
+      }
 
     val paddedDims = VarsDimensions(
       inputVars.dims.number,
@@ -1868,14 +1862,13 @@ class TfFrontend(
       .getList
       .i
 
-    if (strides.length != 4) {
-      throw new CompilerException(
-        s"Unsupported strides [${strides.mkString(", ")}]"
-      )
+    val (stridesHeight, stridesWidth) = strides.map(_.toInt) match {
+      case Seq(_, h, w, _) => (h, w)
+      case _ =>
+        throw new CompilerException(
+          s"Unsupported strides [${strides.mkString(", ")}]"
+        )
     }
-
-    val stridesHeight = strides(1).toInt
-    val stridesWidth  = strides(2).toInt
 
     val (weights, bias) =
       context.mm.getOrEmitWeightsAndBiasObjects(
@@ -1886,7 +1879,7 @@ class TfFrontend(
     val inputVars =
       context.mm.consumeObject(conv2DDef.input(0), Seq(conv2DDef.name))
 
-    val (paddingLeft, paddingTop, paddingRight, paddingBottom) =
+    val (paddingTop, paddingLeft, paddingBottom, paddingRight) =
       if (padding == "SAME") {
         val paddingWidth =
           (weights.dims.width.toDouble - 1) / 2
@@ -1894,10 +1887,10 @@ class TfFrontend(
           (weights.dims.height.toDouble - 1) / 2
 
         (
-          Math.floor(paddingWidth).toInt,
           Math.floor(paddingHeight).toInt,
-          Math.ceil(paddingWidth).toInt,
-          Math.ceil(paddingHeight).toInt
+          Math.floor(paddingWidth).toInt,
+          Math.ceil(paddingHeight).toInt,
+          Math.ceil(paddingWidth).toInt
         )
       } else
         (0, 0, 0, 0)
@@ -2069,13 +2062,13 @@ class TfFrontend(
       .getList
       .i
 
-    if (kSize.length != 4) {
-      throw new CompilerException(
-        s"Unsupported ksize [${kSize.mkString(", ")}]"
-      )
+    val (kHeight, kWidth) = kSize.map(_.toInt) match {
+      case Seq(_, h, w, _) => (h, w)
+      case _ =>
+        throw new CompilerException(
+          s"Unsupported ksize [${kSize.mkString(", ")}]"
+        )
     }
-    val kHeight = kSize(1).toInt
-    val kWidth  = kSize(2).toInt
 
     val strides = poolDef.attr
       .get("strides")
@@ -2083,16 +2076,15 @@ class TfFrontend(
       .getList
       .i
 
-    if (strides.length != 4) {
-      throw new CompilerException(
-        s"Unsupported strides [${strides.mkString(", ")}]"
-      )
+    val (stridesHeight, stridesWidth) = strides.map(_.toInt) match {
+      case Seq(_, h, w, _) => (h, w)
+      case _ =>
+        throw new CompilerException(
+          s"Unsupported strides [${strides.mkString(", ")}]"
+        )
     }
 
-    val stridesHeight = strides(1).toInt
-    val stridesWidth  = strides(2).toInt
-
-    val (paddingLeft, paddingTop, paddingRight, paddingBottom) =
+    val (paddingTop, paddingLeft, paddingBottom, paddingRight) =
       (0, 0, 0, 0)
 
     val outputTemp = context.mm.allocateTempObject(

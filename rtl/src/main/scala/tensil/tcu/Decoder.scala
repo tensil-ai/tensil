@@ -42,7 +42,7 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
     val dram0    = Decoupled(new MemControl(layout.arch.dram0Depth))
     val dram1    = Decoupled(new MemControl(layout.arch.dram1Depth))
     val dataflow =
-      Decoupled(new DataFlowControlWithSize(arch.localDepth))
+      Decoupled(new LocalDataFlowControlWithSize(arch.localDepth))
     val hostDataflow =
       Decoupled(new HostDataFlowControl)
     val acc = Decoupled(
@@ -254,7 +254,7 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
       instruction.ready := enqueuer3.enqueue(
         instruction.valid,
         dataflow,
-        dataflowBundle(DataFlowControl._arrayToAcc, args.size),
+        dataflowBundle(LocalDataFlowControl._arrayToAcc, args.size),
         array,
         arrayBundle(false.B, flags.zeroes, args.size),
         acc,
@@ -269,7 +269,7 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
       instruction.ready := enqueuer4.enqueue(
         instruction.valid,
         dataflow,
-        dataflowBundle(DataFlowControl._memoryToArrayToAcc, args.size),
+        dataflowBundle(LocalDataFlowControl._memoryToArrayToAcc, args.size),
         memPortA,
         MemControlWithStride(memDepth, arch.stride0Depth)(
           args.memAddress,
@@ -310,8 +310,8 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
       instruction.ready := enqueuer3.enqueue(
         instruction.valid,
         dataflow,
-        DataFlowControlWithSize(memDepth)(
-          DataFlowControl.memoryToArrayWeight,
+        LocalDataFlowControlWithSize(memDepth)(
+          LocalDataFlowControl.memoryToArrayWeight,
           args.size
         ),
         array,
@@ -446,8 +446,8 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
       instruction.ready := enqueuer3.enqueue(
         instruction.valid,
         dataflow,
-        DataFlowControlWithSize(memDepth)(
-          DataFlowControl.accumulatorToMemory,
+        LocalDataFlowControlWithSize(memDepth)(
+          LocalDataFlowControl.accumulatorToMemory,
           args.size
         ),
         memPortA,
@@ -468,8 +468,8 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
       instruction.ready := enqueuer3.enqueue(
         instruction.valid,
         dataflow,
-        DataFlowControlWithSize(memDepth)(
-          DataFlowControl.memoryToAccumulator,
+        LocalDataFlowControlWithSize(memDepth)(
+          LocalDataFlowControl.memoryToAccumulator,
           args.size
         ),
         memPortA,
@@ -490,8 +490,8 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
       instruction.ready := enqueuer3.enqueue(
         instruction.valid,
         dataflow,
-        DataFlowControlWithSize(memDepth)(
-          DataFlowControl.memoryToAccumulator,
+        LocalDataFlowControlWithSize(memDepth)(
+          LocalDataFlowControl.memoryToAccumulator,
           args.size
         ),
         memPortA,
@@ -669,7 +669,7 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
   def dataflowBundle(
       kind: UInt,
       size: UInt
-  ): DataFlowControlWithSize = {
+  ): LocalDataFlowControlWithSize = {
     val w = Wire(chiselTypeOf(dataflow.bits))
     w.kind := kind
     w.size := size

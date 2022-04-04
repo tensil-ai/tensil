@@ -14,8 +14,8 @@ import tensil.decoupled.{Driver, VecDriver}
 import scala.collection.mutable
 import chisel3.experimental.FixedPoint
 
-class RouterSpec extends FunUnitSpec {
-  describe("Router") {
+class LocalRouterSpec extends FunUnitSpec {
+  describe("LocalRouter") {
     describe("when local depth = 32") {
       val gen = UInt(8.W)
       val arch = Architecture.mkWithDefaults(
@@ -25,7 +25,7 @@ class RouterSpec extends FunUnitSpec {
       )
 
       it("should move data from local to array to accumulator for matmul") {
-        test(new Router(gen, arch)) { m =>
+        test(new LocalRouter(gen, arch)) { m =>
           m.io.control.setSourceClock(m.clock)
           m.io.mem.output.setSourceClock(m.clock)
           m.io.array.input.setSinkClock(m.clock)
@@ -39,8 +39,8 @@ class RouterSpec extends FunUnitSpec {
           threads += fork {
             for (_ <- 0 until n) {
               m.io.control.enqueue(
-                DataFlowControlWithSize(arch.localDepth)(
-                  DataFlowControl._memoryToArrayToAcc,
+                LocalDataFlowControlWithSize(arch.localDepth)(
+                  LocalDataFlowControl._memoryToArrayToAcc,
                   (arch.localDepth - 1).U
                 )
               )

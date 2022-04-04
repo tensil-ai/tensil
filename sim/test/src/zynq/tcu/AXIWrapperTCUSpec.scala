@@ -30,7 +30,7 @@ import tensil.tools.compiler.MemoryAddressHelper
 import tensil.{InstructionLayout}
 
 import tensil.axi
-import tensil.tcu.DataFlowControl
+import tensil.tcu.LocalDataFlowControl
 import tensil.tcu.instruction.{
   Opcode,
   Instruction,

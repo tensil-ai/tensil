@@ -8,8 +8,8 @@ import chisel3.util.log2Ceil
 import chisel3.experimental.BundleLiterals._
 import chiseltest._
 import tensil.FunUnitSpec
-import tensil.tcu.DataFlowControl
-import tensil.tcu.DataFlowControlWithSize
+import tensil.tcu.LocalDataFlowControl
+import tensil.tcu.LocalDataFlowControlWithSize
 
 class SizeHandlerSpec extends FunUnitSpec {
   describe("SizeHandler") {
@@ -17,15 +17,15 @@ class SizeHandlerSpec extends FunUnitSpec {
       "when inGen = DataFlowControl with Size and outGen = DataFlowControl and depth = 256"
     ) {
       val depth  = 256
-      val inGen  = new DataFlowControlWithSize(depth)
-      val outGen = new DataFlowControl
+      val inGen  = new LocalDataFlowControlWithSize(depth)
+      val outGen = new LocalDataFlowControl
       it("should repeat request `size` times") {
         test(new SizeHandler(inGen, outGen, depth)) { m =>
           m.io.in.setSourceClock(m.clock)
           m.io.out.setSinkClock(m.clock)
 
           val size = 99
-          val kind = DataFlowControl._memoryToArrayToAcc
+          val kind = LocalDataFlowControl._memoryToArrayToAcc
 
           val t = fork {
             m.io.in.enqueue(
@@ -45,7 +45,7 @@ class SizeHandlerSpec extends FunUnitSpec {
           m.io.out.setSinkClock(m.clock)
 
           val size = 256
-          val kind = DataFlowControl._arrayToAcc
+          val kind = LocalDataFlowControl._arrayToAcc
 
           val t = fork {
             m.io.in.enqueue(

@@ -25,54 +25,6 @@ class TCUFormal extends Formal {
   val io     = IO(m.io.cloneType)
   io <> m.io
 
-  // v.assume(Opcode.all.map(io.instruction.bits.opcode === _).reduce(_ || _))
-
-  // v.assume(io.instruction.bits.opcode =/= Opcode.NoOp)
-  // v.assume(io.instruction.bits.opcode =/= Opcode.Configure)
-
-  // v.cover(io.instruction.bits.opcode === Opcode.MatMul)
-  // when(io.instruction.bits.opcode === Opcode.MatMul) {
-  //   v.assume(MatMulFlags.isValid(io.instruction.bits.flags))
-  //   val args = Wire(
-  //     new MatMulArgs(layout)
-  //   )
-  //   args := io.instruction.bits.arguments.asTypeOf(args)
-  //   v.assume(args.accAddress === 0.U)
-  //   v.assume(args.memAddress === 0.U)
-  // }
-
-  // v.cover(io.instruction.bits.opcode === Opcode.DataMove)
-  // when(io.instruction.bits.opcode === Opcode.DataMove) {
-  //   v.assume(DataMoveKind.isValid(io.instruction.bits.flags))
-  //   val args = Wire(
-  //     new DataMoveArgs(layout)
-  //   )
-  //   args := io.instruction.bits.arguments.asTypeOf(args)
-  //   v.assume(args.accAddress === 0.U)
-  //   v.assume(args.memAddress === 0.U)
-  // }
-
-  // v.cover(io.instruction.bits.opcode === Opcode.LoadWeights)
-  // when(io.instruction.bits.opcode === Opcode.LoadWeights) {
-  //   v.assume(LoadWeightFlags.isValid(io.instruction.bits.flags))
-  //   val args = Wire(
-  //     new LoadWeightArgs(layout)
-  //   )
-  //   args := io.instruction.bits.arguments.asTypeOf(args)
-  //   v.assume(args.address === 0.U)
-  // }
-
-  // v.cover(io.instruction.bits.opcode === Opcode.SIMD)
-  // when(io.instruction.bits.opcode === Opcode.SIMD) {
-  //   v.assume(SIMDFlags.isValid(io.instruction.bits.flags))
-  //   val args = Wire(
-  //     new SIMDArgs(layout)
-  //   )
-  //   args := io.instruction.bits.arguments.asTypeOf(args)
-  //   v.assume(args.accReadAddress === 0.U)
-  //   v.assume(args.accWriteAddress === 0.U)
-  // }
-
   val instructionQueue = Queue(io.instruction, 1, flow = true)
   m.io.instruction <> instructionQueue
 

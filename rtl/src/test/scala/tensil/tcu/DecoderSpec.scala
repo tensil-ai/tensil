@@ -201,8 +201,8 @@ class DecoderSpec extends FunUnitSpec {
               val covered = Array(false, false, false)
               fork {
                 m.io.dataflow.expectDequeue(
-                  DataFlowControlWithSize(m.arch.localDepth)(
-                    DataFlowControl.memoryToAccumulator,
+                  LocalDataFlowControlWithSize(m.arch.localDepth)(
+                    LocalDataFlowControl.memoryToAccumulator,
                     0.U
                   )
                 )
@@ -627,15 +627,15 @@ class DecoderSpec extends FunUnitSpec {
           threads += fork {
             // matmul
             m.io.dataflow.expectDequeue(
-              DataFlowControlWithSize(m.arch.localDepth)(
-                DataFlowControl._memoryToArrayToAcc,
+              LocalDataFlowControlWithSize(m.arch.localDepth)(
+                LocalDataFlowControl._memoryToArrayToAcc,
                 (size - 1).U
               )
             )
             // loadweights
             m.io.dataflow.expectDequeue(
-              DataFlowControlWithSize(m.arch.localDepth)(
-                DataFlowControl.memoryToArrayWeight,
+              LocalDataFlowControlWithSize(m.arch.localDepth)(
+                LocalDataFlowControl.memoryToArrayWeight,
                 (size - 1).U
               )
             )
@@ -793,8 +793,8 @@ class DecoderSpec extends FunUnitSpec {
 
           val t0 = fork {
             m.io.dataflow.expectDequeue(
-              DataFlowControlWithSize(m.arch.localDepth)(
-                DataFlowControl._memoryToArrayToAcc,
+              LocalDataFlowControlWithSize(m.arch.localDepth)(
+                LocalDataFlowControl._memoryToArrayToAcc,
                 0.U
               )
             )

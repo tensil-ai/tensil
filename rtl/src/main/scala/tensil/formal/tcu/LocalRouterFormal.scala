@@ -9,9 +9,9 @@ import tensil.tcu._
 import tensil.formal._
 import chisel3.util.Queue
 
-class RouterFormal extends Formal {
+class LocalRouterFormal extends Formal {
   val arch = tensil.Architecture.formal
-  val m    = Module(new Router(Bool(), arch))
+  val m    = Module(new LocalRouter(Bool(), arch))
   val io   = IO(m.io.cloneType)
   io <> m.io
 
@@ -20,7 +20,7 @@ class RouterFormal extends Formal {
   val controlQueue = Queue(io.control, 1, flow = true)
   m.io.control <> controlQueue
 
-  val control = Router.dataflows
+  val control = LocalRouter.dataflows
     .map(kind =>
       kind -> Node(m.io.control, filter = m.io.control.bits.kind === kind)
     )
@@ -33,38 +33,39 @@ class RouterFormal extends Formal {
   val arrayWeightInput = Node(m.io.array.weightInput)
   val memInputFromAcc = Node(
     m.io.mem.input,
-    filter = m.io.control.bits.kind === DataFlowControl.accumulatorToMemory
+    filter = m.io.control.bits.kind === LocalDataFlowControl.accumulatorToMemory
   )
   val memOutputForAcc = Node(
     m.io.mem.output,
     filter =
-      m.io.control.bits.kind === DataFlowControl.memoryToAccumulator //||
+      m.io.control.bits.kind === LocalDataFlowControl.memoryToAccumulator
   )
   val memOutputForArray = Node(
     m.io.mem.output,
-    filter = m.io.control.bits.kind === DataFlowControl._memoryToArrayToAcc ||
-      m.io.control.bits.kind === DataFlowControl.memoryToArrayWeight
+    filter =
+      m.io.control.bits.kind === LocalDataFlowControl._memoryToArrayToAcc ||
+        m.io.control.bits.kind === LocalDataFlowControl.memoryToArrayWeight
   )
 
-  depends(accInput, control(DataFlowControl._arrayToAcc))
-  depends(accInput, control(DataFlowControl._memoryToArrayToAcc))
-  depends(accInput, control(DataFlowControl.memoryToAccumulator))
+  depends(accInput, control(LocalDataFlowControl._arrayToAcc))
+  depends(accInput, control(LocalDataFlowControl._memoryToArrayToAcc))
+  depends(accInput, control(LocalDataFlowControl.memoryToAccumulator))
   depends(accInput, memOutputForAcc)
   depends(accInput, arrayOutput)
 
-  depends(arrayInput, control(DataFlowControl._memoryToArrayToAcc))
+  depends(arrayInput, control(LocalDataFlowControl._memoryToArrayToAcc))
   depends(arrayInput, memOutputForArray)
 
-  depends(arrayWeightInput, control(DataFlowControl.memoryToArrayWeight))
+  depends(arrayWeightInput, control(LocalDataFlowControl.memoryToArrayWeight))
   depends(arrayWeightInput, memOutputForArray)
 
-  depends(memInputFromAcc, control(DataFlowControl.accumulatorToMemory))
+  depends(memInputFromAcc, control(LocalDataFlowControl.accumulatorToMemory))
   depends(memInputFromAcc, accOutput)
 
   assertNoDeadlock()
 }
 
-object RouterFormal extends App {
-  tensil.util.emitToBuildDir(new RouterFormal)
+object LocalRouterFormal extends App {
+  tensil.util.emitToBuildDir(new LocalRouterFormal)
   Symbiyosys.emitConfig("RouterFormal")
 }

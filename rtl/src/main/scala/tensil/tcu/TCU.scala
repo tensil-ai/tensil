@@ -75,7 +75,7 @@ class TCU[T <: Data with Num[T]](
     )
   )
   val router = Module(
-    new Router(
+    new LocalRouter(
       Vec(layout.arch.arraySize, gen),
       layout.arch,
       controlQueueSize = 2

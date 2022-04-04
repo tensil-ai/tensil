@@ -8,21 +8,24 @@ import chisel3.experimental.BundleLiterals.AddBundleLiteralConstructor
 import chisel3.util.log2Ceil
 import tensil.mem.Size
 
-class DataFlowControl extends Bundle {
+class LocalDataFlowControl extends Bundle {
   val kind = UInt(4.W)
 }
-class DataFlowControlWithSize(val depth: Long)
-    extends DataFlowControl
+class LocalDataFlowControlWithSize(val depth: Long)
+    extends LocalDataFlowControl
     with Size {
   val size = UInt(log2Ceil(depth).W)
 }
 
-object DataFlowControlWithSize {
-  def apply(depth: Long)(kind: UInt, size: UInt): DataFlowControlWithSize = {
+object LocalDataFlowControlWithSize {
+  def apply(
+      depth: Long
+  )(kind: UInt, size: UInt): LocalDataFlowControlWithSize = {
     if (kind.isLit() && size.isLit()) {
-      new DataFlowControlWithSize(depth).Lit(_.kind -> kind, _.size -> size)
+      new LocalDataFlowControlWithSize(depth)
+        .Lit(_.kind -> kind, _.size -> size)
     } else {
-      val w = Wire(new DataFlowControlWithSize(depth))
+      val w = Wire(new LocalDataFlowControlWithSize(depth))
       w.kind := kind
       w.size := size
       w
@@ -30,7 +33,7 @@ object DataFlowControlWithSize {
   }
 }
 
-object DataFlowControl {
+object LocalDataFlowControl {
   val memoryToArrayWeight = 0x1.U
   val _memoryToArrayToAcc = 0x2.U
   val _arrayToAcc         = 0x3.U
@@ -38,13 +41,13 @@ object DataFlowControl {
   val memoryToAccumulator = 0x5.U
   val _unused             = 0x6.U
 
-  def apply(kind: UInt): DataFlowControl = {
+  def apply(kind: UInt): LocalDataFlowControl = {
     if (kind.isLit()) {
-      new DataFlowControl().Lit(
+      new LocalDataFlowControl().Lit(
         _.kind -> kind,
       )
     } else {
-      val w = Wire(new DataFlowControl())
+      val w = Wire(new LocalDataFlowControl())
       w.kind := kind
       w
     }

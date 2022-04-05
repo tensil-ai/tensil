@@ -24,6 +24,7 @@ RUN mkdir -p /demo/models
 COPY --from=models /work/tensil-models-main/resnet20v2_cifar.* /demo/models/
 COPY --from=models /work/tensil-models-main/resnet50v2_imagenet.* /demo/models/
 COPY --from=models /work/tensil-models-main/yolov4_tiny_192.* /demo/models/
+COPY --from=models /work/tensil-models-main/yolov4_tiny_416.* /demo/models/
 
 RUN mkdir -p /demo/arch
 COPY ./arch/* /demo/arch/

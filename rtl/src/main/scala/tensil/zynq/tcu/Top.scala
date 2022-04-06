@@ -13,6 +13,7 @@ import tensil.axi.{
 }
 import tensil.mem.MemKind
 import tensil.util.Environment._
+import tensil.tcu.TCUOptions
 import tensil.{
   ArchitectureDataType,
   Architecture,
@@ -27,6 +28,10 @@ case class Args(
     targetDir: File = new File("."),
     dramAxiConfig: axi.Config = axi.Config.Xilinx64,
     summary: Boolean = false,
+    sampleBlockSize: Int = 0,
+    decoderTimeout: Int = 100,
+    validateInstructions: Boolean = false,
+    enableStatus: Boolean = false
 )
 
 class Top(
@@ -145,7 +150,27 @@ object Top extends App {
 
     opt[Boolean]('s', "summary")
       .valueName("true|false")
-      .action((x, c) => c.copy(summary = x)),
+      .action((x, c) => c.copy(summary = x))
+
+    opt[Int]("sample-block-size")
+      .valueName("<integer>")
+      .action((x, c) => c.copy(sampleBlockSize = x))
+      .text("Performance sample block size, defaults to 0 (disabled)")
+
+    opt[Int]("decoder-timeout")
+      .valueName("<integer>")
+      .action((x, c) => c.copy(decoderTimeout = x))
+      .text("Decoder timeout, defaults to 100")
+
+    opt[Boolean]("validate-instructions")
+      .valueName("true|false")
+      .action((x, c) => c.copy(validateInstructions = x))
+      .text("Validate instructions, defaults to false")
+
+    opt[Boolean]("enable-status")
+      .valueName("true|false")
+      .action((x, c) => c.copy(enableStatus = x))
+      .text("Enable status port, defaults to false")
   }
 
   argParser.parse(args, Args()) match {
@@ -154,6 +179,12 @@ object Top extends App {
       val archName = args.archFile.getName().split("\\.")(0)
 
       val options = AXIWrapperTCUOptions(
+        inner = TCUOptions(
+          sampleBlockSize = args.sampleBlockSize,
+          decoderTimeout = args.decoderTimeout,
+          validateInstructions = args.validateInstructions,
+          enableStatus = args.enableStatus,
+        ),
         dramAxiConfig = args.dramAxiConfig
       )
 

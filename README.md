@@ -11,6 +11,7 @@ Tensil
 
 For in-depth end-to-end instructions check our tutorials.
 
+- [Learn how to combine Tensil and TF-Lite to run Yolo on Ultra96](https://www.tensil.ai/docs/tutorials/yolo-ultra96v2/)
 - [Learn Tensil with ResNet and PYNQ Z1](https://www.tensil.ai/docs/tutorials/resnet20-pynqz1/)
 - [Learn Tensil with ResNet and Ultra96](https://www.tensil.ai/docs/tutorials/resnet20-ultra96v2/)
 

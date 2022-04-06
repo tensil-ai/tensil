@@ -118,7 +118,7 @@ class Top(
 }
 
 object Top extends App {
-  val argParser = new scopt.OptionParser[Args]("make_rtl") {
+  val argParser = new scopt.OptionParser[Args]("rtl") {
     help("help").text("Prints this usage text")
 
     opt[File]('a', "arch")

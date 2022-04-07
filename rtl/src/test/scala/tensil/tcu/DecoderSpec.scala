@@ -24,6 +24,7 @@ import scala.collection.mutable
 import chiseltest.internal.TesterThreadList
 import tensil.tcu.instruction.LoadWeightFlags
 import tensil.tcu.instruction.LoadWeightArgs
+import tensil.tcu.instruction.DataMoveKind
 
 class DecoderSpec extends FunUnitSpec {
   val options = TCUOptions(decoderTimeout = 10)
@@ -98,35 +99,35 @@ class DecoderSpec extends FunUnitSpec {
             m.io.instruction.enqueue(
               Instruction(
                 Opcode.DataMove,
-                DataMoveFlags(DataFlowControl.memoryToAccumulatorAccumulate),
+                DataMoveFlags(DataMoveKind.memoryToAccumulatorAccumulate),
                 DataMoveArgs(0, 0, 0)
               )
             )
             m.io.instruction.enqueue(
               Instruction(
                 Opcode.DataMove,
-                DataMoveFlags(DataFlowControl.memoryToAccumulatorAccumulate),
+                DataMoveFlags(DataMoveKind.memoryToAccumulatorAccumulate),
                 DataMoveArgs(0, 0, 0)
               )
             )
             m.io.instruction.enqueue(
               Instruction(
                 Opcode.DataMove,
-                DataMoveFlags(DataFlowControl.memoryToAccumulatorAccumulate),
+                DataMoveFlags(DataMoveKind.memoryToAccumulatorAccumulate),
                 DataMoveArgs(0, 0, 0)
               )
             )
             m.io.instruction.enqueue(
               Instruction(
                 Opcode.DataMove,
-                DataMoveFlags(DataFlowControl.memoryToAccumulatorAccumulate),
+                DataMoveFlags(DataMoveKind.memoryToAccumulatorAccumulate),
                 DataMoveArgs(0, 0, 0)
               )
             )
             m.io.instruction.enqueue(
               Instruction(
                 Opcode.DataMove,
-                DataMoveFlags(DataFlowControl.memoryToAccumulatorAccumulate),
+                DataMoveFlags(DataMoveKind.memoryToAccumulatorAccumulate),
                 DataMoveArgs(0, 0, 0)
               )
             )
@@ -182,8 +183,8 @@ class DecoderSpec extends FunUnitSpec {
       describe("should move data from memory to accumulators") {
         for (accumulate <- Array(false, true)) {
           val flag =
-            if (accumulate) DataFlowControl.memoryToAccumulatorAccumulate
-            else DataFlowControl.memoryToAccumulator
+            if (accumulate) DataMoveKind.memoryToAccumulatorAccumulate
+            else DataMoveKind.memoryToAccumulator
           it(
             s"with accumulate = $accumulate"
           ) {
@@ -200,8 +201,8 @@ class DecoderSpec extends FunUnitSpec {
               val covered = Array(false, false, false)
               fork {
                 m.io.dataflow.expectDequeue(
-                  DataFlowControlWithSize(m.arch.localDepth)(
-                    DataFlowControl.memoryToAccumulator,
+                  LocalDataFlowControlWithSize(m.arch.localDepth)(
+                    LocalDataFlowControl.memoryToAccumulator,
                     0.U
                   )
                 )
@@ -257,22 +258,19 @@ class DecoderSpec extends FunUnitSpec {
           new Decoder(layout.arch, options)
         ) { m =>
           m.io.instruction.setSourceClock(m.clock)
-          m.io.memPortA.setSinkClock(m.clock)
-          m.io.dataflow.setSinkClock(m.clock)
+          m.io.memPortB.setSinkClock(m.clock)
+          m.io.hostDataflow.setSinkClock(m.clock)
           m.io.dram0.setSinkClock(m.clock)
           m.io.dram1.setSinkClock(m.clock)
 
           for (i <- 0 until 1000) {
             val thread0 = fork {
-              m.io.dataflow.expectDequeue(
-                DataFlowControlWithSize(m.arch.localDepth)(
-                  DataFlowControl.memoryToDram0,
-                  0.U
-                )
+              m.io.hostDataflow.expectDequeue(
+                HostDataFlowControl(HostDataFlowControl.Out0)
               )
             }
             val thread1 = fork {
-              m.io.memPortA.expectDequeue(
+              m.io.memPortB.expectDequeue(
                 MemControl(layout.arch.localDepth)(
                   (i % layout.arch.localDepth).U,
                   false.B
@@ -291,7 +289,7 @@ class DecoderSpec extends FunUnitSpec {
               .enqueue(
                 Instruction(
                   Opcode.DataMove,
-                  DataMoveFlags(DataFlowControl.memoryToDram0),
+                  DataMoveFlags(DataMoveKind.memoryToDram0),
                   DataMoveArgs(
                     i % layout.arch.localDepth,
                     i % layout.arch.localDepth
@@ -324,8 +322,8 @@ class DecoderSpec extends FunUnitSpec {
           new Decoder(layout.arch, options)
         ) { m =>
           m.io.instruction.setSourceClock(m.clock)
-          m.io.memPortA.setSinkClock(m.clock)
-          m.io.dataflow.setSinkClock(m.clock)
+          m.io.memPortB.setSinkClock(m.clock)
+          m.io.hostDataflow.setSinkClock(m.clock)
           m.io.dram0.setSinkClock(m.clock)
           m.io.dram1.setSinkClock(m.clock)
 
@@ -339,15 +337,12 @@ class DecoderSpec extends FunUnitSpec {
 
           for (i <- 0 until 1000) {
             val thread0 = fork {
-              m.io.dataflow.expectDequeue(
-                DataFlowControlWithSize(m.arch.localDepth)(
-                  DataFlowControl.memoryToDram0,
-                  0.U
-                )
+              m.io.hostDataflow.expectDequeue(
+                HostDataFlowControl(HostDataFlowControl.Out0)
               )
             }
             val thread1 = fork {
-              m.io.memPortA.expectDequeue(
+              m.io.memPortB.expectDequeue(
                 MemControl(layout.arch.localDepth)(
                   (i % layout.arch.localDepth).U,
                   false.B
@@ -366,7 +361,7 @@ class DecoderSpec extends FunUnitSpec {
               .enqueue(
                 Instruction(
                   Opcode.DataMove,
-                  DataMoveFlags(DataFlowControl.memoryToDram0),
+                  DataMoveFlags(DataMoveKind.memoryToDram0),
                   DataMoveArgs(
                     i % layout.arch.localDepth,
                     i % layout.arch.localDepth
@@ -388,28 +383,22 @@ class DecoderSpec extends FunUnitSpec {
           new Decoder(layout.arch, options)
         ) { m =>
           m.io.instruction.setSourceClock(m.clock)
-          m.io.memPortA.setSinkClock(m.clock)
-          m.io.dataflow.setSinkClock(m.clock)
+          m.io.memPortB.setSinkClock(m.clock)
+          m.io.hostDataflow.setSinkClock(m.clock)
           m.io.dram0.setSinkClock(m.clock)
           m.io.dram1.setSinkClock(m.clock)
 
           val thread0 = fork {
-            m.io.dataflow.expectDequeue(
-              DataFlowControlWithSize(m.arch.localDepth)(
-                DataFlowControl.dram0ToMemory,
-                0.U
-              )
+            m.io.hostDataflow.expectDequeue(
+              HostDataFlowControl(HostDataFlowControl.In0)
             )
-            m.io.dataflow.expectDequeue(
-              DataFlowControlWithSize(m.arch.localDepth)(
-                DataFlowControl.memoryToDram0,
-                0.U
-              )
+            m.io.hostDataflow.expectDequeue(
+              HostDataFlowControl(HostDataFlowControl.Out0)
             )
           }
           val thread1 = fork {
-            m.io.memPortA.expectDequeue(MemControl(memoryDepth)(0.U, true.B))
-            m.io.memPortA.expectDequeue(MemControl(memoryDepth)(0.U, false.B))
+            m.io.memPortB.expectDequeue(MemControl(memoryDepth)(0.U, true.B))
+            m.io.memPortB.expectDequeue(MemControl(memoryDepth)(0.U, false.B))
           }
           val thread2 = fork {
             m.io.dram0.expectDequeue(MemControl(memoryDepth)(0.U, false.B))
@@ -419,14 +408,14 @@ class DecoderSpec extends FunUnitSpec {
           m.io.instruction.enqueue(
             Instruction(
               Opcode.DataMove,
-              DataMoveFlags(DataFlowControl.dram0ToMemory),
+              DataMoveFlags(DataMoveKind.dram0ToMemory),
               DataMoveArgs(0, 0, 0)
             )
           )
           m.io.instruction.enqueue(
             Instruction(
               Opcode.DataMove,
-              DataMoveFlags(DataFlowControl.memoryToDram0),
+              DataMoveFlags(DataMoveKind.memoryToDram0),
               DataMoveArgs(0, 0, 0)
             )
           )
@@ -461,6 +450,7 @@ class DecoderSpec extends FunUnitSpec {
         test(new Decoder(layout.arch, options)) { m =>
           m.io.instruction.setSourceClock(m.clock)
           m.io.dataflow.setSinkClock(m.clock)
+          m.io.hostDataflow.setSinkClock(m.clock)
           m.io.memPortA.setSinkClock(m.clock)
           m.io.memPortB.setSinkClock(m.clock)
           m.io.acc.setSinkClock(m.clock)
@@ -502,7 +492,7 @@ class DecoderSpec extends FunUnitSpec {
             m.io.instruction.enqueue(
               Instruction(
                 Opcode.DataMove,
-                DataMoveFlags(DataFlowControl.dram0ToMemory),
+                DataMoveFlags(DataMoveKind.dram0ToMemory),
                 DataMoveArgs(
                   memAddress,
                   accAddress,
@@ -515,7 +505,7 @@ class DecoderSpec extends FunUnitSpec {
             m.io.instruction.enqueue(
               Instruction(
                 Opcode.DataMove,
-                DataMoveFlags(DataFlowControl.dram1ToMemory),
+                DataMoveFlags(DataMoveKind.dram1ToMemory),
                 DataMoveArgs(
                   memAddress,
                   accAddress,
@@ -562,12 +552,12 @@ class DecoderSpec extends FunUnitSpec {
               )
             }
             // loadweights
-            // datamove (dram0 -> mem)
-            for (i <- 0 until size * ms by ms) {
+            for (i <- (size - 1) * ms to 0 by -ms) {
               m.io.memPortA.expectDequeue(
-                MemControl(arch.localDepth)((memAddress + i).U, true.B)
+                MemControl(arch.localDepth)((memAddress + i).U, false.B)
               )
             }
+            // datamove (dram0 -> mem)
             // datamove (dram1 -> mem)
           }
 
@@ -575,12 +565,12 @@ class DecoderSpec extends FunUnitSpec {
           threads += fork {
             // matmul
             // loadweights
-            for (i <- (size - 1) * ms to 0 by -ms) {
+            // datamove (dram0 -> mem)
+            for (i <- 0 until size * ms by ms) {
               m.io.memPortB.expectDequeue(
-                MemControl(arch.localDepth)((memAddress + i).U, false.B)
+                MemControl(arch.localDepth)((memAddress + i).U, true.B)
               )
             }
-            // datamove (dram0 -> mem)
             // datamove (dram1 -> mem)
             for (i <- 0 until size * ms by ms) {
               m.io.memPortB.expectDequeue(
@@ -636,25 +626,35 @@ class DecoderSpec extends FunUnitSpec {
           // dataflow
           threads += fork {
             // matmul
-            // for (i <- 0 until size) {
             m.io.dataflow.expectDequeue(
-              DataFlowControlWithSize(m.arch.localDepth)(
-                DataFlowControl._memoryToArrayToAcc,
+              LocalDataFlowControlWithSize(m.arch.localDepth)(
+                LocalDataFlowControl._memoryToArrayToAcc,
                 (size - 1).U
               )
             )
-            // }
             // loadweights
-            // datamove (dram0 -> mem)
-            // for (i <- 0 until size) {
             m.io.dataflow.expectDequeue(
-              DataFlowControlWithSize(m.arch.localDepth)(
-                DataFlowControl.dram0ToMemory,
+              LocalDataFlowControlWithSize(m.arch.localDepth)(
+                LocalDataFlowControl.memoryToArrayWeight,
                 (size - 1).U
               )
             )
-            // }
+            // datamove (dram0 -> mem)
             // datamove (dram1 -> mem)
+          }
+
+          // host dataflow
+          threads += fork {
+            // datamove (dram0 -> mem)
+            for (i <- 0 until size)
+              m.io.hostDataflow.expectDequeue(
+                HostDataFlowControl(HostDataFlowControl.In0)
+              )
+            // datamove (dram1 -> mem)
+            for (i <- 0 until size)
+              m.io.hostDataflow.expectDequeue(
+                HostDataFlowControl(HostDataFlowControl.In1)
+              )
           }
 
           threads.map(_.join())
@@ -689,6 +689,7 @@ class DecoderSpec extends FunUnitSpec {
         ) { m =>
           m.io.instruction.setSourceClock(m.clock)
           m.io.dataflow.setSinkClock(m.clock)
+          m.io.hostDataflow.setSinkClock(m.clock)
           m.io.memPortA.setSinkClock(m.clock)
           m.io.memPortB.setSinkClock(m.clock)
           m.io.acc.setSinkClock(m.clock)
@@ -698,11 +699,8 @@ class DecoderSpec extends FunUnitSpec {
 
           {
             val t0 = fork {
-              m.io.dataflow.expectDequeue(
-                DataFlowControlWithSize(m.arch.localDepth)(
-                  DataFlowControl.dram0ToMemory,
-                  0.U
-                )
+              m.io.hostDataflow.expectDequeue(
+                HostDataFlowControl(HostDataFlowControl.In0)
               )
             }
             val t1 = fork {
@@ -711,14 +709,14 @@ class DecoderSpec extends FunUnitSpec {
               )
             }
             val t2 = fork {
-              m.io.memPortA.expectDequeue(
+              m.io.memPortB.expectDequeue(
                 MemControl(layout.arch.localDepth.toInt)(0.U, true.B)
               )
             }
             m.io.instruction.enqueue(
               Instruction(
                 Opcode.DataMove,
-                DataMoveFlags(DataFlowControl.dram0ToMemory),
+                DataMoveFlags(DataMoveKind.dram0ToMemory),
                 DataMoveArgs(0, 0xfffff, 0x0)
               )
             )
@@ -729,11 +727,8 @@ class DecoderSpec extends FunUnitSpec {
 
           {
             val t0 = fork {
-              m.io.dataflow.expectDequeue(
-                DataFlowControlWithSize(m.arch.localDepth)(
-                  DataFlowControl.memoryToDram0,
-                  0.U
-                )
+              m.io.hostDataflow.expectDequeue(
+                HostDataFlowControl(HostDataFlowControl.Out0)
               )
             }
             val t1 = fork {
@@ -742,14 +737,14 @@ class DecoderSpec extends FunUnitSpec {
               )
             }
             val t2 = fork {
-              m.io.memPortA.expectDequeue(
+              m.io.memPortB.expectDequeue(
                 MemControl(layout.arch.localDepth.toInt)(0.U, false.B)
               )
             }
             m.io.instruction.enqueue(
               Instruction(
                 Opcode.DataMove,
-                DataMoveFlags(DataFlowControl.memoryToDram0),
+                DataMoveFlags(DataMoveKind.memoryToDram0),
                 DataMoveArgs(0, 0xfffff, 0x0)
               )
             )
@@ -772,7 +767,7 @@ class DecoderSpec extends FunUnitSpec {
             m.io.instruction.enqueue(
               Instruction(
                 Opcode.DataMove,
-                DataMoveFlags(DataFlowControl.dram1ToMemory),
+                DataMoveFlags(DataMoveKind.dram1ToMemory),
                 DataMoveArgs(0, 0xfffff, 0x0)
               )
             )
@@ -798,8 +793,8 @@ class DecoderSpec extends FunUnitSpec {
 
           val t0 = fork {
             m.io.dataflow.expectDequeue(
-              DataFlowControlWithSize(m.arch.localDepth)(
-                DataFlowControl._memoryToArrayToAcc,
+              LocalDataFlowControlWithSize(m.arch.localDepth)(
+                LocalDataFlowControl._memoryToArrayToAcc,
                 0.U
               )
             )

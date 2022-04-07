@@ -52,12 +52,46 @@ object DataMoveArgs {
 }
 
 class DataMoveFlags extends Bundle {
-  val dataFlowControl = UInt(4.W)
+  import DataMoveKind.DataMoveKind
+  val kind = DataMoveKind(UInt(4.W))
 }
 
 object DataMoveFlags {
-  def apply(dataFlowControl: UInt): DataMoveFlags =
+  def apply(kind: UInt): DataMoveFlags =
     (new DataMoveFlags).Lit(
-      _.dataFlowControl -> dataFlowControl
+      _.kind -> kind
     )
+}
+
+object DataMoveKind {
+  type DataMoveKind = UInt
+
+  val dram0ToMemory = 0x0.U
+  val memoryToDram0 = 0x1.U
+  val dram1ToMemory = 0x2.U
+  val memoryToDram1 = 0x3.U
+  // 0x4 - 0xb are unused
+  val accumulatorToMemory = 0xc.U
+  val memoryToAccumulator = 0xd.U
+  // 0xe is unused
+  val memoryToAccumulatorAccumulate = 0xf.U
+
+  val all = Array(
+    dram0ToMemory,
+    memoryToDram0,
+    dram1ToMemory,
+    memoryToDram1,
+    accumulatorToMemory,
+    memoryToAccumulator,
+    memoryToAccumulatorAccumulate
+  )
+
+  def apply(kind: UInt): DataMoveKind = kind
+
+  def isValid(kind: UInt): Bool = {
+    kind <= memoryToDram1 ||
+    kind === accumulatorToMemory ||
+    kind === memoryToAccumulator ||
+    kind === memoryToAccumulatorAccumulate
+  }
 }

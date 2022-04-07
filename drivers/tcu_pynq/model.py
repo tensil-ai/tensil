@@ -22,6 +22,7 @@ Program = namedtuple(
     "Program",
     [
         "file_name",  # str
+        "size",  # int
     ],
 )
 

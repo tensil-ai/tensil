@@ -9,10 +9,7 @@ import scala.collection.mutable
 
 import onnx.onnx.{NodeProto, ModelProto, TensorProto, ValueInfoProto}
 
-import _root_.tensil.tools.{
-  CompilerException,
-  TracepointCondition
-}
+import _root_.tensil.tools.{CompilerException, TracepointCondition}
 import _root_.tensil.tools.data.{Shape, TensorData}
 import _root_.tensil.tools.util
 import _root_.tensil.{TablePrinter, Architecture}
@@ -870,13 +867,13 @@ class OnnxFrontend(
     if (mode != "constant" && mode != "edge" && mode != "reflect")
       throw new CompilerException(s"Padding with ${mode} is not supported")
 
-    if (pads(0) != 0 || pads(1) != 0 || pads(4) != 0 || pads(5) != 0)
-      throw new CompilerException("Only height/width padding is supported")
-
-    val paddingTop    = pads(2).toInt
-    val paddingLeft   = pads(3).toInt
-    val paddingBottom = pads(6).toInt
-    val paddingRight  = pads(7).toInt
+    val (paddingTop, paddingLeft, paddingBottom, paddingRight) =
+      pads.map(_.toInt) match {
+        case Seq(0, 0, t, l, 0, 0, b, r) =>
+          (t, l, b, r)
+        case _ =>
+          throw new CompilerException("Only height/width padding is supported")
+      }
 
     val paddedDims = VarsDimensions(
       inputVars.dims.number,
@@ -1846,21 +1843,23 @@ class OnnxFrontend(
     } else
       1
 
-    if (strides.length != 2) {
-      throw new CompilerException(
-        s"Unsupported strides [${strides.mkString(", ")}]"
-      )
-    }
-    val (stridesHeight, stridesWidth) = (strides(0).toInt, strides(1).toInt)
-
-    if (pads.length != 4) {
-      throw new CompilerException(
-        s"Unsupported pads [${pads.mkString(", ")}]"
-      )
+    val (stridesHeight, stridesWidth) = strides.map(_.toInt) match {
+      case Seq(h, w) =>
+        (h, w)
+      case _ =>
+        throw new CompilerException(
+          s"Unsupported strides [${strides.mkString(", ")}]"
+        )
     }
 
-    val (paddingLeft, paddingTop, paddingRight, paddingBottom) =
-      (pads(0).toInt, pads(1).toInt, pads(2).toInt, pads(3).toInt)
+    val (paddingTop, paddingLeft, paddingBottom, paddingRight) =
+      pads.map(_.toInt) match {
+        case Seq(t, l, b, r) => (t, l, b, r)
+        case _ =>
+          throw new CompilerException(
+            s"Unsupported pads [${pads.mkString(", ")}]"
+          )
+      }
 
     context.mm.addPendingConst(
       conv2DProto.input(1),
@@ -2040,26 +2039,26 @@ class OnnxFrontend(
 
     val strides = stridesAttr.ints.toVector
 
-    if (strides.length != 2) {
-      throw new CompilerException(
-        s"Unsupported strides [${strides.mkString(", ")}]"
-      )
+    val (stridesHeight, stridesWidth) = strides.map(_.toInt) match {
+      case Seq(h, w) =>
+        (h, w)
+      case _ =>
+        throw new CompilerException(
+          s"Unsupported strides [${strides.mkString(", ")}]"
+        )
     }
-
-    val (stridesHeight, stridesWidth) = (strides(0).toInt, strides(1).toInt)
 
     val kernelShape = kernelShapeAttr.ints.toVector
 
-    if (kernelShape.length != 2) {
-      throw new CompilerException(
-        s"Unsupported kernel shape [${kernelShape.mkString(", ")}]"
-      )
+    val (kHeight, kWidth) = kernelShape.map(_.toInt) match {
+      case Seq(h, w) => (h, w)
+      case _ =>
+        throw new CompilerException(
+          s"Unsupported kernel shape [${kernelShape.mkString(", ")}]"
+        )
     }
 
-    val (kHeight, kWidth) = (kernelShape(0).toInt, kernelShape(1).toInt)
-
-    val (paddingLeft, paddingTop, paddingRight, paddingBottom) =
-      (0, 0, 0, 0)
+    val (paddingTop, paddingLeft, paddingBottom, paddingRight) = (0, 0, 0, 0)
 
     val outputTemp = context.mm.allocateTempObject(
       poolProto.output(0),

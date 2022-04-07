@@ -10,7 +10,7 @@ class Fixed8bp4(
 object Fixed8bp4
     extends FixedBase(
       width = 8,
-      basePoint = 2,
+      basePoint = 4,
       sizeBytes = 1,
       fromLongBits = (bits: Long) => new Fixed8bp4(bits.toShort),
       toLongBits = (fixed: Fixed8bp4) => fixed.bits.toLong

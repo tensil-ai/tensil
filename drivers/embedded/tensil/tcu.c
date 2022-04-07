@@ -36,36 +36,31 @@ static error_t init_axi_dma(uint32_t axi_dma_device_id, XAxiDma *axi_dma) {
 
 #endif
 
-error_t tcu_init(struct tcu *tcu, size_t sample_block_size) {
-#ifdef TENSIL_PLATFORM_INSTRUCTION_AXI_DMA_DEVICE_ID
-    error_t error;
-
-    error = init_axi_dma(TENSIL_PLATFORM_INSTRUCTION_AXI_DMA_DEVICE_ID,
-                         &tcu->instruction_axi_dma);
-
-    if (error)
-        return error;
-
 #ifdef TENSIL_PLATFORM_SAMPLE_AXI_DMA_DEVICE_ID
+error_t tcu_init_sampling(struct tcu *tcu, size_t sample_block_size) {
     tcu->sample_block_size = sample_block_size;
 
-    error = init_axi_dma(TENSIL_PLATFORM_SAMPLE_AXI_DMA_DEVICE_ID,
-                         &tcu->sample_axi_dma);
+    error_t error = init_axi_dma(TENSIL_PLATFORM_SAMPLE_AXI_DMA_DEVICE_ID,
+                                 &tcu->sample_axi_dma);
 
     if (error)
         return error;
-#endif
-
-#else
-    return DRIVER_ERROR(
-        ERROR_DRIVER_INVALID_PLATFORM,
-        "Target must specify instruction AXI DMA device, see platform.h");
-#endif
 
     return ERROR_NONE;
 }
+#endif
 
 #ifdef TENSIL_PLATFORM_INSTRUCTION_AXI_DMA_DEVICE_ID
+
+error_t tcu_init(struct tcu *tcu) {
+    error_t error = init_axi_dma(TENSIL_PLATFORM_INSTRUCTION_AXI_DMA_DEVICE_ID,
+                                 &tcu->instruction_axi_dma);
+
+    if (error)
+        return error;
+
+    return ERROR_NONE;
+}
 
 error_t tcu_start_instructions(struct tcu *tcu,
                                const struct instruction_buffer *buffer,

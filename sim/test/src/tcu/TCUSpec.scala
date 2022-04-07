@@ -59,7 +59,7 @@ class TCUSpec extends UnitSpec {
         m.io.instruction.enqueue(
           Instruction(
             Opcode.DataMove,
-            DataMoveFlags(DataFlowControl.memoryToAccumulator),
+            DataMoveFlags(DataMoveKind.memoryToAccumulator),
             DataMoveArgs(0, 0, size / 4 - 1, 2, 2)
           )
         )
@@ -112,14 +112,14 @@ class TCUSpec extends UnitSpec {
           m.io.instruction.enqueue(
             Instruction(
               Opcode.DataMove,
-              DataMoveFlags(DataFlowControl.accumulatorToMemory),
+              DataMoveFlags(DataMoveKind.accumulatorToMemory),
               DataMoveArgs(0, 0, size - 1, 2, 2)
             )
           )
           m.io.instruction.enqueue(
             Instruction(
               Opcode.DataMove,
-              DataMoveFlags(DataFlowControl.memoryToDram0),
+              DataMoveFlags(DataMoveKind.memoryToDram0),
               DataMoveArgs(0, 0, size - 1, 2, 2)
             )
           )
@@ -193,7 +193,7 @@ class TCUSpec extends UnitSpec {
         m.io.instruction.enqueue(
           Instruction(
             Opcode.DataMove,
-            DataMoveFlags(DataFlowControl.memoryToDram0),
+            DataMoveFlags(DataMoveKind.memoryToDram0),
             DataMoveArgs(0, 0, size - 1, 2, 2)
           )
         )
@@ -416,7 +416,7 @@ class TCUSpec extends UnitSpec {
       m.io.instruction.enqueue(
         Instruction(
           Opcode.DataMove,
-          DataMoveFlags(DataFlowControl.dram1ToMemory),
+          DataMoveFlags(DataMoveKind.dram1ToMemory),
           DataMoveArgs(0, 0, size - 1)
         )
       )
@@ -456,7 +456,7 @@ class TCUSpec extends UnitSpec {
         m.io.instruction.enqueue(
           Instruction(
             Opcode.DataMove,
-            DataMoveFlags(DataFlowControl.dram0ToMemory),
+            DataMoveFlags(DataMoveKind.dram0ToMemory),
             DataMoveArgs(0, 0, 0)
           )
         )
@@ -473,14 +473,14 @@ class TCUSpec extends UnitSpec {
         m.io.instruction.enqueue(
           Instruction(
             Opcode.DataMove,
-            DataMoveFlags(DataFlowControl.memoryToAccumulator),
+            DataMoveFlags(DataMoveKind.memoryToAccumulator),
             DataMoveArgs(0, 0, 0)
           )
         )
         m.io.instruction.enqueue(
           Instruction(
             Opcode.DataMove,
-            DataMoveFlags(DataFlowControl.memoryToAccumulatorAccumulate),
+            DataMoveFlags(DataMoveKind.memoryToAccumulatorAccumulate),
             DataMoveArgs(0, 0, 0)
           )
         )
@@ -488,14 +488,14 @@ class TCUSpec extends UnitSpec {
         m.io.instruction.enqueue(
           Instruction(
             Opcode.DataMove,
-            DataMoveFlags(DataFlowControl.accumulatorToMemory),
+            DataMoveFlags(DataMoveKind.accumulatorToMemory),
             DataMoveArgs(1, 0, 0)
           )
         )
         m.io.instruction.enqueue(
           Instruction(
             Opcode.DataMove,
-            DataMoveFlags(DataFlowControl.memoryToDram0),
+            DataMoveFlags(DataMoveKind.memoryToDram0),
             DataMoveArgs(1, 0, 0)
           )
         )
@@ -645,7 +645,7 @@ class TCUSpec extends UnitSpec {
       m.io.instruction.enqueue(
         Instruction(
           Opcode.DataMove,
-          DataMoveFlags(DataFlowControl.dram1ToMemory),
+          DataMoveFlags(DataMoveKind.dram1ToMemory),
           DataMoveArgs(4, 0, 4)
         )
       )
@@ -661,7 +661,7 @@ class TCUSpec extends UnitSpec {
       m.io.instruction.enqueue(
         Instruction(
           Opcode.DataMove,
-          DataMoveFlags(DataFlowControl.dram0ToMemory),
+          DataMoveFlags(DataMoveKind.dram0ToMemory),
           DataMoveArgs(0, 0, 0)
         )
       )
@@ -680,7 +680,7 @@ class TCUSpec extends UnitSpec {
         .enqueue(
           Instruction(
             Opcode.DataMove,
-            DataMoveFlags(DataFlowControl.accumulatorToMemory),
+            DataMoveFlags(DataMoveKind.accumulatorToMemory),
             DataMoveArgs(1, 0, 0)
           )
         )
@@ -692,7 +692,7 @@ class TCUSpec extends UnitSpec {
       m.io.instruction.enqueue(
         Instruction(
           Opcode.DataMove,
-          DataMoveFlags(DataFlowControl.memoryToDram0),
+          DataMoveFlags(DataMoveKind.memoryToDram0),
           DataMoveArgs(1, 1, 0)
         )
       )
@@ -711,7 +711,7 @@ class TCUSpec extends UnitSpec {
       m.io.instruction.enqueue(
         Instruction(
           Opcode.DataMove,
-          DataMoveFlags(DataFlowControl.dram1ToMemory),
+          DataMoveFlags(DataMoveKind.dram1ToMemory),
           DataMoveArgs(9, 5, 4)
         )
       )
@@ -730,7 +730,7 @@ class TCUSpec extends UnitSpec {
         .enqueue(
           Instruction(
             Opcode.DataMove,
-            DataMoveFlags(DataFlowControl.accumulatorToMemory),
+            DataMoveFlags(DataMoveKind.accumulatorToMemory),
             DataMoveArgs(1, 0, 0)
           )
         )
@@ -743,7 +743,7 @@ class TCUSpec extends UnitSpec {
       m.io.instruction.enqueue(
         Instruction(
           Opcode.DataMove,
-          DataMoveFlags(DataFlowControl.memoryToDram0),
+          DataMoveFlags(DataMoveKind.memoryToDram0),
           DataMoveArgs(1, 1, 0)
         )
       )
@@ -908,14 +908,14 @@ class TCUSpec extends UnitSpec {
         m.io.instruction.enqueue(
           Instruction(
             Opcode.DataMove,
-            DataMoveFlags(DataFlowControl.dram1ToMemory),
+            DataMoveFlags(DataMoveKind.dram1ToMemory),
             DataMoveArgs(weightOffset, weightOffset, identity.length - 1)
           )
         )
         m.io.instruction.enqueue(
           Instruction(
             Opcode.DataMove,
-            DataMoveFlags(DataFlowControl.dram0ToMemory),
+            DataMoveFlags(DataMoveKind.dram0ToMemory),
             DataMoveArgs(inputAddress, inputAddress, data.length - 1)
           )
         )
@@ -945,7 +945,7 @@ class TCUSpec extends UnitSpec {
         m.io.instruction.enqueue(
           Instruction(
             Opcode.DataMove,
-            DataMoveFlags(DataFlowControl.accumulatorToMemory),
+            DataMoveFlags(DataMoveKind.accumulatorToMemory),
             DataMoveArgs(outputAddress, 0, data.length - 1)
           )
         )
@@ -953,7 +953,7 @@ class TCUSpec extends UnitSpec {
         m.io.instruction.enqueue(
           Instruction(
             Opcode.DataMove,
-            DataMoveFlags(DataFlowControl.memoryToDram0),
+            DataMoveFlags(DataMoveKind.memoryToDram0),
             DataMoveArgs(outputAddress, outputAddress, data.length - 1)
           )
         )
@@ -1068,7 +1068,7 @@ class TCUSpec extends UnitSpec {
           m.io.instruction.enqueue(
             Instruction(
               Opcode.DataMove,
-              DataMoveFlags(DataFlowControl.dram1ToMemory),
+              DataMoveFlags(DataMoveKind.dram1ToMemory),
               DataMoveArgs(i + weightsOffset, i + weightsOffset, 0)
             )
           )
@@ -1078,7 +1078,7 @@ class TCUSpec extends UnitSpec {
           m.io.instruction.enqueue(
             Instruction(
               Opcode.DataMove,
-              DataMoveFlags(DataFlowControl.dram0ToMemory),
+              DataMoveFlags(DataMoveKind.dram0ToMemory),
               DataMoveArgs(i, i, 0)
             )
           )
@@ -1106,7 +1106,7 @@ class TCUSpec extends UnitSpec {
         m.io.instruction.enqueue(
           Instruction(
             Opcode.DataMove,
-            DataMoveFlags(DataFlowControl.accumulatorToMemory),
+            DataMoveFlags(DataMoveKind.accumulatorToMemory),
             DataMoveArgs(4, 0, 3)
           )
         )
@@ -1115,7 +1115,7 @@ class TCUSpec extends UnitSpec {
           m.io.instruction.enqueue(
             Instruction(
               Opcode.DataMove,
-              DataMoveFlags(DataFlowControl.memoryToDram0),
+              DataMoveFlags(DataMoveKind.memoryToDram0),
               DataMoveArgs(i, i, 0)
             )
           )
@@ -2395,7 +2395,7 @@ class TCUSpec extends UnitSpec {
       m.io.instruction.enqueue(
         Instruction(
           Opcode.DataMove,
-          DataMoveFlags(DataFlowControl.dram1ToMemory),
+          DataMoveFlags(DataMoveKind.dram1ToMemory),
           DataMoveArgs(address, address, numRows - 1)
         )
       )
@@ -2430,7 +2430,7 @@ class TCUSpec extends UnitSpec {
       m.io.instruction.enqueue(
         Instruction(
           Opcode.DataMove,
-          DataMoveFlags(DataFlowControl.dram1ToMemory),
+          DataMoveFlags(DataMoveKind.dram1ToMemory),
           DataMoveArgs(address, address, numRows - 1)
         )
       )
@@ -2462,7 +2462,7 @@ class TCUSpec extends UnitSpec {
         m.io.instruction.enqueue(
           Instruction(
             Opcode.DataMove,
-            DataMoveFlags(DataFlowControl.dram1ToMemory),
+            DataMoveFlags(DataMoveKind.dram1ToMemory),
             DataMoveArgs(address(i) + offset, address(i) + offset, 0)
           )
         )
@@ -2549,7 +2549,7 @@ class TCUSpec extends UnitSpec {
         m.io.instruction.enqueue(
           Instruction(
             Opcode.DataMove,
-            DataMoveFlags(DataFlowControl.dram0ToMemory),
+            DataMoveFlags(DataMoveKind.dram0ToMemory),
             DataMoveArgs(address(i), address(i), 0)
           )
         )
@@ -2598,7 +2598,7 @@ class TCUSpec extends UnitSpec {
         m.io.instruction.enqueue(
           Instruction(
             Opcode.DataMove,
-            DataMoveFlags(DataFlowControl.dram0ToMemory),
+            DataMoveFlags(DataMoveKind.dram0ToMemory),
             DataMoveArgs(i, i, 0)
           )
         )
@@ -2634,7 +2634,7 @@ class TCUSpec extends UnitSpec {
       m.io.instruction.enqueue(
         Instruction(
           Opcode.DataMove,
-          DataMoveFlags(DataFlowControl.dram0ToMemory),
+          DataMoveFlags(DataMoveKind.dram0ToMemory),
           DataMoveArgs(address, address, numRows - 1)
         )
       )
@@ -2657,7 +2657,7 @@ class TCUSpec extends UnitSpec {
         m.io.instruction.enqueue(
           Instruction(
             Opcode.DataMove,
-            DataMoveFlags(DataFlowControl.accumulatorToMemory),
+            DataMoveFlags(DataMoveKind.accumulatorToMemory),
             DataMoveArgs(memAddress(i), accAddress(i))
           )
         )
@@ -2672,7 +2672,7 @@ class TCUSpec extends UnitSpec {
       m.io.instruction.enqueue(
         Instruction(
           Opcode.DataMove,
-          DataMoveFlags(DataFlowControl.accumulatorToMemory),
+          DataMoveFlags(DataMoveKind.accumulatorToMemory),
           DataMoveArgs(memAddress, accAddress, size - 1)
         )
       )
@@ -2745,7 +2745,7 @@ class TCUSpec extends UnitSpec {
         m.io.instruction.enqueue(
           Instruction(
             Opcode.DataMove,
-            DataMoveFlags(DataFlowControl.memoryToDram0),
+            DataMoveFlags(DataMoveKind.memoryToDram0),
             DataMoveArgs(i, i, 0)
           )
         )
@@ -2806,7 +2806,7 @@ class TCUSpec extends UnitSpec {
       m.io.instruction.enqueue(
         Instruction(
           Opcode.DataMove,
-          DataMoveFlags(DataFlowControl.memoryToDram0),
+          DataMoveFlags(DataMoveKind.memoryToDram0),
           DataMoveArgs(address, address, length - 1)
         )
       )
@@ -2842,7 +2842,7 @@ class TCUSpec extends UnitSpec {
         m.io.instruction.enqueue(
           Instruction(
             Opcode.DataMove,
-            DataMoveFlags(DataFlowControl.memoryToDram0),
+            DataMoveFlags(DataMoveKind.memoryToDram0),
             DataMoveArgs(address(ki), address(ki), 0)
           )
         )

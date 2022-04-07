@@ -139,7 +139,7 @@ error_t buffer_append_program_from_file(struct instruction_buffer *buffer,
     if (res)
         return FS_ERROR(res);
 
-    if (fno.fsize != size)
+    if (size && fno.fsize != size)
         return DRIVER_ERROR(ERROR_DRIVER_UNEXPECTED_PROGRAM_SIZE,
                             "Unexpected program size in %s", file_name);
 

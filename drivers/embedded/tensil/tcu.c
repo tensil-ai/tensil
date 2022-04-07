@@ -67,31 +67,28 @@ static error_t init_axi_dma(uint32_t axi_dma_device_id, XAxiDma *axi_dma) {
 
 #endif
 
-error_t tcu_init(struct tcu *tcu, size_t sample_block_size) {
-#ifdef TENSIL_PLATFORM_INSTRUCTION_AXI_DMA_DEVICE_ID
-    error_t error;
-
-    error = init_axi_dma(TENSIL_PLATFORM_INSTRUCTION_AXI_DMA_DEVICE_ID,
-                         &tcu->instruction_axi_dma);
-
-    if (error)
-        return error;
-
 #ifdef TENSIL_PLATFORM_SAMPLE_AXI_DMA_DEVICE_ID
+error_t tcu_init_sampling(struct tcu *tcu, size_t sample_block_size) {
     tcu->sample_block_size = sample_block_size;
 
-    error = init_axi_dma(TENSIL_PLATFORM_SAMPLE_AXI_DMA_DEVICE_ID,
+    error_t error = init_axi_dma(TENSIL_PLATFORM_SAMPLE_AXI_DMA_DEVICE_ID,
                          &tcu->sample_axi_dma);
 
     if (error)
         return error;
+
+    return ERROR_NONE;
+}
 #endif
 
-#else
-    return DRIVER_ERROR(
-        ERROR_DRIVER_INVALID_PLATFORM,
-        "Target must specify instruction AXI DMA device, see platform.h");
-#endif
+#ifdef TENSIL_PLATFORM_INSTRUCTION_AXI_DMA_DEVICE_ID
+
+error_t tcu_init(struct tcu *tcu) {
+    error_t error = init_axi_dma(TENSIL_PLATFORM_INSTRUCTION_AXI_DMA_DEVICE_ID,
+                         &tcu->instruction_axi_dma);
+
+    if (error)
+        return error;
 
 #ifdef TENSIL_PLATFORM_AFIFM0_ADDR
     set_afifm_rdctl_fabric_width(TENSIL_PLATFORM_AFIFM0_ADDR,
@@ -113,8 +110,6 @@ error_t tcu_init(struct tcu *tcu, size_t sample_block_size) {
 
     return ERROR_NONE;
 }
-
-#ifdef TENSIL_PLATFORM_INSTRUCTION_AXI_DMA_DEVICE_ID
 
 error_t tcu_start_instructions(struct tcu *tcu,
                                const struct instruction_buffer *buffer,
@@ -156,9 +151,9 @@ error_t tcu_start_sampling(struct tcu *tcu, struct sample_buffer *buffer) {
     uint8_t *transfer_ptr = buffer->ptr + buffer->offset;
     size_t transfer_size = tcu->sample_block_size * SAMPLE_SIZE_BYTES;
 
-    if (transfer_size > buffer->size - buffer->offset)
-        return DRIVER_ERROR(ERROR_DRIVER_OUT_OF_SAMPLE_BUFFER,
-                            "Out of sample buffer");
+	if (transfer_size > buffer->size - buffer->offset)
+		return DRIVER_ERROR(ERROR_DRIVER_OUT_OF_SAMPLE_BUFFER,
+							"Out of sample buffer");
 
     int status;
 

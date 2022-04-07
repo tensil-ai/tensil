@@ -20,7 +20,7 @@
 
 #include "../architecture_params.h"
 
-#define PROGRAM_COUNTER_SHIFT 2
+#define PROGRAM_COUNTER_SHIFT 1
 
 static uint8_t *get_dram_bank_base_ptr(const struct driver *driver,
                                        enum dram_bank dram_bank) {
@@ -43,6 +43,74 @@ static size_t get_dram_bank_size(const struct driver *driver,
         return driver->dram1_size;
     }
 }
+
+#ifdef TENSIL_PLATFORM_SAMPLE_AXI_DMA_DEVICE_ID
+
+static error_t run_buffer_with_sampling(struct driver *driver) {
+#ifdef TENSIL_PLATFORM_INSTRUCTION_AXI_DMA_DEVICE_ID
+
+    error_t error = ERROR_NONE;
+    size_t instructions_run_offset = 0;
+    sample_buffer_reset(&driver->sample_buffer);
+
+    bool instructions_busy = false;
+    bool sample_busy = false;
+
+    while (instructions_run_offset != driver->buffer.offset) {
+        if (!instructions_busy) {
+            error = tcu_start_instructions(&driver->tcu, &driver->buffer,
+                                           &instructions_run_offset);
+
+            if (error)
+                return error;
+        }
+
+        if (!sample_busy) {
+            error = tcu_start_sampling(&driver->tcu, &driver->sample_buffer);
+
+            if (error)
+                return error;
+        }
+
+        do {
+            sample_busy = tcu_is_sample_busy(&driver->tcu);
+            instructions_busy = tcu_is_instructions_busy(&driver->tcu);
+        } while (sample_busy && instructions_busy);
+
+        if (!sample_busy)
+            tcu_complete_sampling(&driver->tcu, &driver->sample_buffer);
+    }
+
+    while (tcu_is_instructions_busy(&driver->tcu)) {
+        if (!sample_busy) {
+            error = tcu_start_sampling(&driver->tcu, &driver->sample_buffer);
+
+            if (error)
+                return error;
+        }
+
+        sample_busy = tcu_is_sample_busy(&driver->tcu);
+
+        if (!sample_busy)
+            tcu_complete_sampling(&driver->tcu, &driver->sample_buffer);
+    }
+
+    if (sample_busy) {
+        while (tcu_is_sample_busy(&driver->tcu))
+            ;
+
+        tcu_complete_sampling(&driver->tcu, &driver->sample_buffer);
+    }
+
+    return ERROR_NONE;
+#else
+    return DRIVER_ERROR(
+        ERROR_DRIVER_INVALID_PLATFORM,
+        "Target must specify instruction AXI DMA device, see platform.h");
+#endif
+}
+
+#else
 
 static error_t run_buffer(struct tcu *tcu,
                           const struct instruction_buffer *buffer) {
@@ -69,6 +137,8 @@ static error_t run_buffer(struct tcu *tcu,
 #endif
 }
 
+#endif
+
 static error_t run_config(struct driver *driver) {
     buffer_reset(&driver->buffer);
 
@@ -93,6 +163,15 @@ static error_t run_config(struct driver *driver) {
     if (error)
         return error;
 
+#ifdef TENSIL_PLATFORM_SAMPLE_AXI_DMA_DEVICE_ID
+    error = buffer_append_config_instruction(
+        &driver->buffer, &driver->layout, CONFIG_REGISTER_SAMPLE_INTERVAL,
+        SAMPLE_INTERVAL_CYCLES);
+
+    if (error)
+        return error;
+#endif
+
 #ifdef TENSIL_PLATFORM_INSTRUCTION_AXI_DMA_DEVICE_ID
     error = buffer_pad_to_alignment(
         &driver->buffer, &driver->layout,
@@ -102,7 +181,11 @@ static error_t run_config(struct driver *driver) {
         return error;
 #endif
 
+#ifdef TENSIL_PLATFORM_SAMPLE_AXI_DMA_DEVICE_ID
+    return run_buffer_with_sampling(driver);
+#else
     return run_buffer(&driver->tcu, &driver->buffer);
+#endif
 }
 
 static void fill_dram_vectors(struct driver *driver, enum dram_bank dram_bank,
@@ -158,67 +241,6 @@ static void wait_for_flush(struct driver *driver) {
         ;
 }
 
-#ifdef TENSIL_PLATFORM_SAMPLE_AXI_DMA_DEVICE_ID
-
-static error_t run_buffer_with_sampling(struct driver *driver) {
-    error_t error = ERROR_NONE;
-    size_t instructions_run_offset = 0;
-    sample_buffer_reset(&driver->sample_buffer);
-
-    bool instructions_busy = false;
-    bool sample_busy = false;
-
-    while (instructions_run_offset != driver->buffer.offset) {
-        if (!instructions_busy) {
-            error = tcu_start_instructions(&driver->tcu, &driver->buffer,
-                                           &instructions_run_offset);
-
-            if (error)
-                return error;
-        }
-
-        if (!sample_busy) {
-            error = tcu_start_sampling(&driver->tcu, &driver->sample_buffer);
-
-            if (error)
-                return error;
-        }
-
-        do {
-            sample_busy = tcu_is_sample_busy(&driver->tcu);
-            instructions_busy = tcu_is_instructions_busy(&driver->tcu);
-        } while (sample_busy && instructions_busy);
-
-        if (!sample_busy)
-            tcu_complete_sampling(&driver->tcu, &driver->sample_buffer);
-    }
-
-    while (tcu_is_instructions_busy(&driver->tcu)) {
-        if (!sample_busy) {
-            error = tcu_start_sampling(&driver->tcu, &driver->sample_buffer);
-
-            if (error)
-                return error;
-        }
-
-        sample_busy = tcu_is_sample_busy(&driver->tcu);
-
-        if (!sample_busy)
-            tcu_complete_sampling(&driver->tcu, &driver->sample_buffer);
-    }
-
-    if (sample_busy) {
-        while (tcu_is_sample_busy(&driver->tcu))
-            ;
-
-        tcu_complete_sampling(&driver->tcu, &driver->sample_buffer);
-    }
-
-    return ERROR_NONE;
-}
-
-#endif
-
 error_t driver_init(struct driver *driver) {
     memset(driver, 0, sizeof(struct driver));
 
@@ -234,7 +256,6 @@ error_t driver_init(struct driver *driver) {
     driver->arch.simd_registers_depth =
         TENSIL_ARCHITECTURE_SIMD_REGISTERS_DEPTH;
 
-    driver->sample_block_size = TENSIL_PLATFORM_SAMPLE_BLOCK_SIZE;
     driver->decoder_timeout = TENSIL_PLATFORM_DECODER_TIMEOUT;
 
     if (!architecture_is_valid(&driver->arch)) {
@@ -275,6 +296,14 @@ error_t driver_init(struct driver *driver) {
         "Target must specify program and DRAM buffers, see platform.h");
 #endif
 
+#ifdef TENSIL_PLATFORM_SAMPLE_AXI_DMA_DEVICE_ID
+#ifdef TENSIL_PLATFORM_SAMPLE_BLOCK_SIZE
+    driver->sample_block_size = TENSIL_PLATFORM_SAMPLE_BLOCK_SIZE;
+#else
+    return DRIVER_ERROR(
+        ERROR_DRIVER_INVALID_PLATFORM,
+        "Target must specify sample block size, see platform.h");
+#endif
 #if defined(TENSIL_PLATFORM_SAMPLE_BUFFER_BASE) &&                             \
     defined(TENSIL_PLATFORM_SAMPLE_BUFFER_HIGH)
 
@@ -288,12 +317,30 @@ error_t driver_init(struct driver *driver) {
     driver->sample_buffer.ptr = (uint8_t *)TENSIL_PLATFORM_SAMPLE_BUFFER_BASE;
     driver->sample_buffer.size =
         TENSIL_PLATFORM_SAMPLE_BUFFER_HIGH - TENSIL_PLATFORM_SAMPLE_BUFFER_BASE;
+#else
+    return DRIVER_ERROR(
+        ERROR_DRIVER_INVALID_PLATFORM,
+        "Target must specify sample buffers, see platform.h");
+#endif
 #endif
 
-    error_t error = tcu_init(&driver->tcu, driver->sample_block_size);
+#ifdef TENSIL_PLATFORM_INSTRUCTION_AXI_DMA_DEVICE_ID
+    error_t error = tcu_init(&driver->tcu);
 
     if (error)
         return error;
+#else
+    return DRIVER_ERROR(
+        ERROR_DRIVER_INVALID_PLATFORM,
+        "Target must specify instruction AXI DMA device, see platform.h");
+#endif
+
+#ifdef TENSIL_PLATFORM_SAMPLE_AXI_DMA_DEVICE_ID
+    error = tcu_init_sampling(&driver->tcu, driver->sample_block_size);
+
+    if (error)
+        return error;
+#endif
 
     return run_config(driver);
 }
@@ -303,14 +350,6 @@ static error_t setup_buffer_postamble(struct driver *driver) {
 
     if (error)
         return error;
-
-#ifdef TENSIL_PLATFORM_SAMPLE_AXI_DMA_DEVICE_ID
-    error = buffer_append_config_instruction(
-        &driver->buffer, &driver->layout, CONFIG_REGISTER_SAMPLE_INTERVAL, 0);
-
-    if (error)
-        return error;
-#endif
 
 #ifdef TENSIL_PLATFORM_INSTRUCTION_AXI_DMA_DEVICE_ID
     error = buffer_pad_to_alignment(
@@ -328,18 +367,11 @@ static error_t setup_buffer_preamble(struct driver *driver) {
     buffer_reset(&driver->buffer);
 
 #ifdef TENSIL_PLATFORM_SAMPLE_AXI_DMA_DEVICE_ID
-    error_t error = buffer_append_config_instruction(
-        &driver->buffer, &driver->layout, CONFIG_REGISTER_SAMPLE_INTERVAL,
-        SAMPLE_INTERVAL_CYCLES);
-
-    if (error)
-        return error;
-
     // Since config instructions precede the program in the buffer we
     // need to offset the program counter correspondingly in order for the
     // sample lookup to be accurate. This assumes the config instruction
     // is not advancing program counter after setting it.
-    error = buffer_append_config_instruction(&driver->buffer, &driver->layout,
+    error_t error = buffer_append_config_instruction(&driver->buffer, &driver->layout,
                                              CONFIG_REGISTER_PROGRAM_COUNTER,
                                              PROGRAM_COUNTER_SHIFT);
 

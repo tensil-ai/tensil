@@ -29,9 +29,9 @@ struct tcu {
 struct sample_buffer;
 struct instruction_buffer;
 
-error_t tcu_init(struct tcu *tcu, size_t sample_block_size);
-
 #ifdef TENSIL_PLATFORM_INSTRUCTION_AXI_DMA_DEVICE_ID
+
+error_t tcu_init(struct tcu *tcu);
 
 error_t tcu_start_instructions(struct tcu *tcu,
                                const struct instruction_buffer *buffer,
@@ -44,6 +44,8 @@ int tcu_get_instructions_data_width_bytes(struct tcu *tcu);
 #endif
 
 #ifdef TENSIL_PLATFORM_SAMPLE_AXI_DMA_DEVICE_ID
+
+error_t tcu_init_sampling(struct tcu *tcu, size_t sample_block_size);
 
 error_t tcu_start_sampling(struct tcu *tcu, struct sample_buffer *buffer);
 

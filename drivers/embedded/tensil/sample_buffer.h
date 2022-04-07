@@ -13,7 +13,7 @@
 
 #include "error.h"
 
-#define SAMPLE_SIZE_BYTES 32
+#define SAMPLE_SIZE_BYTES 8
 #define SAMPLE_INTERVAL_CYCLES 1000
 
 struct sample_buffer {

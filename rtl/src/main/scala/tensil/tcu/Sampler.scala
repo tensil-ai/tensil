@@ -52,7 +52,6 @@ class Sampler(blockSize: Int) extends Module {
   val cycleCounter = RegInit(0.U(16.W))
 
   val outputCounter = RegInit(0.U(32.W))
-  val outputReady   = RegInit(false.B)
   val outputSample  = RegInit(0.U.asTypeOf(new Sample()))
   val outputLast    = RegInit(false.B)
   val outputValid   = RegInit(false.B)
@@ -60,12 +59,6 @@ class Sampler(blockSize: Int) extends Module {
   val sample      = Wire(new Sample())
   val sampleReady = Wire(Bool())
 
-  val invalidProgramCounter =
-    WireDefault(UInt(32.W), Fill(sample.programCounter.getWidth, 1.U))
-  val invalidFlags =
-    WireDefault(new SampleFlags(), 0.U.asTypeOf(new SampleFlags()))
-
-  outputReady := io.sample.ready
   io.sample.valid := outputValid
   io.sample.bits.bits := outputSample
   io.sample.bits.last := outputLast
@@ -74,25 +67,23 @@ class Sampler(blockSize: Int) extends Module {
     sample.programCounter := io.programCounter
     sample.flags := io.flags
 
-    when(cycleCounter === (io.sampleInterval - 1.U)) {
+    when(cycleCounter === 0.U) {
       sampleReady := true.B
 
-      cycleCounter := 0.U
+      cycleCounter := (io.sampleInterval - 1.U)
     }.otherwise {
       sampleReady := false.B
 
-      cycleCounter := cycleCounter + 1.U
+      cycleCounter := cycleCounter - 1.U
     }
   }.otherwise {
-    sample.programCounter := invalidProgramCounter
-    sample.flags := invalidFlags
-
-    sampleReady := true.B
+    sample := WireDefault(new Sample(), 0.U.asTypeOf(new Sample()))
+    sampleReady := false.B
 
     cycleCounter := 0.U
   }
 
-  when(!outputValid || outputReady) {
+  when(!outputValid || io.sample.ready) {
     when(sampleReady) {
       when(outputCounter === (blockSize - 1).U) {
         outputLast := true.B
@@ -106,6 +97,7 @@ class Sampler(blockSize: Int) extends Module {
       outputSample := sample
     }.otherwise {
       outputValid := false.B
+      outputLast := false.B
     }
   }
 }

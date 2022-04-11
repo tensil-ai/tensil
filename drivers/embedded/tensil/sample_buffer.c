@@ -105,7 +105,10 @@ error_t sample_buffer_print_analysis(
     const struct instruction_layout *layout, bool print_summary,
     bool print_aggregates, bool print_listing, uint32_t program_counter_shift) {
     size_t samples_count = sample_buffer->offset / SAMPLE_SIZE_BYTES;
+    uint8_t *sample_ptr = sample_buffer->ptr;
+
     size_t valid_samples_count = 0;
+    size_t valid_samples_base = 0;
 
     counter_t header_counts[HEADER_COUNTS_SIZE];
 
@@ -139,15 +142,29 @@ error_t sample_buffer_print_analysis(
 
     printf("Collected %zu samples\n", samples_count);
 
+    uint32_t prev_program_counter = 0;
+
     for (size_t i = 0; i < samples_count; i++) {
-        uint8_t *sample_ptr = sample_buffer->ptr + (i * SAMPLE_SIZE_BYTES);
+        uint32_t next_program_counter = *((uint32_t *)sample_ptr);
+
+        if (next_program_counter < prev_program_counter) {
+            valid_samples_base = i;
+            break;
+        }
+
+        prev_program_counter = next_program_counter;
+        sample_ptr += SAMPLE_SIZE_BYTES;
+    }
+
+    sample_ptr = sample_buffer->ptr + (valid_samples_base * SAMPLE_SIZE_BYTES);
+
+    for (size_t i = valid_samples_base; i < samples_count; i++) {
         uint32_t program_counter = *((uint32_t *)sample_ptr);
         uint32_t instruction_offset =
             program_counter * layout->instruction_size_bytes;
         uint16_t flags = *((uint16_t *)(sample_ptr + 4));
 
-        if (program_counter != UINT32_MAX &&
-            instruction_offset < instruction_buffer->offset) {
+        if (instruction_offset < instruction_buffer->offset) {
             valid_samples_count++;
 
             uint8_t *instruction_ptr =
@@ -187,6 +204,8 @@ error_t sample_buffer_print_analysis(
                 printf("\n");
             }
         }
+
+        sample_ptr += SAMPLE_SIZE_BYTES;
     }
 
     printf("Found %zu valid samples\n", valid_samples_count);

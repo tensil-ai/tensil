@@ -1457,52 +1457,69 @@ error_t driver_run_sampling_test(struct driver *driver, bool verbose) {
     sample_buffer_before_read(&driver->sample_buffer);
 
     size_t samples_count = driver->sample_buffer.offset / SAMPLE_SIZE_BYTES;
+    uint8_t *sample_ptr = driver->sample_buffer.ptr;
+
     size_t valid_samples_count = 0;
+    size_t valid_samples_base = 0;
+
     size_t stalling_samples_count = 0;
     size_t missing_samples_count = 0;
 
-    uint32_t prev_instruction_counter = 0;
+    uint32_t prev_program_counter = 0;
 
     for (size_t i = 0; i < samples_count; i++) {
-        uint8_t *sample_ptr =
-            driver->sample_buffer.ptr + (i * SAMPLE_SIZE_BYTES);
-        uint32_t instruction_counter = *((uint32_t *)sample_ptr);
-        uint32_t instruction_offset =
-            instruction_counter * driver->layout.instruction_size_bytes;
+        uint32_t next_program_counter = *((uint32_t *)sample_ptr);
 
-        if (instruction_counter != UINT32_MAX &&
-            instruction_offset < driver->buffer.offset) {
+        if (next_program_counter < prev_program_counter) {
+            valid_samples_base = i;
+            break;
+        }
+
+        prev_program_counter = next_program_counter;
+        sample_ptr += SAMPLE_SIZE_BYTES;
+    }
+
+    sample_ptr =
+        driver->sample_buffer.ptr + (valid_samples_base * SAMPLE_SIZE_BYTES);
+
+    for (size_t i = valid_samples_base; i < samples_count; i++) {
+        uint32_t next_program_counter = *((uint32_t *)sample_ptr);
+        uint32_t instruction_offset =
+            next_program_counter * driver->layout.instruction_size_bytes;
+
+        if (instruction_offset < driver->buffer.offset) {
             valid_samples_count++;
 
-            if (!prev_instruction_counter) {
-                prev_instruction_counter = instruction_counter;
+            if (!prev_program_counter) {
+                prev_program_counter = next_program_counter;
             } else {
-                if (prev_instruction_counter == instruction_counter)
+                if (prev_program_counter == next_program_counter)
                     stalling_samples_count++;
                 else {
-                    if (instruction_counter >
-                        prev_instruction_counter + SAMPLE_INTERVAL_CYCLES) {
+                    if (next_program_counter >
+                        prev_program_counter + SAMPLE_INTERVAL_CYCLES) {
                         if (verbose)
                             printf("Offset %u -> %u\n",
-                                   (unsigned int)prev_instruction_counter,
-                                   (unsigned int)instruction_counter);
+                                   (unsigned int)prev_program_counter,
+                                   (unsigned int)next_program_counter);
 
                         missing_samples_count++;
                     }
-                    prev_instruction_counter = instruction_counter;
+                    prev_program_counter = next_program_counter;
                 }
             }
         }
+
+        sample_ptr += SAMPLE_SIZE_BYTES;
     }
 
-    printf("%s: collected %lu samples, %lu valid, %lu stalling",
+    printf("%s: collected %lu samples, %lu "
+           "valid with %lu stalling and %lu missing, %lu head-invalid, %lu "
+           "tail-invalid\n",
            missing_samples_count ? failed : ok, samples_count,
-           valid_samples_count, stalling_samples_count);
-
-    if (missing_samples_count)
-        printf(", %lu missing\n", missing_samples_count);
-    else
-        printf("\n");
+           valid_samples_count, stalling_samples_count, missing_samples_count,
+           valid_samples_base,
+           samples_count - valid_samples_base - valid_samples_count);
 
     return ERROR_NONE;
 }

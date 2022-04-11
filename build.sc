@@ -41,6 +41,8 @@ object tools extends ScalaPBModule { m =>
     )
 
   object test extends Tests with TestModule.ScalaTest {
+    def forkArgs = Seq("-Xmx12g", "-Xmx12g")
+
     def ivyDeps = m.ivyDeps() ++ Agg(ivy"org.scalatest::scalatest:3.0.4")
   }
 }
@@ -76,6 +78,8 @@ object rtl extends SbtModule { m =>
     )
 
   object test extends Tests with ScalaTest {
+    def forkArgs = Seq("-Xmx12g", "-Xmx12g")
+
     override def ivyDeps =
       m.ivyDeps() ++ Agg(ivy"org.scalatest::scalatest:3.0.4")
   }

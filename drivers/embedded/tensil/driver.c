@@ -1182,7 +1182,7 @@ error_t driver_run_array_test(struct driver *driver, bool verbose) {
     if (error)
         goto cleanup;
 
-    error = driver_run(driver, true, true, true, true);
+    error = driver_run(driver, false, false, false, false);
 
     if (error)
         goto cleanup;
@@ -1191,11 +1191,9 @@ error_t driver_run_array_test(struct driver *driver, bool verbose) {
                              ARRAY_TEST_SIZE, to_buffer);
 
     for (size_t k = 0; k < ARRAY_TEST_SIZE * driver->arch.array_size; k++) {
-        from_buffer[k] =
-            saturate(driver->arch.data_type,
-                     saturate(driver->arch.data_type,
-                              from_buffer[k] * ARRAY_TEST_IDENTITY_WEIGHT) +
-                         ARRAY_TEST_BIAS);
+        from_buffer[k] = saturate(
+            driver->arch.data_type,
+            (from_buffer[k] * ARRAY_TEST_IDENTITY_WEIGHT) + ARRAY_TEST_BIAS);
 
         if (compare_scalars(driver->arch.data_type, from_buffer[k],
                             to_buffer[k])) {

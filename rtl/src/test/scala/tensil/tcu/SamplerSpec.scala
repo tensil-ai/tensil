@@ -10,10 +10,8 @@ import tensil.util.WithLast
 import chisel3.experimental.BundleLiterals._
 
 class SamplerSpec extends FunUnitSpec {
-  private val InvalidPC = -1
-
   private def mkFlagsLiteral(pc: Int): SampleFlags = {
-    val k = if (pc != InvalidPC) pc % 16 + 1 else 0
+    val k = pc % 16 + 1
 
     (new SampleFlags).Lit(
       _.instruction -> (new DecoupledFlags)
@@ -38,30 +36,37 @@ class SamplerSpec extends FunUnitSpec {
   private def mkSample(m: Sampler, pc: Int, last: Boolean) =
     chiselTypeOf(m.io.sample.bits).Lit(
       _.bits -> (new Sample).Lit(
-        _.flags -> mkFlagsLiteral(pc),
-        _.programCounter -> (if (pc != InvalidPC) pc.U
-                             else "h_ffff_ffff".U)
+        _.flags          -> mkFlagsLiteral(pc),
+        _.programCounter -> pc.U
       ),
       _.last -> last.B
     )
 
   private def mkSamples(m: Sampler, pcs: Seq[Int]) =
     pcs
-      .grouped(BlockSize)
+      .grouped(blockSize)
       .map(block => {
         block.zipWithIndex.map {
-          case (pc, i) => mkSample(m, pc, i == BlockSize - 1)
+          case (pc, i) => mkSample(m, pc, i == blockSize - 1)
         }
       })
       .flatten
+      .toSeq
+
+  private def mkPcs(interval0: Int, interval1: Int, count: Int, runs: Int) =
+    (0 until Math.ceil((count * runs).toFloat / interval0).toInt)
+      .map(pc =>
+        (Math
+          .ceil((pc * interval0).toFloat / interval1)
+          .toInt * interval1) % count
+      )
       .toSeq
 
   private def simulateRuns(
       m: Sampler,
       interval: Int,
       count: Int,
-      runs: Int,
-      wait: Int
+      runs: Int
   ) = {
     require(interval > 0)
     require(count > 0)
@@ -85,139 +90,57 @@ class SamplerSpec extends FunUnitSpec {
       m.io.flags.array.valid,
     )
 
-    for (_ <- 0 until runs) {
-      m.io.sampleInterval.poke(interval.U)
+    m.io.sampleInterval.poke(interval.U)
 
-      for (i <- 0 until count) {
-        val k    = i % flags.length
-        val flag = flags(k)
+    for (i <- 0 until count * runs) {
+      val k    = (i % count) % flags.length
+      val flag = flags(k)
 
-        flag.poke(true.B)
-        m.io.programCounter.poke(i.U)
+      flag.poke(true.B)
+      m.io.programCounter.poke((i % count).U)
 
-        m.clock.step()
+      m.clock.step()
 
-        flag.poke(false.B)
-
-        if (i == count - 1) {
-          m.io.sampleInterval.poke(0.U)
-
-          for (_ <- 0 until wait)
-            m.clock.step()
-        }
-      }
+      flag.poke(false.B)
     }
   }
 
-  val BlockSize = 10
+  val blockSize = 32
+  val runs      = 2
+  val count     = 1000
 
-  describe("Sampler") {
-    it("should sample every cycle") {
-      test(new Sampler(BlockSize)) { m =>
+  def testSampler(interval: Int, delay: Int) = {
+    it(s"should sample every $interval cycles with $delay cycle write delay") {
+      test(new Sampler(blockSize)) { m =>
         m.io.sample.setSinkClock(m.clock)
-
-        val count = 1000
-        val runs  = 2
-        val wait  = 100
-
-        parallel(
-          simulateRuns(
-            m,
-            interval = 1,
-            count = count,
-            runs = runs,
-            wait = wait
-          ), {
-            val pcs =
-              Seq
-                .fill(runs)(
-                  (0 until count).toSeq ++ Seq.fill(wait)(InvalidPC)
-                )
-                .flatten
-
-            m.io.sample.expectDequeueSeq(mkSamples(m, pcs))
-          }
-        )
-      }
-    }
-
-    it("should sample every 13 cycles") {
-      test(new Sampler(BlockSize)) { m =>
-        m.io.sample.setSinkClock(m.clock)
-
-        val interval = 13
-        val count    = 1000
-        val runs     = 2
-        val wait     = 100
 
         parallel(
           simulateRuns(
             m,
             interval = interval,
             count = count,
-            runs = runs,
-            wait = wait
+            runs = runs
           ), {
-            val pcs =
-              Seq
-                .fill(runs)(
-                  (0 until count / 13)
-                    .map(pc => (pc + 1) * 13 - 1)
-                    .toSeq ++ Seq.fill(wait)(InvalidPC)
-                )
-                .flatten
+            m.clock.step()
 
-            m.io.sample.expectDequeueSeq(mkSamples(m, pcs))
-          }
-        )
-      }
-    }
-
-    it("should skip sample when stream is delayed") {
-      test(new Sampler(BlockSize)) { m =>
-        m.io.sample.setSinkClock(m.clock)
-
-        val count = 1000
-        val runs  = 2
-        val wait  = 100
-        val delay = 9
-
-        parallel(
-          simulateRuns(
-            m,
-            interval = 1,
-            count = count,
-            runs = runs,
-            wait = wait
-          ), {
-            val pcs =
-              Seq
-                .fill(runs)(
-                  (0 until count / (delay + 1))
-                    .map(pc => pc * (delay + 1))
-                    .toSeq ++ Seq.fill(wait / (delay + 1))(InvalidPC)
-                )
-                .flatten
-
-            for (sample <- mkSamples(m, pcs)) {
-              m.clock.step(delay)
+            for (
+              sample <- mkSamples(
+                m,
+                mkPcs(Math.max(delay, interval), interval, count, runs)
+              )
+            ) {
+              m.clock.step(delay - 1)
               m.io.sample.expectDequeue(sample)
             }
           }
         )
       }
     }
-
-    it("should sample invalid PCs when sampleInterval = 0") {
-      test(new Sampler(BlockSize)) { m =>
-        m.io.sample.setSinkClock(m.clock)
-
-        val count = 1000
-
-        val pcs = Seq.fill(count)(InvalidPC)
-
-        m.io.sample.expectDequeueSeq(mkSamples(m, pcs))
-      }
-    }
   }
+
+  testSampler(1, 1)
+  testSampler(10, 10)
+  testSampler(10, 13)
+  testSampler(13, 10)
+  testSampler(13, 13)
 }

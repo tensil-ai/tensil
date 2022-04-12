@@ -461,7 +461,7 @@ int main() {
 
     struct run_opts resnet20v2_run_opts = {
         .print_sampling_aggregates = true,
-        .print_sampling_listing = true,
+        .print_sampling_listing = false,
         .print_sampling_summary = true,
         .sample_file_name = "resnet20v2_cifar_ultra.tsample"};
 

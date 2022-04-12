@@ -13,10 +13,31 @@
 #include "tensil/driver.h"
 #include "tensil/instruction.h"
 #include "tensil/model.h"
-#include "tensil/stopwatch.h"
 #include "tensil/tcu.h"
 
 #include "console.h"
+#include "stopwatch.h"
+
+static error_t driver_run_timed(struct driver *driver,
+                                const struct run_opts *run_opts) {
+    struct stopwatch sw;
+
+    error_t error = stopwatch_start(&sw);
+
+    if (error)
+        return error;
+
+    error = driver_run(driver, run_opts);
+
+    if (error)
+        return error;
+
+    stopwatch_stop(&sw);
+
+    printf("Program run took %.2f us\n", stopwatch_elapsed_us(&sw));
+
+    return ERROR_NONE;
+}
 
 static const char *data_type_to_string(enum data_type type) {
     switch (type) {
@@ -407,7 +428,7 @@ int main() {
             if (error)
                 goto cleanup;
 
-            error = driver_run(&driver, NULL);
+            error = driver_run_timed(&driver, NULL);
 
             if (error)
                 goto cleanup;
@@ -440,12 +461,11 @@ int main() {
 
     struct run_opts resnet20v2_run_opts = {
         .print_sampling_aggregates = true,
-        .print_sampling_listing = false,
+        .print_sampling_listing = true,
         .print_sampling_summary = true,
-        .print_timing = true,
         .sample_file_name = "resnet20v2_cifar_ultra.tsample"};
 
-    error = driver_run(&driver, &resnet20v2_run_opts);
+    error = driver_run_timed(&driver, &resnet20v2_run_opts);
 
     if (error)
         goto cleanup;
@@ -496,10 +516,9 @@ int main() {
         .print_sampling_aggregates = true,
         .print_sampling_listing = false,
         .print_sampling_summary = true,
-        .print_timing = true,
         .sample_file_name = "yolov4_tiny_192_ultra.tsample"};
 
-    error = driver_run(&driver, &yolov4_tiny_run_opts);
+    error = driver_run_timed(&driver, &yolov4_tiny_run_opts);
 
     if (error)
         goto cleanup;
@@ -539,7 +558,6 @@ int main() {
         .print_sampling_aggregates = true,
         .print_sampling_listing = false,
         .print_sampling_summary = true,
-        .print_timing = true,
         .sample_file_name = "resnet50v2_imagenet_ultra.tsample"};
 
     for (int i = 0; i < 3; i++) {
@@ -553,7 +571,7 @@ int main() {
         if (error)
             goto cleanup;
 
-        error = driver_run(&driver, &resnet50v2_run_opts);
+        error = driver_run_timed(&driver, &resnet50v2_run_opts);
 
         if (error)
             goto cleanup;

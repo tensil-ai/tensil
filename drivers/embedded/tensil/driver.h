@@ -113,7 +113,6 @@ error_t driver_read_dram_vectors(const struct driver *driver,
 
 struct run_opts {
 #ifdef TENSIL_PLATFORM_ENABLE_PRINTF
-    bool print_timing;
     bool print_sampling_summary;
     bool print_sampling_aggregates;
     bool print_sampling_listing;

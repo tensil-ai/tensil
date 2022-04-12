@@ -12,7 +12,6 @@
 #include "instruction_buffer.h"
 #include "model.h"
 #include "sample_buffer.h"
-#include "stopwatch.h"
 #include "tcu.h"
 
 #ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
@@ -194,27 +193,18 @@ static void wait_for_flush(struct driver *driver) {
 }
 
 error_t driver_run(struct driver *driver, const struct run_opts *run_opts) {
-    struct stopwatch sw;
-
-    error_t error = stopwatch_start(&sw);
-
-    if (error)
-        return error;
-
     reset_flush_probe(driver);
 
 #ifdef TENSIL_PLATFORM_SAMPLE_AXI_DMA_DEVICE_ID
-    error = run_buffer_with_sampling(driver);
+    error_t error = run_buffer_with_sampling(driver);
 #else
-    error = run_buffer(&driver->tcu, &driver->buffer);
+    error_t error = run_buffer(&driver->tcu, &driver->buffer);
 #endif
 
     if (error)
         return error;
 
     wait_for_flush(driver);
-
-    stopwatch_stop(&sw);
 
 #ifdef TENSIL_PLATFORM_SAMPLE_AXI_DMA_DEVICE_ID
 
@@ -245,12 +235,6 @@ error_t driver_run(struct driver *driver, const struct run_opts *run_opts) {
 #endif
 
 #endif
-
-#ifdef TENSIL_PLATFORM_ENABLE_PRINTF
-    if (run_opts && run_opts->print_timing)
-        printf("Program run took %.2f us\n", stopwatch_elapsed_us(&sw));
-#endif
-
     return ERROR_NONE;
 }
 

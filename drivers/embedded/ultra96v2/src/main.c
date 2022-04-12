@@ -186,7 +186,7 @@ static error_t test_resnet20v2_on_cifar(struct driver *driver,
         if (error)
             goto cleanup;
 
-        error = driver_run(driver, false, false, false, false);
+        error = driver_run(driver, NULL);
 
         if (error)
             goto cleanup;
@@ -407,7 +407,7 @@ int main() {
             if (error)
                 goto cleanup;
 
-            error = driver_run(&driver, true, false, false, false);
+            error = driver_run(&driver, NULL);
 
             if (error)
                 goto cleanup;
@@ -438,7 +438,14 @@ int main() {
     if (error)
         goto cleanup;
 
-    error = driver_run(&driver, true, true, true, false);
+    struct run_opts resnet20v2_run_opts = {
+        .print_sampling_aggregates = true,
+        .print_sampling_listing = false,
+        .print_sampling_summary = true,
+        .print_timing = true,
+        .sample_file_name = "resnet20v2_cifar_ultra.tsample"};
+
+    error = driver_run(&driver, &resnet20v2_run_opts);
 
     if (error)
         goto cleanup;
@@ -485,7 +492,14 @@ int main() {
     if (error)
         goto cleanup;
 
-    error = driver_run(&driver, true, true, true, false);
+    struct run_opts yolov4_tiny_run_opts = {
+        .print_sampling_aggregates = true,
+        .print_sampling_listing = false,
+        .print_sampling_summary = true,
+        .print_timing = true,
+        .sample_file_name = "yolov4_tiny_192_ultra.tsample"};
+
+    error = driver_run(&driver, &yolov4_tiny_run_opts);
 
     if (error)
         goto cleanup;
@@ -521,6 +535,13 @@ int main() {
     if (error)
         goto cleanup;
 
+    struct run_opts resnet50v2_run_opts = {
+        .print_sampling_aggregates = true,
+        .print_sampling_listing = false,
+        .print_sampling_summary = true,
+        .print_timing = true,
+        .sample_file_name = "resnet50v2_imagenet_ultra.tsample"};
+
     for (int i = 0; i < 3; i++) {
         char file_name_buffer[FILE_NAME_BUFFER_SIZE];
         snprintf(file_name_buffer, FILE_NAME_BUFFER_SIZE,
@@ -532,7 +553,7 @@ int main() {
         if (error)
             goto cleanup;
 
-        error = driver_run(&driver, true, true, true, false);
+        error = driver_run(&driver, &resnet50v2_run_opts);
 
         if (error)
             goto cleanup;

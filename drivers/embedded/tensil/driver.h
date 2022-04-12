@@ -107,9 +107,15 @@ error_t driver_read_dram_vectors(const struct driver *driver,
                                  enum dram_bank dram_bank, size_t offset,
                                  size_t stride, size_t size, float *buffer);
 
-error_t driver_run(struct driver *driver, bool print_timing,
-                   bool print_sampling_summary, bool print_sampling_aggregates,
-                   bool print_sampling_listing);
+struct run_opts {
+    bool print_timing;
+    bool print_sampling_summary;
+    bool print_sampling_aggregates;
+    bool print_sampling_listing;
+    const char* sample_file_name;
+};
+
+error_t driver_run(struct driver *driver, const struct run_opts *run_opts);
 
 error_t driver_run_memory_test(struct driver *driver, enum dram_bank from_bank,
                                enum dram_bank to_bank, bool verbose);

@@ -11,6 +11,7 @@
 #include "dram.h"
 #include "instruction_buffer.h"
 #include "model.h"
+#include "sample_buffer.h"
 #include "stopwatch.h"
 #include "tcu.h"
 
@@ -192,9 +193,7 @@ static void wait_for_flush(struct driver *driver) {
         ;
 }
 
-error_t driver_run(struct driver *driver, bool print_timing,
-                   bool print_sampling_summary, bool print_sampling_aggregates,
-                   bool print_sampling_listing) {
+error_t driver_run(struct driver *driver, const struct run_opts *run_opts) {
     struct stopwatch sw;
 
     error_t error = stopwatch_start(&sw);
@@ -218,24 +217,31 @@ error_t driver_run(struct driver *driver, bool print_timing,
     stopwatch_stop(&sw);
 
 #ifdef TENSIL_PLATFORM_SAMPLE_AXI_DMA_DEVICE_ID
-    if (print_sampling_summary || print_sampling_aggregates ||
-        print_sampling_listing) {
-        sample_buffer_before_read(&driver->sample_buffer);
-
+    if (run_opts && (run_opts->print_sampling_summary ||
+                     run_opts->print_sampling_aggregates ||
+                     run_opts->print_sampling_listing)) {
         error_t error = sample_buffer_print_analysis(
             &driver->sample_buffer, &driver->buffer, &driver->layout,
-            print_sampling_summary, print_sampling_aggregates,
-            print_sampling_listing, PROGRAM_COUNTER_SHIFT);
+            run_opts->print_sampling_summary,
+            run_opts->print_sampling_aggregates,
+            run_opts->print_sampling_listing, PROGRAM_COUNTER_SHIFT);
 
         if (error)
             return error;
     }
+
+    if (run_opts && run_opts->sample_file_name) {
+        error_t error =
+            sample_buffer_to_file(&driver->sample_buffer, &driver->buffer,
+                                  &driver->layout, run_opts->sample_file_name);
+
+        if (error)
+            return error;
+    }
+
 #endif
 
-    if (error)
-        return error;
-
-    if (print_timing)
+    if (run_opts && run_opts->print_timing)
         printf("Program run took %.2f us\n", stopwatch_elapsed_us(&sw));
 
     return ERROR_NONE;
@@ -328,7 +334,7 @@ static error_t run_config(struct driver *driver) {
     if (error)
         return error;
 
-    return driver_run(driver, false, false, false, false);
+    return driver_run(driver, NULL);
 }
 
 error_t driver_init(struct driver *driver) {
@@ -923,7 +929,7 @@ static error_t do_memory_test(struct driver *driver, enum dram_bank from_bank,
     if (error)
         return error;
 
-    error = driver_run(driver, false, false, false, false);
+    error = driver_run(driver, NULL);
 
     if (error)
         return error;
@@ -1182,7 +1188,7 @@ error_t driver_run_array_test(struct driver *driver, bool verbose) {
     if (error)
         goto cleanup;
 
-    error = driver_run(driver, false, false, false, false);
+    error = driver_run(driver, NULL);
 
     if (error)
         goto cleanup;
@@ -1387,7 +1393,7 @@ error_t driver_run_simd_test(struct driver *driver, bool verbose) {
     if (error)
         goto cleanup;
 
-    error = driver_run(driver, false, false, false, false);
+    error = driver_run(driver, NULL);
 
     if (error)
         goto cleanup;
@@ -1449,15 +1455,12 @@ error_t driver_run_sampling_test(struct driver *driver, bool verbose) {
     if (error)
         return error;
 
-    error = driver_run(driver, false, false, false, false);
+    error = driver_run(driver, NULL);
 
     if (error)
         return error;
 
-    sample_buffer_before_read(&driver->sample_buffer);
-
     size_t samples_count = driver->sample_buffer.offset / SAMPLE_SIZE_BYTES;
-    uint8_t *sample_ptr = driver->sample_buffer.ptr;
 
     size_t valid_samples_count = 0;
     size_t valid_samples_base = 0;
@@ -1465,52 +1468,36 @@ error_t driver_run_sampling_test(struct driver *driver, bool verbose) {
     size_t stalling_samples_count = 0;
     size_t missing_samples_count = 0;
 
+    const uint8_t *sample_ptr =
+        sample_buffer_find_valid_samples_ptr(&driver->sample_buffer);
+
     uint32_t prev_program_counter = 0;
+    uint32_t next_program_counter = 0;
+    uint32_t instruction_offset = 0;
 
-    for (size_t i = 0; i < samples_count; i++) {
-        uint32_t next_program_counter = *((uint32_t *)sample_ptr);
+    while (sample_buffer_get_next_samples_ptr(
+        &driver->sample_buffer, &driver->buffer, &driver->layout, &sample_ptr,
+        &next_program_counter, &instruction_offset)) {
+        valid_samples_count++;
 
-        if (next_program_counter < prev_program_counter) {
-            valid_samples_base = i;
-            break;
-        }
+        if (!prev_program_counter) {
+            prev_program_counter = next_program_counter;
+        } else {
+            if (prev_program_counter == next_program_counter)
+                stalling_samples_count++;
+            else {
+                if (next_program_counter >
+                    prev_program_counter + SAMPLE_INTERVAL_CYCLES) {
+                    if (verbose)
+                        printf("Offset %u -> %u\n",
+                               (unsigned int)prev_program_counter,
+                               (unsigned int)next_program_counter);
 
-        prev_program_counter = next_program_counter;
-        sample_ptr += SAMPLE_SIZE_BYTES;
-    }
-
-    sample_ptr =
-        driver->sample_buffer.ptr + (valid_samples_base * SAMPLE_SIZE_BYTES);
-
-    for (size_t i = valid_samples_base; i < samples_count; i++) {
-        uint32_t next_program_counter = *((uint32_t *)sample_ptr);
-        uint32_t instruction_offset =
-            next_program_counter * driver->layout.instruction_size_bytes;
-
-        if (instruction_offset < driver->buffer.offset) {
-            valid_samples_count++;
-
-            if (!prev_program_counter) {
-                prev_program_counter = next_program_counter;
-            } else {
-                if (prev_program_counter == next_program_counter)
-                    stalling_samples_count++;
-                else {
-                    if (next_program_counter >
-                        prev_program_counter + SAMPLE_INTERVAL_CYCLES) {
-                        if (verbose)
-                            printf("Offset %u -> %u\n",
-                                   (unsigned int)prev_program_counter,
-                                   (unsigned int)next_program_counter);
-
-                        missing_samples_count++;
-                    }
-                    prev_program_counter = next_program_counter;
+                    missing_samples_count++;
                 }
+                prev_program_counter = next_program_counter;
             }
         }
-
-        sample_ptr += SAMPLE_SIZE_BYTES;
     }
 
     printf("%s: collected %lu samples, %lu "

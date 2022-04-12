@@ -95,9 +95,13 @@ error_t driver_get_model_output_scalars(const struct driver *driver,
                                         const char *output_name, size_t size,
                                         float *buffer);
 
+#ifdef TENSIL_PLATFORM_ENABLE_PRINTF
+
 error_t driver_print_model_output_vectors(const struct driver *driver,
                                           const struct model *model,
                                           const char *output_name);
+
+#endif
 
 error_t driver_write_dram_vectors(struct driver *driver,
                                   enum dram_bank dram_bank, size_t offset,
@@ -108,14 +112,21 @@ error_t driver_read_dram_vectors(const struct driver *driver,
                                  size_t stride, size_t size, float *buffer);
 
 struct run_opts {
+#ifdef TENSIL_PLATFORM_ENABLE_PRINTF
     bool print_timing;
     bool print_sampling_summary;
     bool print_sampling_aggregates;
     bool print_sampling_listing;
-    const char* sample_file_name;
+#endif
+
+#ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
+    const char *sample_file_name;
+#endif
 };
 
 error_t driver_run(struct driver *driver, const struct run_opts *run_opts);
+
+#ifdef TENSIL_PLATFORM_ENABLE_PRINTF
 
 error_t driver_run_memory_test(struct driver *driver, enum dram_bank from_bank,
                                enum dram_bank to_bank, bool verbose);
@@ -129,3 +140,14 @@ error_t driver_run_simd_test(struct driver *driver, bool verbose);
 error_t driver_run_sampling_test(struct driver *driver, bool verbose);
 
 #endif
+
+#endif
+
+// Internal functions
+
+uint8_t *driver_get_dram_bank_base_ptr(const struct driver *driver,
+                                       enum dram_bank dram_bank);
+
+error_t driver_setup_buffer_postamble(struct driver *driver);
+
+error_t driver_setup_buffer_preamble(struct driver *driver);

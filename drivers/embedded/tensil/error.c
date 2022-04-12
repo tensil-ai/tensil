@@ -54,4 +54,6 @@ error_t error_set_xilinx(struct error *error, int xstatus, const char *format,
     return error;
 }
 
+#ifdef TENSIL_PLATFORM_ENABLE_PRINTF
 void error_print(error_t error) { printf("Error: %s\n", error->message); }
+#endif

@@ -72,4 +72,6 @@ error_t error_set_fs(struct error *error, FRESULT fresult, const char *format,
 error_t error_set_xilinx(struct error *error, int xstatus, const char *format,
                          ...);
 
+#ifdef TENSIL_PLATFORM_ENABLE_PRINTF
 void error_print(error_t error);
+#endif

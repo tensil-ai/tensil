@@ -18,11 +18,56 @@
 #define OPCODE_COUNTS_SIZE (1 << 4)
 #define FLAGS_COUNTS_SIZE (1 << 16)
 
-typedef unsigned int counter_t;
-
 void sample_buffer_reset(struct sample_buffer *sample_buffer) {
     sample_buffer->offset = 0;
 }
+
+const uint8_t *sample_buffer_find_valid_samples_ptr(
+    const struct sample_buffer *sample_buffer) {
+    Xil_DCacheFlushRange((UINTPTR)sample_buffer->ptr, sample_buffer->offset);
+
+    const uint8_t *ptr = sample_buffer->ptr;
+
+    uint32_t prev_program_counter = 0;
+
+    for (size_t i = 0; i < sample_buffer->offset / SAMPLE_SIZE_BYTES; i++) {
+        uint32_t next_program_counter = *((uint32_t *)ptr);
+
+        if (next_program_counter < prev_program_counter) {
+            return ptr;
+        }
+
+        prev_program_counter = next_program_counter;
+        ptr += SAMPLE_SIZE_BYTES;
+    }
+
+    return sample_buffer->ptr;
+}
+
+bool sample_buffer_get_next_samples_ptr(
+    const struct sample_buffer *sample_buffer,
+    const struct instruction_buffer *instruction_buffer,
+    const struct instruction_layout *layout, const uint8_t **ptr,
+    uint32_t *program_counter, uint32_t *instruction_offset) {
+    const uint8_t *next_ptr = *ptr;
+    if (next_ptr < sample_buffer->ptr + sample_buffer->offset) {
+        next_ptr += SAMPLE_SIZE_BYTES;
+
+        *program_counter = *((uint32_t *)next_ptr);
+        *instruction_offset = *program_counter * layout->instruction_size_bytes;
+
+        if (*instruction_offset < instruction_buffer->offset) {
+            *ptr = next_ptr;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+#ifdef TENSIL_PLATFORM_ENABLE_PRINTF
+
+typedef unsigned int counter_t;
 
 static void print_flags(uint16_t flags) {
     for (size_t k = 0; k < 16; k++) {
@@ -93,49 +138,6 @@ static const char *opcode_to_string(uint8_t opcode) {
     default:
         return "???";
     }
-}
-
-const uint8_t *sample_buffer_find_valid_samples_ptr(
-    const struct sample_buffer *sample_buffer) {
-    Xil_DCacheFlushRange((UINTPTR)sample_buffer->ptr, sample_buffer->offset);
-
-    const uint8_t *ptr = sample_buffer->ptr;
-
-    uint32_t prev_program_counter = 0;
-
-    for (size_t i = 0; i < sample_buffer->offset / SAMPLE_SIZE_BYTES; i++) {
-        uint32_t next_program_counter = *((uint32_t *)ptr);
-
-        if (next_program_counter < prev_program_counter) {
-            return ptr;
-        }
-
-        prev_program_counter = next_program_counter;
-        ptr += SAMPLE_SIZE_BYTES;
-    }
-
-    return sample_buffer->ptr;
-}
-
-bool sample_buffer_get_next_samples_ptr(
-    const struct sample_buffer *sample_buffer,
-    const struct instruction_buffer *instruction_buffer,
-    const struct instruction_layout *layout, const uint8_t **ptr,
-    uint32_t *program_counter, uint32_t *instruction_offset) {
-    const uint8_t *next_ptr = *ptr;
-    if (next_ptr < sample_buffer->ptr + sample_buffer->offset) {
-        next_ptr += SAMPLE_SIZE_BYTES;
-
-        *program_counter = *((uint32_t *)next_ptr);
-        *instruction_offset = *program_counter * layout->instruction_size_bytes;
-
-        if (*instruction_offset < instruction_buffer->offset) {
-            *ptr = next_ptr;
-            return true;
-        }
-    }
-
-    return false;
 }
 
 error_t sample_buffer_print_analysis(
@@ -277,6 +279,8 @@ error_t sample_buffer_print_analysis(
 
     return ERROR_NONE;
 }
+
+#endif
 
 #ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
 

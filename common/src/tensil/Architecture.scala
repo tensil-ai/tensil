@@ -23,6 +23,7 @@ case class Architecture(
     @key("simd_registers_depth") simdRegistersDepth: Int,
     @key("stride0_depth") stride0Depth: Int,
     @key("stride1_depth") stride1Depth: Int,
+    @key("number_of_threads") numberOfThreads: Int,
 ) {
   override def toString() =
     s"Architecture($dataType, ${arraySize}x${arraySize}, acc=$accumulatorDepth, loc=$localDepth, drams=[$dram0Depth,$dram1Depth], strides=[$stride0Depth,$stride1Depth], simdRegs=$simdRegistersDepth)"
@@ -88,6 +89,7 @@ object Architecture {
       simdRegistersDepth: Int = 1,
       stride0Depth: Int = 1,
       stride1Depth: Int = 1,
+      numberOfThreads: Int = 2,
   ): Architecture =
     Architecture(
       dataType = dataType,
@@ -99,6 +101,7 @@ object Architecture {
       simdRegistersDepth = simdRegistersDepth,
       stride0Depth = stride0Depth,
       stride1Depth = stride1Depth,
+      numberOfThreads = numberOfThreads,
     )
 
   implicit val rw: ReadWriter[Architecture] = macroRW
@@ -113,6 +116,7 @@ object Architecture {
     simdRegistersDepth = 1,
     stride0Depth = 8,
     stride1Depth = 8,
+    numberOfThreads = 2,
   )
 
   val formal = Architecture(
@@ -125,5 +129,6 @@ object Architecture {
     simdRegistersDepth = 1,
     stride0Depth = 2,
     stride1Depth = 2,
+    numberOfThreads = 2,
   )
 }

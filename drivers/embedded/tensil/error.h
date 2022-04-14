@@ -5,8 +5,8 @@
 
 #include "platform.h"
 
-#ifdef TENSIL_PLATFORM_ENABLE_FATFS
-#include "fatfs.h"
+#ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
+#include "ff.h"
 #endif
 
 #define ERROR_MAX_MESSAGE_SIZE 256
@@ -37,7 +37,7 @@ struct error {
 
     union {
         enum error_code code;
-#ifdef TENSIL_PLATFORM_ENABLE_FATFS
+#ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
         FRESULT fresult;
 #endif
         int xstatus;
@@ -51,7 +51,7 @@ extern struct error last_error;
 #define DRIVER_ERROR(code, ...)                                                \
     error_set_driver(&last_error, code, ##__VA_ARGS__)
 
-#ifdef TENSIL_PLATFORM_ENABLE_FATFS
+#ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
 #define FS_ERROR(fresult)                                                      \
     error_set_fs(&last_error, fresult, "%s:%d file system result %d",          \
                  __FILE__, __LINE__, fresult)
@@ -64,7 +64,7 @@ extern struct error last_error;
 error_t error_set_driver(struct error *error, enum error_code code,
                          const char *format, ...);
 
-#ifdef TENSIL_PLATFORM_ENABLE_FATFS
+#ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
 error_t error_set_fs(struct error *error, FRESULT fresult, const char *format,
                      ...);
 #endif
@@ -72,4 +72,6 @@ error_t error_set_fs(struct error *error, FRESULT fresult, const char *format,
 error_t error_set_xilinx(struct error *error, int xstatus, const char *format,
                          ...);
 
+#ifdef TENSIL_PLATFORM_ENABLE_PRINTF
 void error_print(error_t error);
+#endif

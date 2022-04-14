@@ -11,8 +11,8 @@
 #include "xil_cache.h"
 #include "xstatus.h"
 
-#ifdef TENSIL_PLATFORM_ENABLE_FATFS
-#include "fatfs.h"
+#ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
+#include "ff.h"
 #endif
 
 #define FP16BP8_SIZE 2
@@ -133,7 +133,7 @@ int dram_compare_scalars(uint8_t *bank_ptr, enum data_type type, size_t offset0,
     return memcmp((const void *)base_ptr0, (const void *)base_ptr1, size_bytes);
 }
 
-#ifdef TENSIL_PLATFORM_ENABLE_FATFS
+#ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
 
 error_t dram_write_scalars_from_file(uint8_t *bank_ptr, enum data_type type,
                                      size_t offset, size_t size,
@@ -141,7 +141,7 @@ error_t dram_write_scalars_from_file(uint8_t *bank_ptr, enum data_type type,
     FIL fil;
     FILINFO fno;
     FRESULT res;
-    FATFS_UINT bytes_read;
+    UINT bytes_read;
     size_t sizeof_scalar = dram_sizeof_scalar(type);
     uint8_t *base_ptr = bank_ptr + offset * sizeof_scalar;
 

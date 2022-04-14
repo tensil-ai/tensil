@@ -18,15 +18,56 @@
 #define OPCODE_COUNTS_SIZE (1 << 4)
 #define FLAGS_COUNTS_SIZE (1 << 16)
 
-typedef unsigned int counter_t;
-
 void sample_buffer_reset(struct sample_buffer *sample_buffer) {
     sample_buffer->offset = 0;
 }
 
-void sample_buffer_before_read(const struct sample_buffer *sample_buffer) {
+const uint8_t *sample_buffer_find_valid_samples_ptr(
+    const struct sample_buffer *sample_buffer) {
     Xil_DCacheFlushRange((UINTPTR)sample_buffer->ptr, sample_buffer->offset);
+
+    const uint8_t *ptr = sample_buffer->ptr;
+
+    uint32_t prev_program_counter = 0;
+
+    for (size_t i = 0; i < sample_buffer->offset / SAMPLE_SIZE_BYTES; i++) {
+        uint32_t next_program_counter = *((uint32_t *)ptr);
+
+        if (next_program_counter < prev_program_counter) {
+            return ptr;
+        }
+
+        prev_program_counter = next_program_counter;
+        ptr += SAMPLE_SIZE_BYTES;
+    }
+
+    return sample_buffer->ptr;
 }
+
+bool sample_buffer_get_next_samples_ptr(
+    const struct sample_buffer *sample_buffer,
+    const struct instruction_buffer *instruction_buffer,
+    const struct instruction_layout *layout, const uint8_t **ptr,
+    uint32_t *program_counter, uint32_t *instruction_offset) {
+    const uint8_t *next_ptr = *ptr;
+    if (next_ptr < sample_buffer->ptr + sample_buffer->offset) {
+        next_ptr += SAMPLE_SIZE_BYTES;
+
+        *program_counter = *((uint32_t *)next_ptr);
+        *instruction_offset = *program_counter * layout->instruction_size_bytes;
+
+        if (*instruction_offset < instruction_buffer->offset) {
+            *ptr = next_ptr;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+#ifdef TENSIL_PLATFORM_ENABLE_PRINTF
+
+typedef unsigned int counter_t;
 
 static void print_flags(uint16_t flags) {
     for (size_t k = 0; k < 16; k++) {
@@ -104,9 +145,6 @@ error_t sample_buffer_print_analysis(
     const struct instruction_buffer *instruction_buffer,
     const struct instruction_layout *layout, bool print_summary,
     bool print_aggregates, bool print_listing, uint32_t program_counter_shift) {
-    size_t samples_count = sample_buffer->offset / SAMPLE_SIZE_BYTES;
-    size_t valid_samples_count = 0;
-
     counter_t header_counts[HEADER_COUNTS_SIZE];
 
     counter_t opcode_counts[OPCODE_COUNTS_SIZE];
@@ -137,55 +175,51 @@ error_t sample_buffer_print_analysis(
     memset(simd_flags_counts, 0, FLAGS_COUNTS_SIZE * sizeof(counter_t));
     memset(noop_flags_counts, 0, FLAGS_COUNTS_SIZE * sizeof(counter_t));
 
-    printf("Collected %zu samples\n", samples_count);
+    size_t valid_samples_count = 0;
+    uint32_t program_counter = 0;
+    uint32_t instruction_offset = 0;
+    const uint8_t *sample_ptr =
+        sample_buffer_find_valid_samples_ptr(sample_buffer);
 
-    for (size_t i = 0; i < samples_count; i++) {
-        uint8_t *sample_ptr = sample_buffer->ptr + (i * SAMPLE_SIZE_BYTES);
-        uint32_t program_counter = *((uint32_t *)sample_ptr);
-        uint32_t instruction_offset =
-            program_counter * layout->instruction_size_bytes;
+    while (sample_buffer_get_next_samples_ptr(
+        sample_buffer, instruction_buffer, layout, &sample_ptr,
+        &program_counter, &instruction_offset)) {
+        valid_samples_count++;
+
         uint16_t flags = *((uint16_t *)(sample_ptr + 4));
+        uint8_t *instruction_ptr = instruction_buffer->ptr + instruction_offset;
+        uint8_t header = instruction_ptr[layout->instruction_size_bytes - 1];
+        uint8_t opcode = header >> 4;
 
-        if (program_counter != UINT32_MAX &&
-            instruction_offset < instruction_buffer->offset) {
-            valid_samples_count++;
+        header_counts[header]++;
+        opcode_counts[opcode]++;
 
-            uint8_t *instruction_ptr =
-                instruction_buffer->ptr + instruction_offset;
-            uint8_t header =
-                instruction_ptr[layout->instruction_size_bytes - 1];
-            uint8_t opcode = header >> 4;
+        switch (opcode) {
+        case OPCODE_MAT_MUL:
+            matmul_flags_counts[flags]++;
+            break;
+        case OPCODE_DATA_MOVE:
+            data_move_flags_counts[flags]++;
+            break;
+        case OPCODE_LOAD_WEIGHT:
+            load_weight_flags_counts[flags]++;
+            break;
+        case OPCODE_SIMD:
+            simd_flags_counts[flags]++;
+            break;
+        case OPCODE_NOOP:
+            noop_flags_counts[flags]++;
+            break;
+        default:
+            break;
+        }
 
-            header_counts[header]++;
-            opcode_counts[opcode]++;
-
-            switch (opcode) {
-            case OPCODE_MAT_MUL:
-                matmul_flags_counts[flags]++;
-                break;
-            case OPCODE_DATA_MOVE:
-                data_move_flags_counts[flags]++;
-                break;
-            case OPCODE_LOAD_WEIGHT:
-                load_weight_flags_counts[flags]++;
-                break;
-            case OPCODE_SIMD:
-                simd_flags_counts[flags]++;
-                break;
-            case OPCODE_NOOP:
-                noop_flags_counts[flags]++;
-                break;
-            default:
-                break;
-            }
-
-            if (print_listing) {
-                printf("[%08u] %s: ",
-                       (unsigned int)program_counter - program_counter_shift,
-                       opcode_to_string(opcode));
-                print_flags(flags);
-                printf("\n");
-            }
+        if (print_listing) {
+            printf("[%08u] %s: ",
+                   (unsigned int)program_counter - program_counter_shift,
+                   opcode_to_string(opcode));
+            print_flags(flags);
+            printf("\n");
         }
     }
 
@@ -245,5 +279,47 @@ error_t sample_buffer_print_analysis(
 
     return ERROR_NONE;
 }
+
+#endif
+
+#ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
+
+error_t
+sample_buffer_to_file(const struct sample_buffer *sample_buffer,
+                      const struct instruction_buffer *instruction_buffer,
+                      const struct instruction_layout *layout,
+                      const char *file_name) {
+    FIL fil;
+    FRESULT res;
+    UINT bytes_written;
+
+    memset(&fil, 0, sizeof(FIL));
+    res = f_open(&fil, file_name, FA_WRITE | FA_CREATE_ALWAYS);
+    if (res)
+        return FS_ERROR(res);
+
+    const uint8_t *start_ptr =
+        sample_buffer_find_valid_samples_ptr(sample_buffer);
+
+    uint32_t program_counter = 0;
+    uint32_t instruction_offset = 0;
+    const uint8_t *end_ptr = start_ptr;
+    while (sample_buffer_get_next_samples_ptr(
+        sample_buffer, instruction_buffer, layout, &end_ptr, &program_counter,
+        &instruction_offset))
+        ;
+
+    UINT bytes_to_write = end_ptr - start_ptr;
+    res = f_write(&fil, (void *)start_ptr, bytes_to_write, &bytes_written);
+
+    f_close(&fil);
+
+    if (res)
+        return FS_ERROR(res);
+
+    return ERROR_NONE;
+}
+
+#endif
 
 #endif

@@ -10,8 +10,8 @@
 
 #include "instruction.h"
 
-#ifdef TENSIL_PLATFORM_ENABLE_FATFS
-#include "fatfs.h"
+#ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
+#include "ff.h"
 #endif
 
 static error_t
@@ -125,21 +125,21 @@ error_t buffer_append_program_from_flash(struct instruction_buffer *buffer,
 
 #endif
 
-#ifdef TENSIL_PLATFORM_ENABLE_FATFS
+#ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
 
 error_t buffer_append_program_from_file(struct instruction_buffer *buffer,
                                         size_t size, const char *file_name) {
     FIL fil;
     FILINFO fno;
     FRESULT res;
-    FATFS_UINT bytes_read;
+    UINT bytes_read;
 
     memset(&fno, 0, sizeof(FILINFO));
     res = f_stat(file_name, &fno);
     if (res)
         return FS_ERROR(res);
 
-    if (fno.fsize != size)
+    if (size && fno.fsize != size)
         return DRIVER_ERROR(ERROR_DRIVER_UNEXPECTED_PROGRAM_SIZE,
                             "Unexpected program size in %s", file_name);
 

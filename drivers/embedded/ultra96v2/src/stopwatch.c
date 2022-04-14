@@ -6,13 +6,13 @@
 #include <math.h>
 
 error_t stopwatch_start(struct stopwatch *stopwatch) {
-#if defined(TENSIL_PLATFORM_ENABLE_XTIME)
+#if defined(STOPWATCH_XTIME)
     XTime_GetTime(&stopwatch->start);
-#elif defined(TENSIL_PLATFORM_STOPWATCH_TIMER_DEVICE_ID)
+#elif defined(STOPWATCH_TIMER_DEVICE_ID)
     stopwatch->stop_count = 0;
 
     int status = XTmrCtr_Initialize(&stopwatch->timer_counter,
-                                    TENSIL_PLATFORM_STOPWATCH_TIMER_DEVICE_ID);
+                                    STOPWATCH_TIMER_DEVICE_ID);
     if (status != XST_SUCCESS)
         return XILINX_ERROR(status);
 
@@ -26,9 +26,9 @@ error_t stopwatch_start(struct stopwatch *stopwatch) {
 }
 
 void stopwatch_stop(struct stopwatch *stopwatch) {
-#if defined(TENSIL_PLATFORM_ENABLE_XTIME)
+#if defined(STOPWATCH_XTIME)
     XTime_GetTime(&stopwatch->end);
-#elif defined(TENSIL_PLATFORM_STOPWATCH_TIMER_DEVICE_ID)
+#elif defined(STOPWATCH_TIMER_DEVICE_ID)
     XTmrCtr_Stop(&stopwatch->timer_counter, 0);
 
     uint32_t high_count = XTmrCtr_GetValue(&stopwatch->timer_counter, 1);
@@ -41,10 +41,10 @@ void stopwatch_stop(struct stopwatch *stopwatch) {
 #define US_PER_SECOND 1000000.0
 
 float stopwatch_elapsed_us(const struct stopwatch *stopwatch) {
-#if defined(TENSIL_PLATFORM_ENABLE_XTIME)
+#if defined(STOPWATCH_XTIME)
     return ((float)(stopwatch->end - stopwatch->start) /
             ((float)COUNTS_PER_SECOND / US_PER_SECOND));
-#elif defined(TENSIL_PLATFORM_STOPWATCH_TIMER_DEVICE_ID)
+#elif defined(STOPWATCH_TIMER_DEVICE_ID)
     return ((float)stopwatch->stop_count /
             ((float)stopwatch->timer_counter.Config.SysClockFreqHz /
              US_PER_SECOND));
@@ -54,10 +54,10 @@ float stopwatch_elapsed_us(const struct stopwatch *stopwatch) {
 }
 
 float stopwatch_elapsed_seconds(const struct stopwatch *stopwatch) {
-#if defined(TENSIL_PLATFORM_ENABLE_XTIME)
+#if defined(STOPWATCH_XTIME)
     return ((float)(stopwatch->end - stopwatch->start) /
             (float)COUNTS_PER_SECOND);
-#elif defined(TENSIL_PLATFORM_STOPWATCH_TIMER_DEVICE_ID)
+#elif defined(STOPWATCH_TIMER_DEVICE_ID)
     return ((float)stopwatch->stop_count /
             (float)stopwatch->timer_counter.Config.SysClockFreqHz);
 #else

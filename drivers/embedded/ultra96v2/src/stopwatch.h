@@ -3,20 +3,20 @@
 
 #pragma once
 
-#include "error.h"
+#include "tensil/error.h"
 #include "platform.h"
 
-#if defined(TENSIL_PLATFORM_ENABLE_XTIME)
+#if defined(STOPWATCH_XTIME)
 #include "xtime_l.h"
-#elif defined(TENSIL_PLATFORM_STOPWATCH_TIMER_DEVICE_ID)
+#elif defined(STOPWATCH_TIMER_DEVICE_ID)
 #include "xtmrctr.h"
 #endif
 
 struct stopwatch {
-#if defined(TENSIL_PLATFORM_ENABLE_XTIME)
+#if defined(STOPWATCH_XTIME)
     XTime start;
     XTime end;
-#elif defined(TENSIL_PLATFORM_STOPWATCH_TIMER_DEVICE_ID)
+#elif defined(STOPWATCH_TIMER_DEVICE_ID)
     XTmrCtr timer_counter;
     uint64_t stop_count;
 #endif

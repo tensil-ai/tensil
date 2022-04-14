@@ -7,37 +7,6 @@
 #include "platform.h"
 #include "sample_buffer.h"
 
-#if defined(TENSIL_PLATFORM_AFIFM_RDCTRL) ||                                   \
-    defined(TENSIL_PLATFORM_AFIFM_WRCTRL)
-#include "xil_io.h"
-#endif
-
-#ifdef TENSIL_PLATFORM_AFIFM_RDCTRL
-
-static void set_afifm_rdctl_fabric_width(UINTPTR afifm_address,
-                                         uint32_t fabric_width_mask,
-                                         uint32_t fabric_width_value) {
-    UINTPTR rdctl_address = afifm_address + TENSIL_PLATFORM_AFIFM_RDCTRL;
-
-    Xil_Out32(rdctl_address, (Xil_In32(rdctl_address) & fabric_width_mask) |
-                                 fabric_width_value);
-}
-
-#endif
-
-#ifdef TENSIL_PLATFORM_AFIFM_WRCTRL
-
-static void set_afifm_wrctl_fabric_width(UINTPTR afifm_address,
-                                         uint32_t fabric_width_mask,
-                                         uint32_t fabric_width_value) {
-    UINTPTR wrctl_address = afifm_address + TENSIL_PLATFORM_AFIFM_WRCTRL;
-
-    Xil_Out32(wrctl_address, (Xil_In32(wrctl_address) & fabric_width_mask) |
-                                 fabric_width_value);
-}
-
-#endif
-
 #if defined(TENSIL_PLATFORM_INSTRUCTION_AXI_DMA_DEVICE_ID) ||                  \
     defined(TENSIL_PLATFORM_SAMPLE_AXI_DMA_DEVICE_ID)
 
@@ -67,54 +36,31 @@ static error_t init_axi_dma(uint32_t axi_dma_device_id, XAxiDma *axi_dma) {
 
 #endif
 
-error_t tcu_init(struct tcu *tcu, size_t sample_block_size) {
-#ifdef TENSIL_PLATFORM_INSTRUCTION_AXI_DMA_DEVICE_ID
-    error_t error;
-
-    error = init_axi_dma(TENSIL_PLATFORM_INSTRUCTION_AXI_DMA_DEVICE_ID,
-                         &tcu->instruction_axi_dma);
-
-    if (error)
-        return error;
-
 #ifdef TENSIL_PLATFORM_SAMPLE_AXI_DMA_DEVICE_ID
+error_t tcu_init_sampling(struct tcu *tcu, size_t sample_block_size) {
     tcu->sample_block_size = sample_block_size;
 
-    error = init_axi_dma(TENSIL_PLATFORM_SAMPLE_AXI_DMA_DEVICE_ID,
-                         &tcu->sample_axi_dma);
+    error_t error = init_axi_dma(TENSIL_PLATFORM_SAMPLE_AXI_DMA_DEVICE_ID,
+                                 &tcu->sample_axi_dma);
 
     if (error)
         return error;
-#endif
-
-#else
-    return DRIVER_ERROR(
-        ERROR_DRIVER_INVALID_PLATFORM,
-        "Target must specify instruction AXI DMA device, see platform.h");
-#endif
-
-#ifdef TENSIL_PLATFORM_AFIFM0_ADDR
-    set_afifm_rdctl_fabric_width(TENSIL_PLATFORM_AFIFM0_ADDR,
-                                 TENSIL_PLATFORM_AFIFM0_FABRIC_WIDTH_MASK,
-                                 TENSIL_PLATFORM_AFIFM0_FABRIC_WIDTH);
-    set_afifm_wrctl_fabric_width(TENSIL_PLATFORM_AFIFM0_ADDR,
-                                 TENSIL_PLATFORM_AFIFM0_FABRIC_WIDTH_MASK,
-                                 TENSIL_PLATFORM_AFIFM0_FABRIC_WIDTH);
-#endif
-
-#ifdef TENSIL_PLATFORM_AFIFM1_ADDR
-    set_afifm_rdctl_fabric_width(TENSIL_PLATFORM_AFIFM1_ADDR,
-                                 TENSIL_PLATFORM_AFIFM0_FABRIC_WIDTH_MASK,
-                                 TENSIL_PLATFORM_AFIFM1_FABRIC_WIDTH);
-    set_afifm_wrctl_fabric_width(TENSIL_PLATFORM_AFIFM1_ADDR,
-                                 TENSIL_PLATFORM_AFIFM0_FABRIC_WIDTH_MASK,
-                                 TENSIL_PLATFORM_AFIFM1_FABRIC_WIDTH);
-#endif
 
     return ERROR_NONE;
 }
+#endif
 
 #ifdef TENSIL_PLATFORM_INSTRUCTION_AXI_DMA_DEVICE_ID
+
+error_t tcu_init(struct tcu *tcu) {
+    error_t error = init_axi_dma(TENSIL_PLATFORM_INSTRUCTION_AXI_DMA_DEVICE_ID,
+                                 &tcu->instruction_axi_dma);
+
+    if (error)
+        return error;
+
+    return ERROR_NONE;
+}
 
 error_t tcu_start_instructions(struct tcu *tcu,
                                const struct instruction_buffer *buffer,

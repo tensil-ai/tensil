@@ -313,7 +313,7 @@ class BackendStream(
     tracepointResolveRefToObject: (MemoryRef) => Option[MemoryObject] = (ref) =>
       None
 ) {
-  private var previousOpcode = Opcode.NoOp
+  private var previousOpcode = Opcode.Wait
   private var previousFlags  = 0
 
   private val file = File.createTempFile("stream_", ".tprog")
@@ -321,6 +321,7 @@ class BackendStream(
     new FileOutputStream(file)
   )
 
+  private var currentTid: Int                 = 0
   private var currentInstructionSizeBits: Int = 0
   private var currentInstruction: BigInt      = 0
 
@@ -353,7 +354,7 @@ class BackendStream(
       flags: Int = 0
   ): (Long, Long) = {
     currentOp match {
-      case Opcode.NoOp =>
+      case Opcode.Wait =>
         val cycles = 1
         val energy = 0
 
@@ -453,21 +454,28 @@ class BackendStream(
 
   def emitNoOp(
       mkComment: (Seq[MemoryAddress]) => Option[String] = (_) => None
+  ): Unit = emitWait(currentTid, mkComment)
+
+  def emitWait(
+      tidToWait: Int,
+      mkComment: (Seq[MemoryAddress]) => Option[String] = (_) => None
   ): Unit = {
-    beforeEmit(Opcode.NoOp)
-    emitHeader(Opcode.NoOp)
+    beforeEmit(Opcode.Wait)
+
+    emitTidOperand0(tidToWait)
+    emitHeader(Opcode.Wait, currentTid)
 
     if (printProgram)
       printOp(
-        "NoOp",
+        "Wait",
         "",
         if (printComments) mkComment(Nil) else None,
         currentInstruction
       )
 
     if (stats.isDefined) {
-      val (cycles, energy) = estimateCyclesAndEnergy(Opcode.NoOp)
-      stats.get.countInstruction("NoOp", cycles, energy)
+      val (cycles, energy) = estimateCyclesAndEnergy(Opcode.Wait)
+      stats.get.countInstruction("Wait", cycles, energy)
     }
 
     emitInstruction()
@@ -499,7 +507,7 @@ class BackendStream(
       accumulatorAddress.raw
     )
     emitLocalAndAccumulatorSizeOperand2(size)
-    emitHeader(Opcode.MatMul, flags)
+    emitHeader(Opcode.MatMul, currentTid, flags)
 
     val mnemonic = "MatMul"
 
@@ -589,7 +597,7 @@ class BackendStream(
       simdSourceRight,
       simdDestination
     )
-    emitHeader(Opcode.SIMD, flags)
+    emitHeader(Opcode.SIMD, currentTid, flags)
 
     val mnemonic = "SIMD"
 
@@ -731,7 +739,7 @@ class BackendStream(
         emitLocalAndDRAM1SizeOperand2(size)
     }
 
-    emitHeader(Opcode.DataMove, flags)
+    emitHeader(Opcode.DataMove, currentTid, flags)
 
     val mnemonic = "DataMove"
 
@@ -799,7 +807,7 @@ class BackendStream(
 
     emitLocalStrideAddressOperand0(localStride, localAddress.raw)
     emitLocalSizeOperand1(size)
-    emitHeader(Opcode.LoadWeights, flags)
+    emitHeader(Opcode.LoadWeights, currentTid, flags)
 
     val mnemonic = "LoadWeights"
 
@@ -970,18 +978,36 @@ class BackendStream(
     )
   }
 
-  private def emitHeader(opcode: Int, flags: Int = 0): Unit = {
-    require(opcode >= 0 && flags >= 0)
+  private def emitTidOperand0(
+      tid: Int
+  ): Unit = {
+    if (tid >= (1 << layout.tidSizeBits))
+      throw new CompilerException(s"TID overflow")
 
-    if (opcode >= 16)
+    emitInstructionBits(tid, layout.tidSizeBits)
+    emitInstructionBits(
+      0L,
+      layout.operand0SizeBits - layout.tidSizeBits
+    )
+  }
+
+  private def emitHeader(opcode: Int, tid: Int = 0, flags: Int = 0): Unit = {
+    require(opcode >= 0 && tid >= 0 && flags >= 0)
+
+    if (opcode >= (1 << layout.opcodeSizeBits))
       throw new CompilerException("Opcode overflow")
 
-    if (flags >= 16)
+    if (tid >= (1 << layout.tidSizeBits))
+      throw new CompilerException("TID overflow")
+
+    if (flags >= (1 << layout.flagsSizeBits))
       throw new CompilerException("Flags overflow")
 
-    currentInstruction |= (BigInt(
-      (opcode << 4) | flags
-    ) << layout.operandsSizeBits)
+    val header = BigInt(
+      (opcode << (layout.tidSizeBits + layout.flagsSizeBits)) | (tid << layout.flagsSizeBits) | flags
+    )
+
+    currentInstruction |= (header << layout.operandsSizeBits)
   }
 
   private def emitInstructionBits(bits: Long, bitsSize: Int): Unit = {
@@ -992,11 +1018,11 @@ class BackendStream(
   }
 
   private def mkInstructionBytes(): Array[Byte] = {
-    val bytes            = currentInstruction.toByteArray
+    val bytes            = currentInstruction.toByteArray.dropWhile(b => b == 0)
     val paddingBytesSize = layout.instructionSizeBytes - bytes.size
 
     if (paddingBytesSize < 0)
-      throw new CompilerException("Operands overflow")
+      throw new CompilerException(s"Operands overflow ${bytes.toList}")
 
     val paddedBytes = Array.fill[Byte](paddingBytesSize)(0) ++ bytes
 

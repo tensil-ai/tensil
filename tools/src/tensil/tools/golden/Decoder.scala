@@ -5,10 +5,7 @@ package tensil.tools.golden
 
 import java.io._
 
-import tensil.tools.compiler.{
-  DataMoveFlags,
-  MemoryAddressRaw
-}
+import tensil.tools.compiler.{DataMoveFlags, MemoryAddressRaw}
 import tensil.tools.compiler.Opcode
 import tensil.tools.{TraceContext}
 import tensil.{Architecture, InstructionLayout}
@@ -60,7 +57,7 @@ class Decoder(arch: Architecture) {
       executive: Executive,
       trace: ExecutiveTrace
   ): Unit = {
-    val bytes             = new Array[Byte](layout.instructionSizeBytes);
+    val bytes             = Array.fill[Byte](layout.instructionSizeBytes + 1)(0);
     var instructionOffset = 0L
 
     while (stream.read(bytes, 0, layout.instructionSizeBytes) != -1) {
@@ -117,11 +114,15 @@ class Decoder(arch: Architecture) {
         r
       }
 
-      val header: Byte = (instruction >> layout.operandsSizeBits).toByte
-      val opcode: Byte = (header >> 4).toByte
-      val flags: Byte  = (header & 0xf).toByte
+      val header = instruction >> layout.operandsSizeBits
 
-      if (opcode == Opcode.NoOp) {
+      val opcode: Int =
+        (header >> (layout.flagsSizeBits + layout.tidSizeBits)).toByte
+      val tid: Int =
+        ((header >> layout.flagsSizeBits) & ((1 << layout.tidSizeBits) - 1)).toByte
+      val flags: Int = (header & ((1 << layout.flagsSizeBits) - 1)).toByte
+
+      if (opcode == Opcode.Wait) {
         skipBits(layout.operandsSizeBits)
       } else if (opcode == Opcode.MatMul) {
         val (localAddress, localStride)             = decodeAddressOperand0()

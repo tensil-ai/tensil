@@ -306,6 +306,14 @@ error_t driver_run_array_test(struct driver *driver, bool verbose) {
         goto cleanup;
     }
 
+    // size_t barriers[] = {500, 500, 500, 500};
+    size_t barriers[] = {0, 28, 494, 474};
+    /*size_t curr_barrier = 0;
+    bool backoff_barrier = false;
+
+    while (curr_barrier < 4) {
+        bad_indexes_size = 0;*/
+
     write_dram_random_vectors(driver, DRAM0, ARRAY_TEST_INPUT_DRAM0_ADDRESS, 0,
                               ARRAY_TEST_SIZE);
     driver_read_dram_vectors(driver, DRAM0, ARRAY_TEST_INPUT_DRAM0_ADDRESS, 0,
@@ -336,6 +344,8 @@ error_t driver_run_array_test(struct driver *driver, bool verbose) {
     if (error)
         goto cleanup;
 
+    // 1. array_size+1 DRAM1 -> Local:
+
     error = buffer_append_instruction(
         &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
         DATA_MOVE_FLAG_DRAM1_TO_LOCAL, ARRAY_TEST_WEIGHTS_LOCAL_ADDRESS,
@@ -344,6 +354,13 @@ error_t driver_run_array_test(struct driver *driver, bool verbose) {
     if (error)
         goto cleanup;
 
+    // BARRIER
+    for (size_t i = 0; i < barriers[0]; i++)
+        buffer_append_instruction(&driver->buffer, &driver->layout, OPCODE_NOOP,
+                                  0, 0, 0, 0);
+
+    // 2. array_size+1 LoadWeight:
+
     error = buffer_append_instruction(
         &driver->buffer, &driver->layout, OPCODE_LOAD_WEIGHT, 0,
         ARRAY_TEST_WEIGHTS_LOCAL_ADDRESS, driver->arch.array_size, 0);
@@ -351,34 +368,104 @@ error_t driver_run_array_test(struct driver *driver, bool verbose) {
     if (error)
         goto cleanup;
 
+    // 3. 2048 DRAM0 -> Local:
+
     error = buffer_append_instruction(
         &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
         DATA_MOVE_FLAG_DRAM0_TO_LOCAL, ARRAY_TEST_INPUT_LOCAL_ADDRESS,
-        ARRAY_TEST_INPUT_DRAM0_ADDRESS, ARRAY_TEST_SIZE - 1);
+        ARRAY_TEST_INPUT_DRAM0_ADDRESS, ARRAY_TEST_SIZE / 2 - 1);
 
     if (error)
         goto cleanup;
+
+    // BARRIER
+    for (size_t i = 0; i < barriers[1]; i++)
+        buffer_append_instruction(&driver->buffer, &driver->layout, OPCODE_NOOP,
+                                  0, 0, 0, 0);
+
+    // 4. 2048 Matmul:
 
     error = buffer_append_instruction(
         &driver->buffer, &driver->layout, OPCODE_MAT_MUL, 0,
         ARRAY_TEST_INPUT_LOCAL_ADDRESS, ARRAY_TEST_OUTPUT_ACC_ADDRESS,
-        ARRAY_TEST_SIZE - 1);
+        ARRAY_TEST_SIZE / 2 - 1);
 
     if (error)
         goto cleanup;
+
+    // 5. 2048 DRAM0 -> Local:
+
+    error = buffer_append_instruction(
+        &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
+        DATA_MOVE_FLAG_DRAM0_TO_LOCAL,
+        ARRAY_TEST_INPUT_LOCAL_ADDRESS + ARRAY_TEST_SIZE / 2,
+        ARRAY_TEST_INPUT_DRAM0_ADDRESS + ARRAY_TEST_SIZE / 2,
+        ARRAY_TEST_SIZE / 2 - 1);
+
+    if (error)
+        goto cleanup;
+
+    // 6. 2048 Acc -> Local:
 
     error = buffer_append_instruction(
         &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
         DATA_MOVE_FLAG_ACC_TO_LOCAL, ARRAY_TEST_OUTPUT_LOCAL_ADDRESS,
-        ARRAY_TEST_OUTPUT_ACC_ADDRESS, ARRAY_TEST_SIZE - 1);
+        ARRAY_TEST_OUTPUT_ACC_ADDRESS, ARRAY_TEST_SIZE / 2 - 1);
 
     if (error)
         goto cleanup;
 
+    // BARRIER
+    for (size_t i = 0; i < barriers[2]; i++)
+        buffer_append_instruction(&driver->buffer, &driver->layout, OPCODE_NOOP,
+                                  0, 0, 0, 0);
+
+    // 7. 2048 Matmul:
+
+    error = buffer_append_instruction(
+        &driver->buffer, &driver->layout, OPCODE_MAT_MUL, 0,
+        ARRAY_TEST_INPUT_LOCAL_ADDRESS + ARRAY_TEST_SIZE / 2,
+        ARRAY_TEST_OUTPUT_ACC_ADDRESS + ARRAY_TEST_SIZE / 2,
+        ARRAY_TEST_SIZE / 2 - 1);
+
+    if (error)
+        goto cleanup;
+
+    // 8. 2048 Local -> DRAM0:
+
     error = buffer_append_instruction(
         &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
         DATA_MOVE_FLAG_LOCAL_TO_DRAM0, ARRAY_TEST_OUTPUT_LOCAL_ADDRESS,
-        ARRAY_TEST_OUTPUT_DRAM0_ADDRESS, ARRAY_TEST_SIZE - 1);
+        ARRAY_TEST_OUTPUT_DRAM0_ADDRESS, ARRAY_TEST_SIZE / 2 - 1);
+
+    if (error)
+        goto cleanup;
+
+    // 9. 2048 Acc -> Local:
+
+    error = buffer_append_instruction(
+        &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
+        DATA_MOVE_FLAG_ACC_TO_LOCAL,
+        ARRAY_TEST_OUTPUT_LOCAL_ADDRESS + ARRAY_TEST_SIZE / 2,
+        ARRAY_TEST_OUTPUT_ACC_ADDRESS + ARRAY_TEST_SIZE / 2,
+        ARRAY_TEST_SIZE / 2 - 1);
+
+    if (error)
+        goto cleanup;
+
+    // BARRIER
+    for (size_t i = 0; i < barriers[3]; i++)
+        buffer_append_instruction(&driver->buffer, &driver->layout, OPCODE_NOOP,
+                                  0, 0, 0, 0);
+
+    // 10. 2048 Local -> DRAM0:
+
+    error = buffer_append_instruction(
+        &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
+        DATA_MOVE_FLAG_LOCAL_TO_DRAM0,
+        ARRAY_TEST_OUTPUT_LOCAL_ADDRESS + ARRAY_TEST_SIZE / 2,
+        ARRAY_TEST_OUTPUT_DRAM0_ADDRESS + ARRAY_TEST_SIZE / 2,
+        ARRAY_TEST_SIZE / 2 - 1);
 
     if (error)
         goto cleanup;
@@ -388,7 +475,11 @@ error_t driver_run_array_test(struct driver *driver, bool verbose) {
     if (error)
         goto cleanup;
 
-    error = driver_run(driver, NULL);
+    struct run_opts run_opts = {.print_sampling_aggregates = true,
+                                .print_sampling_listing = true,
+                                .print_sampling_summary = true};
+
+    error = driver_run(driver, &run_opts);
 
     if (error)
         goto cleanup;
@@ -412,6 +503,22 @@ error_t driver_run_array_test(struct driver *driver, bool verbose) {
 
     printf("%s\n", bad_indexes_size ? failed : ok);
 
+    /*
+    printf("%s: %zu %zu %zu %zu\n", bad_indexes_size ? failed : ok,
+           barriers[0], barriers[1], barriers[2], barriers[3]);
+
+    if (bad_indexes_size) {
+        backoff_barrier = true;
+        barriers[curr_barrier]++;
+    } else if (backoff_barrier) {
+        backoff_barrier = false;
+        curr_barrier++;
+    } else {
+        barriers[curr_barrier]--;
+        if (!barriers[curr_barrier])
+            curr_barrier++;
+    }*/
+
     if (bad_indexes_size && verbose)
         for (size_t k = 0; k < bad_indexes_size; k++) {
             size_t bad_index = bad_indexes[k];
@@ -419,6 +526,7 @@ error_t driver_run_array_test(struct driver *driver, bool verbose) {
             printf("\t at %zu expected=%f, actual=%f\n", bad_index,
                    from_buffer[bad_index], to_buffer[bad_index]);
         }
+    /*}*/
 
 cleanup:
     free(from_buffer);

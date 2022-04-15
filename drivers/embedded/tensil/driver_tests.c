@@ -274,8 +274,8 @@ static bool compare_scalars(enum data_type type, float expected, float actual) {
     return fabs(expected - actual) > max_error;
 }
 
-#define ARRAY_TEST_BLOCK_SIZE (driver->arch.accumulator_depth / 2)
-#define ARRAY_TEST_BLOCKS 8
+#define ARRAY_TEST_BLOCK_SIZE (driver->arch.accumulator_depth)
+#define ARRAY_TEST_BLOCKS 32
 
 #define ARRAY_TEST_IDENTITY_WEIGHT 3.456
 #define ARRAY_TEST_BIAS 78.912
@@ -288,9 +288,7 @@ static bool compare_scalars(enum data_type type, float expected, float actual) {
 #define ARRAY_TEST_INPUT1_LOCAL_ADDRESS                                        \
     (ARRAY_TEST_INPUT0_LOCAL_ADDRESS + ARRAY_TEST_BLOCK_SIZE)
 
-#define ARRAY_TEST_OUTPUT0_ACC_ADDRESS 0
-#define ARRAY_TEST_OUTPUT1_ACC_ADDRESS                                         \
-    (ARRAY_TEST_OUTPUT0_ACC_ADDRESS + ARRAY_TEST_BLOCK_SIZE)
+#define ARRAY_TEST_OUTPUT_ACC_ADDRESS 0
 
 #define ARRAY_TEST_OUTPUT0_LOCAL_ADDRESS (ARRAY_TEST_BLOCK_SIZE * 2)
 #define ARRAY_TEST_OUTPUT1_LOCAL_ADDRESS                                       \
@@ -324,8 +322,7 @@ error_t driver_run_array_test(struct driver *driver, bool verbose) {
         goto cleanup;
     }
 
-    size_t barriers[] = {500, 500, 500, 500};
-    // size_t barriers[] = {0, 28, 494, 474};
+    size_t barriers[] = {0, 1000, 1000, 1000};
     size_t curr_barrier = 0;
     bool backoff_barrier = false;
 
@@ -412,7 +409,7 @@ error_t driver_run_array_test(struct driver *driver, bool verbose) {
 
             error = buffer_append_instruction(
                 &driver->buffer, &driver->layout, OPCODE_MAT_MUL, 0,
-                ARRAY_TEST_INPUT0_LOCAL_ADDRESS, ARRAY_TEST_OUTPUT0_ACC_ADDRESS,
+                ARRAY_TEST_INPUT0_LOCAL_ADDRESS, ARRAY_TEST_OUTPUT_ACC_ADDRESS,
                 ARRAY_TEST_BLOCK_SIZE - 1);
 
             if (error)
@@ -433,7 +430,7 @@ error_t driver_run_array_test(struct driver *driver, bool verbose) {
             error = buffer_append_instruction(
                 &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
                 DATA_MOVE_FLAG_ACC_TO_LOCAL, ARRAY_TEST_OUTPUT0_LOCAL_ADDRESS,
-                ARRAY_TEST_OUTPUT0_ACC_ADDRESS, ARRAY_TEST_BLOCK_SIZE - 1);
+                ARRAY_TEST_OUTPUT_ACC_ADDRESS, ARRAY_TEST_BLOCK_SIZE - 1);
 
             if (error)
                 goto cleanup;
@@ -448,7 +445,7 @@ error_t driver_run_array_test(struct driver *driver, bool verbose) {
 
             error = buffer_append_instruction(
                 &driver->buffer, &driver->layout, OPCODE_MAT_MUL, 0,
-                ARRAY_TEST_INPUT1_LOCAL_ADDRESS, ARRAY_TEST_OUTPUT1_ACC_ADDRESS,
+                ARRAY_TEST_INPUT1_LOCAL_ADDRESS, ARRAY_TEST_OUTPUT_ACC_ADDRESS,
                 ARRAY_TEST_BLOCK_SIZE - 1);
 
             if (error)
@@ -469,7 +466,7 @@ error_t driver_run_array_test(struct driver *driver, bool verbose) {
             error = buffer_append_instruction(
                 &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
                 DATA_MOVE_FLAG_ACC_TO_LOCAL, ARRAY_TEST_OUTPUT1_LOCAL_ADDRESS,
-                ARRAY_TEST_OUTPUT1_ACC_ADDRESS, ARRAY_TEST_BLOCK_SIZE - 1);
+                ARRAY_TEST_OUTPUT_ACC_ADDRESS, ARRAY_TEST_BLOCK_SIZE - 1);
 
             if (error)
                 goto cleanup;
@@ -525,7 +522,7 @@ error_t driver_run_array_test(struct driver *driver, bool verbose) {
             }
         }
 
-        printf("%s\n", bad_indexes_size ? failed : ok);
+        // printf("%s\n", bad_indexes_size ? failed : ok);
 
         printf("%s: %zu %zu %zu %zu\n", bad_indexes_size ? failed : ok,
                barriers[0], barriers[1], barriers[2], barriers[3]);

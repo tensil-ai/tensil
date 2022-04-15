@@ -439,43 +439,43 @@ object Compiler {
           )
           print(tb)
         }
+      }
 
-        if (backendStats.isDefined) {
-          if (options.printInstructionsSummary) {
-            BackendStats.printCompositionSummary("TOTAL", backendStats.get)
-            BackendStats.printCyclesSummary("TOTAL", backendStats.get)
-            BackendStats.printEnergySummary("TOTAL", backendStats.get)
+      if (backendStats.isDefined) {
+        if (options.printInstructionsSummary) {
+          BackendStats.printCompositionSummary("TOTAL", backendStats.get)
+          BackendStats.printCyclesSummary("TOTAL", backendStats.get)
+          BackendStats.printEnergySummary("TOTAL", backendStats.get)
+        }
+
+        if (options.printStridesSummary) {
+          def printStrideStats(
+              title: String,
+              select: StrideStats => Any
+          ): Unit = {
+            val tb = new TablePrinter(Some(title), true)
+            BackendStats.printStrideStats(
+              options.arch.stride0Depth,
+              options.arch.stride1Depth,
+              backendStats.get,
+              select,
+              tb
+            )
+            print(tb)
           }
 
-          if (options.printStridesSummary) {
-            def printStrideStats(
-                title: String,
-                select: StrideStats => Any
-            ): Unit = {
-              val tb = new TablePrinter(Some(title), true)
-              BackendStats.printStrideStats(
-                options.arch.stride0Depth,
-                options.arch.stride1Depth,
-                backendStats.get,
-                select,
-                tb
-              )
-              print(tb)
-            }
-
-            printStrideStats(
-              "TOTAL STRIDES COUNT SUMMARY",
-              stats => stats.count
-            )
-            printStrideStats(
-              "TOTAL STRIDES MAX SIZE SUMMARY",
-              stats => stats.maxSize
-            )
-            printStrideStats(
-              "TOTAL STRIDES AVERAGE SIZE SUMMARY",
-              stats => Math.round(stats.totalSize.toFloat / stats.count.toFloat)
-            )
-          }
+          printStrideStats(
+            "TOTAL STRIDES COUNT SUMMARY",
+            stats => stats.count
+          )
+          printStrideStats(
+            "TOTAL STRIDES MAX SIZE SUMMARY",
+            stats => stats.maxSize
+          )
+          printStrideStats(
+            "TOTAL STRIDES AVERAGE SIZE SUMMARY",
+            stats => Math.round(stats.totalSize.toFloat / stats.count.toFloat)
+          )
         }
 
         options.arch.dataType.reportAndResetOverUnderflowStats()

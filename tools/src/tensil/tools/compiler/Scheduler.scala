@@ -761,40 +761,40 @@ class Scheduler(
         macs.toFloat / macsDivisor
       )
       print(tb)
+    }
 
-      if (collectStats) {
-        if (options.printInstructionsSummary) {
-          BackendStats.printCompositionSummary(name, layerStats.get)
-          BackendStats.printCyclesSummary(name, layerStats.get)
-          BackendStats.printEnergySummary(name, layerStats.get)
+    if (collectStats) {
+      if (options.printInstructionsSummary) {
+        BackendStats.printCompositionSummary(name, layerStats.get)
+        BackendStats.printCyclesSummary(name, layerStats.get)
+        BackendStats.printEnergySummary(name, layerStats.get)
+      }
+
+      if (options.printStridesSummary) {
+        def printStrideStats(
+            title: String,
+            select: StrideStats => Any
+        ): Unit = {
+          val tb = new TablePrinter(Some(title), true)
+          BackendStats.printStrideStats(
+            arch.stride0Depth,
+            arch.stride1Depth,
+            layerStats.get,
+            select,
+            tb
+          )
+          print(tb)
         }
 
-        if (options.printStridesSummary) {
-          def printStrideStats(
-              title: String,
-              select: StrideStats => Any
-          ): Unit = {
-            val tb = new TablePrinter(Some(title), true)
-            BackendStats.printStrideStats(
-              arch.stride0Depth,
-              arch.stride1Depth,
-              layerStats.get,
-              select,
-              tb
-            )
-            print(tb)
-          }
-
-          printStrideStats(s"$name STRIDES COUNT SUMMARY", stats => stats.count)
-          printStrideStats(
-            s"$name STRIDES MAX SIZE SUMMARY",
-            stats => stats.maxSize
-          )
-          printStrideStats(
-            s"$name STRIDES AVERAGE SIZE SUMMARY",
-            stats => Math.round(stats.totalSize.toFloat / stats.count.toFloat)
-          )
-        }
+        printStrideStats(s"$name STRIDES COUNT SUMMARY", stats => stats.count)
+        printStrideStats(
+          s"$name STRIDES MAX SIZE SUMMARY",
+          stats => stats.maxSize
+        )
+        printStrideStats(
+          s"$name STRIDES AVERAGE SIZE SUMMARY",
+          stats => Math.round(stats.totalSize.toFloat / stats.count.toFloat)
+        )
       }
     }
 

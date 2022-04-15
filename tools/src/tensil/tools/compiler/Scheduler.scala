@@ -39,12 +39,8 @@ class Scheduler(
     arch: Architecture,
     options: CompilerOptions
 ) {
-  private val ANSI_RESET       = "\u001B[0m"
-  private val ANSI_YELLOW_BOLD = "\u001B[33m\u001B[1m"
-
   if (options.printProgress) {
-    println(ANSI_YELLOW_BOLD + s"$name:" + ANSI_RESET)
-    println(s"Emitting HIR ...")
+    println(s"$name, emitting HIR ...")
   }
 
   private var tempOutputNodes =

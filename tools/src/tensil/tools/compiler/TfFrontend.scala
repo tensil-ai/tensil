@@ -353,14 +353,7 @@ class TfFrontend(
   private var layerIndex = 0
 
   private def startLayer(nodeDefs: Seq[NodeDef]): Scheduler = {
-    val name = s"LAYER $layerIndex"
-
-    if (options.printLayersSummary) {
-      val tb = new TablePrinter(Some(s"$name SUMMARY"))
-      for (nodeDef <- nodeDefs)
-        tb.addNamedLine(nodeDef.op, nodeDef.name)
-      print(tb)
-    }
+    val name = s"LAYER $layerIndex (${nodeDefs.map(_.name).mkString(",")})"
 
     layerIndex += 1
 

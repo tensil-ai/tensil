@@ -383,14 +383,7 @@ class OnnxFrontend(
   private var layerIndex = 0
 
   private def startLayer(nodeProtos: Seq[NodeProto]): Scheduler = {
-    val name = s"LAYER $layerIndex"
-
-    if (options.printLayersSummary) {
-      val tb = new TablePrinter(Some(s"$name SUMMARY"))
-      for (nodeProto <- nodeProtos)
-        tb.addNamedLine(nodeProto.opType.get, nodeProto.name.get)
-      print(tb)
-    }
+    val name = s"LAYER $layerIndex (${nodeProtos.map(_.name.get).mkString(",")})"
 
     layerIndex += 1
 

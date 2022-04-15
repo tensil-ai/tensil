@@ -397,7 +397,7 @@ object Compiler {
               groupResultsWithIndex
                 .map(_._1.macs)
                 .filter(v => v > 0)
-                .min(scala.math.Ordering.Long)
+                .min
             )
           tb.addLine(
             new TableLine(

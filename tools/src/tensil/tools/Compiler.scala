@@ -266,9 +266,11 @@ object Compiler {
 
       layerSchedulerResults = emitResults.filter(_.isDefined).map(_.get).toList
       macs = layerSchedulerResults.map(_.macs).sum
-      macEfficiency = backendStats
-        .map(stats => BackendStats.macEfficiency(stats, options.arch, macs))
-        .getOrElse(0f)
+      macEfficiency =
+        if (backendStats.isDefined)
+          BackendStats.macEfficiency(backendStats.get, options.arch, macs)
+        else
+          0f
 
       // TODO: fix leaks
       // mm.reportObjects()
@@ -352,7 +354,8 @@ object Compiler {
           s"True MACs (${macsLetter}MAC)",
           macs.toFloat / macsDivisor
         )
-        tb.addNamedLine("MAC efficiency (%)", macEfficiency * 100f)
+        if (backendStats.isDefined)
+          tb.addNamedLine("MAC efficiency (%)", macEfficiency * 100f)
         print(tb)
       }
 

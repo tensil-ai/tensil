@@ -718,6 +718,10 @@ class Scheduler(
 
     val stageInitInstructionCounts = instructionsCounts.map(_._1)
     val partitionInstructionCounts = instructionsCounts.map(_._2).flatten
+    val macEfficiency =
+      if (collectStats)
+        BackendStats.macEfficiency(layerStats.get, arch, macs)
+      else 0f
 
     if (options.printSchedulerSummary) {
       val tb = new TablePrinter(Some(s"$name SCHEDULER SUMMARY"))
@@ -760,6 +764,8 @@ class Scheduler(
         s"True MACs (${macsLetter}MAC)",
         macs.toFloat / macsDivisor
       )
+      if (collectStats)
+        tb.addNamedLine("MAC efficiency (%)", macEfficiency * 100f)
       print(tb)
     }
 
@@ -805,10 +811,7 @@ class Scheduler(
       numberOfCombinedStages = numberOfCombinedStages,
       numberOfPartitions = numberOfPartitions,
       macs = macs,
-      macEfficiency =
-        if (collectStats)
-          BackendStats.macEfficiency(layerStats.get, arch, macs)
-        else 0f
+      macEfficiency = macEfficiency
     )
   }
 

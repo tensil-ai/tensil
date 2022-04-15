@@ -9,7 +9,7 @@ import scala.collection.mutable
 
 import onnx.onnx.{NodeProto, ModelProto, TensorProto, ValueInfoProto}
 
-import _root_.tensil.tools.{CompilerException, TracepointCondition}
+import _root_.tensil.tools.{CompilerException, TracepointCondition, CompilerOptions}
 import _root_.tensil.tools.data.{Shape, TensorData}
 import _root_.tensil.tools.util
 import _root_.tensil.{TablePrinter, Architecture}
@@ -23,11 +23,8 @@ object OnnxFrontend {
 class OnnxFrontend(
     modelProto: ModelProto,
     arch: Architecture,
-    inputBatchSize: Int,
     graphStream: Option[OutputStream],
-    printSchedulerSummary: Boolean,
-    printLayersSummary: Boolean,
-    printProgress: Boolean
+    options: CompilerOptions
 ) extends Frontend {
 
   private object VarsDimensions {
@@ -388,7 +385,7 @@ class OnnxFrontend(
   private def startLayer(nodeProtos: Seq[NodeProto]): Scheduler = {
     val name = s"LAYER $layerIndex"
 
-    if (printLayersSummary) {
+    if (options.printLayersSummary) {
       val tb = new TablePrinter(Some(s"$name SUMMARY"))
       for (nodeProto <- nodeProtos)
         tb.addNamedLine(nodeProto.opType.get, nodeProto.name.get)
@@ -400,8 +397,7 @@ class OnnxFrontend(
     new Scheduler(
       name,
       arch,
-      printSchedulerSummary,
-      printProgress
+      options
     )
   }
 

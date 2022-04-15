@@ -200,21 +200,15 @@ object Compiler {
         new TfFrontend(
           graphDef = util.protoFromStream(GraphDef, modelStream),
           arch = options.arch,
-          inputBatchSize = options.inputBatchSize,
           graphStream = graphStream,
-          printSchedulerSummary = options.printSchedulerSummary,
-          printLayersSummary = options.printLayersSummary,
-          printProgress = options.printProgress
+          options = options
         )
       } else if (modelSourceType == CompilerSourceType.ONNX) {
         new OnnxFrontend(
           modelProto = util.protoFromStream(ModelProto, modelStream),
           arch = options.arch,
-          inputBatchSize = options.inputBatchSize,
           graphStream = graphStream,
-          printSchedulerSummary = options.printSchedulerSummary,
-          printLayersSummary = options.printLayersSummary,
-          printProgress = options.printProgress
+          options = options
         )
       } else
         throw new CompilerException(
@@ -273,9 +267,7 @@ object Compiler {
       layerSchedulerResults = emitResults.filter(_.isDefined).map(_.get).toList
       macs = layerSchedulerResults.map(_.macs).sum
       macEfficiency = backendStats
-        .map(stats =>
-          macs.toFloat / (options.arch.arraySize * options.arch.arraySize).toFloat / stats.totalCycles.toFloat
-        )
+        .map(stats => BackendStats.macEfficiency(stats, options.arch, macs))
         .getOrElse(0f)
 
       // TODO: fix leaks
@@ -354,114 +346,136 @@ object Compiler {
         )
         tb.addNamedLine("True consts scalar size", mm.constsScalarSize)
         tb.addNamedLine("Consts utilization (%)", mm.constsUtilization * 100f)
-        tb.addNamedLine("True MACs (M)", macs.toFloat / 1e6f)
+        val (macsLetter, macsDivisor) =
+          BackendStats.getUnitsLetterAndDivisor(macs)
+        tb.addNamedLine(
+          s"True MACs (${macsLetter}MAC)",
+          macs.toFloat / macsDivisor
+        )
         tb.addNamedLine("MAC efficiency (%)", macEfficiency * 100f)
         print(tb)
+      }
 
-        if (options.printLayersSummary) {
-          val layerSchedulerResultsWithIndex =
-            layerSchedulerResults.zipWithIndex
+      if (options.printLayersSummary) {
+        val layerSchedulerResultsWithIndex =
+          layerSchedulerResults.zipWithIndex
 
-          for (
-            groupResultsWithIndex <- layerSchedulerResultsWithIndex.grouped(32)
-          ) {
-            val tb = new TablePrinter(Some("LAYERS SUMMARY"), true)
-            tb.addLine(
-              new TableLine(
-                List("Layer:") ++ groupResultsWithIndex.map(_._2)
-              )
+        for (
+          groupResultsWithIndex <- layerSchedulerResultsWithIndex.grouped(32)
+        ) {
+          val tb = new TablePrinter(Some("LAYERS SUMMARY"), true)
+          tb.addLine(
+            new TableLine(
+              List("Layer:") ++ groupResultsWithIndex.map(_._2)
             )
-            tb.addLine(
-              new TableLine(
-                List(
-                  "Number of stages:"
-                ) ++ groupResultsWithIndex
-                  .map(_._1.numberOfStages)
-              )
+          )
+          tb.addLine(
+            new TableLine(
+              List(
+                "Number of stages:"
+              ) ++ groupResultsWithIndex
+                .map(_._1.numberOfStages)
             )
-            tb.addLine(
-              new TableLine(
-                List(
-                  "Number of combined stages:"
-                ) ++ groupResultsWithIndex
-                  .map(_._1.numberOfCombinedStages)
-              )
+          )
+          tb.addLine(
+            new TableLine(
+              List(
+                "Number of combined stages:"
+              ) ++ groupResultsWithIndex
+                .map(_._1.numberOfCombinedStages)
             )
-            tb.addLine(
-              new TableLine(
-                List(
-                  "Number of partitions:"
-                ) ++ groupResultsWithIndex.map(_._1.numberOfPartitions)
-              )
+          )
+          tb.addLine(
+            new TableLine(
+              List(
+                "Number of partitions:"
+              ) ++ groupResultsWithIndex.map(_._1.numberOfPartitions)
             )
-            tb.addLine(
-              new TableLine(
-                List(
-                  "True MACs (M):"
-                ) ++ groupResultsWithIndex
-                  .map(_._1.macs.toFloat)
-                  .map(_ / 1e6f)
-                  .map(f => f"$f%.3f")
-              )
+          )
+          val (macsLetter, macsDivisor) =
+            BackendStats.getUnitsLetterAndDivisor(
+              groupResultsWithIndex
+                .map(_._1.macs)
+                .filter(v => v > 0)
+                .min(scala.math.Ordering.Long)
             )
-            tb.addLine(
-              new TableLine(
-                List(
-                  "MAC efficiency (%):"
-                ) ++ groupResultsWithIndex
-                  .map(_._1.macEfficiency)
-                  .map(_ * 100f)
-                  .map(f => f"$f%.1f")
-              )
+          tb.addLine(
+            new TableLine(
+              List(
+                s"True MACs (${macsLetter}MAC):"
+              ) ++ groupResultsWithIndex
+                .map(_._1.macs.toFloat)
+                .map(_ / macsDivisor)
+                .map(f => f"$f%.3f")
             )
-            tb.addLine(
-              new TableLine(
-                List(
-                  "Accumulator utilization (%):"
-                ) ++ groupResultsWithIndex
-                  .map(_._1.accumulatorUtilization)
-                  .map(_ * 100f)
-                  .map(f => f"$f%.1f")
-              )
+          )
+          tb.addLine(
+            new TableLine(
+              List(
+                "MAC efficiency (%):"
+              ) ++ groupResultsWithIndex
+                .map(_._1.macEfficiency)
+                .map(_ * 100f)
+                .map(f => f"$f%.1f")
             )
-            tb.addLine(
-              new TableLine(
-                List("Local utilization (%):") ++ groupResultsWithIndex
-                  .map(_._1.localUtilization)
-                  .map(_ * 100f)
-                  .map(f => f"$f%.1f")
-              )
+          )
+          tb.addLine(
+            new TableLine(
+              List(
+                "Accumulator utilization (%):"
+              ) ++ groupResultsWithIndex
+                .map(_._1.accumulatorUtilization)
+                .map(_ * 100f)
+                .map(f => f"$f%.1f")
             )
-            print(tb)
-          }
+          )
+          tb.addLine(
+            new TableLine(
+              List("Local utilization (%):") ++ groupResultsWithIndex
+                .map(_._1.localUtilization)
+                .map(_ * 100f)
+                .map(f => f"$f%.1f")
+            )
+          )
+          print(tb)
         }
 
         if (backendStats.isDefined) {
-          BackendStats.printCompositionSummary(backendStats.get)
-          BackendStats.printCyclesSummary(backendStats.get)
-          BackendStats.printEnergySummary(backendStats.get)
-
-          def printStrideStats(
-              title: String,
-              select: StrideStats => Any
-          ): Unit = {
-            val tb = new TablePrinter(Some(title), true)
-            BackendStats.printStrideStats(
-              options.arch.stride0Depth,
-              options.arch.stride1Depth,
-              backendStats.get,
-              select,
-              tb
-            )
-            print(tb)
+          if (options.printInstructionsSummary) {
+            BackendStats.printCompositionSummary("TOTAL", backendStats.get)
+            BackendStats.printCyclesSummary("TOTAL", backendStats.get)
+            BackendStats.printEnergySummary("TOTAL", backendStats.get)
           }
 
-          printStrideStats("STRIDES COUNT SUMMARY", stats => stats.count)
-          printStrideStats("STRIDES MAX SIZE SUMMARY", stats => stats.maxSize)
-          printStrideStats(
-            "STRIDES AVERAGE SIZE SUMMARY",
-            stats => Math.round(stats.totalSize.toFloat / stats.count.toFloat)
-          )
+          if (options.printStridesSummary) {
+            def printStrideStats(
+                title: String,
+                select: StrideStats => Any
+            ): Unit = {
+              val tb = new TablePrinter(Some(title), true)
+              BackendStats.printStrideStats(
+                options.arch.stride0Depth,
+                options.arch.stride1Depth,
+                backendStats.get,
+                select,
+                tb
+              )
+              print(tb)
+            }
+
+            printStrideStats(
+              "TOTAL STRIDES COUNT SUMMARY",
+              stats => stats.count
+            )
+            printStrideStats(
+              "TOTAL STRIDES MAX SIZE SUMMARY",
+              stats => stats.maxSize
+            )
+            printStrideStats(
+              "TOTAL STRIDES AVERAGE SIZE SUMMARY",
+              stats => Math.round(stats.totalSize.toFloat / stats.count.toFloat)
+            )
+          }
         }
 
         options.arch.dataType.reportAndResetOverUnderflowStats()

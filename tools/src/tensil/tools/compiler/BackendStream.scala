@@ -5,13 +5,15 @@ package tensil.tools.compiler
 
 import java.io._
 import scala.collection.mutable
-import tensil.{ArchitectureDataType, Architecture, TablePrinter, TableLine, InstructionLayout}
-import tensil.tools.util.divCeil
-import tensil.tools.{
-  CompilerException,
-  TracepointCondition,
-  TracepointsMap
+import tensil.{
+  ArchitectureDataType,
+  Architecture,
+  TablePrinter,
+  TableLine,
+  InstructionLayout
 }
+import tensil.tools.util.divCeil
+import tensil.tools.{CompilerException, TracepointCondition, TracepointsMap}
 
 case class StrideStats(
     count: Long = 0,
@@ -27,6 +29,18 @@ case class InstructionStats(
 ) {}
 
 object BackendStats {
+  def getUnitsLetterAndDivisor(v: Long): (String, Float) =
+    if (v < 1000L)
+      ("", 1f)
+    else if (v < 1000000L)
+      ("K", 1e3f)
+    else if (v < 1000000000L)
+      ("M", 1e6f)
+    else if (v < 1000000000000L)
+      ("G", 1e9f)
+    else
+      ("T", 1e12f)
+
   def macEfficiency(
       stats: BackendStats,
       arch: Architecture,
@@ -40,8 +54,21 @@ object BackendStats {
       arch: Architecture,
       macs: Option[Long] = None
   ) = {
-    tb.addNamedLine("Latency (MCycles)", stats.totalCycles.toFloat / 1e6f)
-    tb.addNamedLine("Energy (GUnits)", stats.totalEnergy.toFloat / 1e9f)
+    val (cyclesLetter, cyclesDivisor) = getUnitsLetterAndDivisor(
+      stats.totalCycles
+    )
+    val (energyLetter, energyDivisor) = getUnitsLetterAndDivisor(
+      stats.totalEnergy
+    )
+
+    tb.addNamedLine(
+      s"Latency (${cyclesLetter}Cycles)",
+      stats.totalCycles.toFloat / cyclesDivisor
+    )
+    tb.addNamedLine(
+      s"Energy (${energyLetter}Units)",
+      stats.totalEnergy.toFloat / energyDivisor
+    )
 
     if (macs.isDefined)
       tb.addNamedLine(
@@ -50,9 +77,9 @@ object BackendStats {
       )
   }
 
-  def printCompositionSummary(stats: BackendStats) {
+  def printCompositionSummary(name: String, stats: BackendStats) {
     val tb = new TablePrinter(
-      Some("INSTRUCTIONS COMPOSITION (NUMBER/TOTAL SIZE)")
+      Some(s"$name INSTRUCTIONS COMPOSITION (NUMBER/TOTAL SIZE)")
     )
 
     stats.instructionCounts.foreach({
@@ -67,28 +94,38 @@ object BackendStats {
     print(tb)
   }
 
-  def printCyclesSummary(stats: BackendStats) {
-    val tb = new TablePrinter(Some("INSTRUCTIONS LATENCY (MCYCLES)"))
+  def printCyclesSummary(name: String, stats: BackendStats) {
+    val tb = new TablePrinter(
+      Some(s"$name INSTRUCTIONS LATENCY")
+    )
 
     stats.instructionCounts.foreach({
       case (mnemonic, stats) =>
+        val (letter, divisor) = getUnitsLetterAndDivisor(stats.cycles)
+
         tb.addNamedLine(
           mnemonic,
-          stats.cycles.toFloat / 1e6f
+          stats.cycles.toFloat / divisor,
+          s"${letter}Cycles"
         )
     })
 
     print(tb)
   }
 
-  def printEnergySummary(stats: BackendStats) {
-    val tb = new TablePrinter(Some("INSTRUCTIONS ENERGY (GUNITS)"))
+  def printEnergySummary(name: String, stats: BackendStats) {
+    val tb = new TablePrinter(
+      Some(s"$name INSTRUCTIONS ENERGY")
+    )
 
     stats.instructionCounts.foreach({
       case (mnemonic, stats) =>
+        val (letter, divisor) = getUnitsLetterAndDivisor(stats.energy)
+
         tb.addNamedLine(
           mnemonic,
-          stats.energy.toFloat / 1e9f
+          stats.energy.toFloat / divisor,
+          s"${letter}Units"
         )
     })
 

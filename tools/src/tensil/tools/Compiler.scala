@@ -251,10 +251,16 @@ object Compiler {
 
       val flowNodeNames = frontend.traverse(outputNames)
 
-      if (options.printProgress)
+      if (options.printProgress) {
+        println(s"Found ${flowNodeNames.size} node(s)")
         println(s"Rewriting emitters ...")
+      }
 
       val flowEmitters = frontend.rewrite(flowNodeNames)
+
+      if (options.printProgress) {
+        println(s"Rewritten to ${flowEmitters.size} emitter(s)")
+      }
 
       val context = EmitContext(backend, backendStats, mm, outputNames)
 

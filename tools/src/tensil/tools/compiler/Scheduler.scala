@@ -39,8 +39,13 @@ class Scheduler(
     arch: Architecture,
     options: CompilerOptions
 ) {
-  if (options.printProgress)
-    println(s"Emitting HIR for $name ...")
+  private val ANSI_RESET       = "\u001B[0m"
+  private val ANSI_YELLOW_BOLD = "\u001B[33m\u001B[1m"
+
+  if (options.printProgress) {
+    println(ANSI_YELLOW_BOLD + s"$name:" + ANSI_RESET)
+    println(s"Emitting HIR ...")
+  }
 
   private var tempOutputNodes =
     mutable.Map.empty[MemoryAddress, TempOutputNode]
@@ -396,8 +401,12 @@ class Scheduler(
       backendStats: Option[BackendStats] = None,
       backendBufferSize: Int = 256 * 1024
   ): SchedulerResult = {
-    if (options.printProgress)
-      println(s"Planning stages and partition for $name ...")
+    if (options.printProgress) {
+      println(
+        s"Emitted ${varOutputNodes.size} root and ${tempOutputNodes.size} non-root node(s)"
+      )
+      println(s"Planning stages and partition ...")
+    }
 
     /** Root's stage signature is a combination of the address
       * value for the first stage const (the first weight vector)
@@ -645,10 +654,14 @@ class Scheduler(
     val layerStats =
       if (collectStats) Some(new BackendStats()) else None
 
-    if (options.printProgress)
-      println(s"Emitting LIR for $name ...")
+    if (options.printProgress) {
+      println(
+        s"Planned ${numberOfCombinedStages} stage(s) and ${numberOfPartitions} partition(s)"
+      )
+      println(s"Emitting LIR ...")
+    }
 
-    def printStreamStatsSummary(
+    def printPartitionsSummary(
         stream: BackendStream,
         stats: Option[BackendStats]
     ) =
@@ -690,7 +703,7 @@ class Scheduler(
       .seq
       .map({
         case ((initStream, initStats, partitionStreamAndStats)) => {
-          printStreamStatsSummary(initStream, initStats)
+          printPartitionsSummary(initStream, initStats)
 
           val buffer = Array.fill[Byte](backendBufferSize)(0)
           backend.writeStream(initStream, buffer)
@@ -699,7 +712,7 @@ class Scheduler(
 
           val instructionsCounts = partitionStreamAndStats.map {
             case (partitionStream, partitionStats) => {
-              printStreamStatsSummary(partitionStream, partitionStats)
+              printPartitionsSummary(partitionStream, partitionStats)
 
               backend.writeStream(partitionStream, buffer)
 
@@ -715,6 +728,12 @@ class Scheduler(
       })
 
     if (collectStats) backendStats.get.add(layerStats.get)
+
+    if (options.printProgress) {
+      println(
+        s"Emitted ${instructionsCounts.map(pair => pair._1 + pair._2.sum).sum} instruction(s)"
+      )
+    }
 
     val stageInitInstructionCounts = instructionsCounts.map(_._1)
     val partitionInstructionCounts = instructionsCounts.map(_._2).flatten

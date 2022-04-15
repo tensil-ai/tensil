@@ -91,6 +91,12 @@ object BackendStats {
         )
     })
 
+    tb.addNamedLine(
+      "TOTAL",
+      stats.instructionCounts.map(_._2.count).sum,
+      stats.instructionCounts.map(_._2.totalSize).sum
+    )
+
     print(tb)
   }
 
@@ -110,6 +116,15 @@ object BackendStats {
         )
     })
 
+    val cycles            = stats.instructionCounts.map(_._2.cycles).sum
+    val (letter, divisor) = getUnitsLetterAndDivisor(cycles)
+
+    tb.addNamedLine(
+      "TOTAL",
+      cycles.toFloat / divisor,
+      s"${letter}Cycles"
+    )
+
     print(tb)
   }
 
@@ -128,6 +143,15 @@ object BackendStats {
           s"${letter}Units"
         )
     })
+
+    val energy            = stats.instructionCounts.map(_._2.energy).sum
+    val (letter, divisor) = getUnitsLetterAndDivisor(energy)
+
+    tb.addNamedLine(
+      "TOTAL",
+      energy.toFloat / divisor,
+      s"${letter}Units"
+    )
 
     print(tb)
   }

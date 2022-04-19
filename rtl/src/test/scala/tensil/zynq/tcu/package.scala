@@ -14,6 +14,7 @@ package object tcu {
     def setClocks(): Unit = {
       m.instruction.setSourceClock(m.clock)
       m.status.setSinkClock(m.clock)
+      m.sample.setSinkClock(m.clock)
       m.dram0.writeAddress.setSinkClock(m.clock)
       m.dram0.writeData.setSinkClock(m.clock)
       m.dram0.writeResponse.setSourceClock(m.clock)

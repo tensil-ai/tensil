@@ -277,34 +277,53 @@ static bool compare_scalars(enum data_type type, float expected, float actual) {
 #define ARRAY_TEST_BLOCK_SIZE (driver->arch.accumulator_depth)
 #define ARRAY_TEST_BLOCKS 32
 
+#define ARRAY_TEST_INSTRUCTION_SPLIT 1
+#define ARRAY_TEST_INSTRUCTION_SIZE                                            \
+    (ARRAY_TEST_BLOCK_SIZE / ARRAY_TEST_INSTRUCTION_SPLIT)
+
 #define ARRAY_TEST_IDENTITY_WEIGHT 3.456
 #define ARRAY_TEST_BIAS 78.912
 
 #define ARRAY_TEST_INPUT_DRAM0_ADDRESS_BASE 0
-#define ARRAY_TEST_INPUT_DRAM0_ADDRESS(i)                                      \
-    (ARRAY_TEST_INPUT_DRAM0_ADDRESS_BASE + ARRAY_TEST_BLOCK_SIZE * i)
+#define ARRAY_TEST_INPUT_DRAM0_ADDRESS(i, j)                                   \
+    (ARRAY_TEST_INPUT_DRAM0_ADDRESS_BASE + ARRAY_TEST_BLOCK_SIZE * i +         \
+     ARRAY_TEST_INSTRUCTION_SIZE * j)
 
-#define ARRAY_TEST_INPUT0_LOCAL_ADDRESS 0
-#define ARRAY_TEST_INPUT1_LOCAL_ADDRESS                                        \
-    (ARRAY_TEST_INPUT0_LOCAL_ADDRESS + ARRAY_TEST_BLOCK_SIZE)
+#define ARRAY_TEST_INPUT0_LOCAL_ADDRESS_BASE 0
+#define ARRAY_TEST_INPUT0_LOCAL_ADDRESS(j)                                     \
+    (ARRAY_TEST_INPUT0_LOCAL_ADDRESS_BASE + ARRAY_TEST_INSTRUCTION_SIZE * j)
 
-#define ARRAY_TEST_OUTPUT_ACC_ADDRESS 0
+#define ARRAY_TEST_INPUT1_LOCAL_ADDRESS_BASE                                   \
+    (ARRAY_TEST_INPUT0_LOCAL_ADDRESS_BASE + ARRAY_TEST_BLOCK_SIZE)
+#define ARRAY_TEST_INPUT1_LOCAL_ADDRESS(j)                                     \
+    (ARRAY_TEST_INPUT1_LOCAL_ADDRESS_BASE + ARRAY_TEST_INSTRUCTION_SIZE * j)
 
-#define ARRAY_TEST_OUTPUT0_LOCAL_ADDRESS (ARRAY_TEST_BLOCK_SIZE * 2)
-#define ARRAY_TEST_OUTPUT1_LOCAL_ADDRESS                                       \
-    (ARRAY_TEST_OUTPUT0_LOCAL_ADDRESS + ARRAY_TEST_BLOCK_SIZE)
+#define ARRAY_TEST_OUTPUT_ACC_ADDRESS_BASE 0
+#define ARRAY_TEST_OUTPUT_ACC_ADDRESS(j)                                       \
+    (ARRAY_TEST_OUTPUT_ACC_ADDRESS_BASE + ARRAY_TEST_INSTRUCTION_SIZE * j)
+
+#define ARRAY_TEST_OUTPUT0_LOCAL_ADDRESS_BASE 0
+#define ARRAY_TEST_OUTPUT0_LOCAL_ADDRESS(j)                                    \
+    (ARRAY_TEST_OUTPUT0_LOCAL_ADDRESS_BASE + ARRAY_TEST_INSTRUCTION_SIZE * j)
+
+#define ARRAY_TEST_OUTPUT1_LOCAL_ADDRESS_BASE                                  \
+    (ARRAY_TEST_OUTPUT0_LOCAL_ADDRESS_BASE + ARRAY_TEST_BLOCK_SIZE)
+#define ARRAY_TEST_OUTPUT1_LOCAL_ADDRESS(j)                                    \
+    (ARRAY_TEST_OUTPUT1_LOCAL_ADDRESS_BASE + ARRAY_TEST_INSTRUCTION_SIZE * j)
 
 #define ARRAY_TEST_OUTPUT_DRAM0_ADDRESS_BASE                                   \
     (ARRAY_TEST_BLOCK_SIZE * ARRAY_TEST_BLOCKS)
-#define ARRAY_TEST_OUTPUT_DRAM0_ADDRESS(i)                                     \
-    (ARRAY_TEST_OUTPUT_DRAM0_ADDRESS_BASE + ARRAY_TEST_BLOCK_SIZE * i)
+
+#define ARRAY_TEST_OUTPUT_DRAM0_ADDRESS(i, j)                                  \
+    (ARRAY_TEST_OUTPUT_DRAM0_ADDRESS_BASE + ARRAY_TEST_BLOCK_SIZE * i +        \
+     ARRAY_TEST_INSTRUCTION_SIZE * j)
 
 #define ARRAY_TEST_WEIGHTS_DRAM1_ADDRESS 0
-#define ARRAY_TEST_WEIGHTS_LOCAL_ADDRESS (ARRAY_TEST_BLOCK_SIZE * 4)
+#define ARRAY_TEST_WEIGHTS_LOCAL_ADDRESS (ARRAY_TEST_BLOCK_SIZE)
 
 error_t driver_run_array_test(struct driver *driver, bool verbose) {
     error_t error = ERROR_NONE;
-    size_t bad_indexes[TEST_MAX_BAD_INDEXES_SIZE];
+    // size_t bad_indexes[TEST_MAX_BAD_INDEXES_SIZE];
     size_t bad_indexes_size = 0;
 
     float *from_buffer =
@@ -322,7 +341,7 @@ error_t driver_run_array_test(struct driver *driver, bool verbose) {
         goto cleanup;
     }
 
-    size_t barriers[] = {0, 1000, 1000, 1000};
+    size_t barriers[] = {128, 10000, 10000, 10000};
     size_t curr_barrier = 0;
     bool backoff_barrier = false;
 
@@ -387,104 +406,131 @@ error_t driver_run_array_test(struct driver *driver, bool verbose) {
             goto cleanup;
 
         for (size_t i = 0; i < ARRAY_TEST_BLOCKS / 2; i++) {
-            size_t j0 = i * 2;
-            size_t j1 = j0 + 1;
+            size_t i0 = i * 2;
+            size_t i1 = i0 + 1;
 
             // 4. DRAM0->Local X0
 
-            error = buffer_append_instruction(
-                &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
-                DATA_MOVE_FLAG_DRAM0_TO_LOCAL, ARRAY_TEST_INPUT0_LOCAL_ADDRESS,
-                ARRAY_TEST_INPUT_DRAM0_ADDRESS(j0), ARRAY_TEST_BLOCK_SIZE - 1);
+            for (size_t j = 0; j < ARRAY_TEST_INSTRUCTION_SPLIT; j++) {
+                error = buffer_append_instruction(
+                    &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
+                    DATA_MOVE_FLAG_DRAM0_TO_LOCAL,
+                    ARRAY_TEST_INPUT0_LOCAL_ADDRESS(j),
+                    ARRAY_TEST_INPUT_DRAM0_ADDRESS(i0, j),
+                    ARRAY_TEST_INSTRUCTION_SIZE - 1);
 
-            if (error)
-                goto cleanup;
+                if (error)
+                    goto cleanup;
+            }
 
             // 5. Wait for X0
-            for (size_t i = 0; i < barriers[1]; i++)
+            for (size_t j = 0; j < barriers[1]; j++)
                 buffer_append_instruction(&driver->buffer, &driver->layout,
                                           OPCODE_NOOP, 0, 0, 0, 0);
 
             // 6. MatMul Y0=X0*W
 
-            error = buffer_append_instruction(
-                &driver->buffer, &driver->layout, OPCODE_MAT_MUL, 0,
-                ARRAY_TEST_INPUT0_LOCAL_ADDRESS, ARRAY_TEST_OUTPUT_ACC_ADDRESS,
-                ARRAY_TEST_BLOCK_SIZE - 1);
+            for (size_t j = 0; j < ARRAY_TEST_INSTRUCTION_SPLIT; j++) {
+                error = buffer_append_instruction(
+                    &driver->buffer, &driver->layout, OPCODE_MAT_MUL, 0,
+                    ARRAY_TEST_INPUT0_LOCAL_ADDRESS(j),
+                    ARRAY_TEST_OUTPUT_ACC_ADDRESS(j),
+                    ARRAY_TEST_INSTRUCTION_SIZE - 1);
 
-            if (error)
-                goto cleanup;
+                if (error)
+                    goto cleanup;
 
-            // 7. DRAM0->Local X1
+                // 7. DRAM0->Local X1
 
-            error = buffer_append_instruction(
-                &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
-                DATA_MOVE_FLAG_DRAM0_TO_LOCAL, ARRAY_TEST_INPUT1_LOCAL_ADDRESS,
-                ARRAY_TEST_INPUT_DRAM0_ADDRESS(j1), ARRAY_TEST_BLOCK_SIZE - 1);
+                error = buffer_append_instruction(
+                    &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
+                    DATA_MOVE_FLAG_DRAM0_TO_LOCAL,
+                    ARRAY_TEST_INPUT1_LOCAL_ADDRESS(j),
+                    ARRAY_TEST_INPUT_DRAM0_ADDRESS(i1, j),
+                    ARRAY_TEST_INSTRUCTION_SIZE - 1);
 
-            if (error)
-                goto cleanup;
+                if (error)
+                    goto cleanup;
+            }
 
             // 8. Acc->Local Y0
 
-            error = buffer_append_instruction(
-                &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
-                DATA_MOVE_FLAG_ACC_TO_LOCAL, ARRAY_TEST_OUTPUT0_LOCAL_ADDRESS,
-                ARRAY_TEST_OUTPUT_ACC_ADDRESS, ARRAY_TEST_BLOCK_SIZE - 1);
+            for (size_t j = 0; j < ARRAY_TEST_INSTRUCTION_SPLIT; j++) {
 
-            if (error)
-                goto cleanup;
+                error = buffer_append_instruction(
+                    &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
+                    DATA_MOVE_FLAG_ACC_TO_LOCAL,
+                    ARRAY_TEST_OUTPUT0_LOCAL_ADDRESS(j),
+                    ARRAY_TEST_OUTPUT_ACC_ADDRESS(j),
+                    ARRAY_TEST_INSTRUCTION_SIZE - 1);
+
+                if (error)
+                    goto cleanup;
+            }
 
             // 9. Wait for X1
             // 10. Wait for Y0
-            for (size_t i = 0; i < barriers[2]; i++)
+            for (size_t j = 0; j < barriers[2]; j++)
                 buffer_append_instruction(&driver->buffer, &driver->layout,
                                           OPCODE_NOOP, 0, 0, 0, 0);
 
             // 11. MatMul Y1=X1*W
 
-            error = buffer_append_instruction(
-                &driver->buffer, &driver->layout, OPCODE_MAT_MUL, 0,
-                ARRAY_TEST_INPUT1_LOCAL_ADDRESS, ARRAY_TEST_OUTPUT_ACC_ADDRESS,
-                ARRAY_TEST_BLOCK_SIZE - 1);
+            for (size_t j = 0; j < ARRAY_TEST_INSTRUCTION_SPLIT; j++) {
+                error = buffer_append_instruction(
+                    &driver->buffer, &driver->layout, OPCODE_MAT_MUL, 0,
+                    ARRAY_TEST_INPUT1_LOCAL_ADDRESS(j),
+                    ARRAY_TEST_OUTPUT_ACC_ADDRESS(j),
+                    ARRAY_TEST_INSTRUCTION_SIZE - 1);
 
-            if (error)
-                goto cleanup;
+                if (error)
+                    goto cleanup;
 
-            // 12. Local->DRAM0 Y0
+                // 12. Local->DRAM0 Y0
 
-            error = buffer_append_instruction(
-                &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
-                DATA_MOVE_FLAG_LOCAL_TO_DRAM0, ARRAY_TEST_OUTPUT0_LOCAL_ADDRESS,
-                ARRAY_TEST_OUTPUT_DRAM0_ADDRESS(j0), ARRAY_TEST_BLOCK_SIZE - 1);
+                error = buffer_append_instruction(
+                    &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
+                    DATA_MOVE_FLAG_LOCAL_TO_DRAM0,
+                    ARRAY_TEST_OUTPUT0_LOCAL_ADDRESS(j),
+                    ARRAY_TEST_OUTPUT_DRAM0_ADDRESS(i0, j),
+                    ARRAY_TEST_INSTRUCTION_SIZE - 1);
 
-            if (error)
-                goto cleanup;
+                if (error)
+                    goto cleanup;
+            }
 
             // 13. Acc->Local Y1
 
-            error = buffer_append_instruction(
-                &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
-                DATA_MOVE_FLAG_ACC_TO_LOCAL, ARRAY_TEST_OUTPUT1_LOCAL_ADDRESS,
-                ARRAY_TEST_OUTPUT_ACC_ADDRESS, ARRAY_TEST_BLOCK_SIZE - 1);
+            for (size_t j = 0; j < ARRAY_TEST_INSTRUCTION_SPLIT; j++) {
+                error = buffer_append_instruction(
+                    &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
+                    DATA_MOVE_FLAG_ACC_TO_LOCAL,
+                    ARRAY_TEST_OUTPUT1_LOCAL_ADDRESS(j),
+                    ARRAY_TEST_OUTPUT_ACC_ADDRESS(j),
+                    ARRAY_TEST_INSTRUCTION_SIZE - 1);
 
-            if (error)
-                goto cleanup;
+                if (error)
+                    goto cleanup;
+            }
 
             // 14. Wait for Y1
-            for (size_t i = 0; i < barriers[3]; i++)
+            for (size_t j = 0; j < barriers[3]; j++)
                 buffer_append_instruction(&driver->buffer, &driver->layout,
                                           OPCODE_NOOP, 0, 0, 0, 0);
 
             // 15. Local->DRAM0 Y1
 
-            error = buffer_append_instruction(
-                &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
-                DATA_MOVE_FLAG_LOCAL_TO_DRAM0, ARRAY_TEST_OUTPUT1_LOCAL_ADDRESS,
-                ARRAY_TEST_OUTPUT_DRAM0_ADDRESS(j1), ARRAY_TEST_BLOCK_SIZE - 1);
+            for (size_t j = 0; j < ARRAY_TEST_INSTRUCTION_SPLIT; j++) {
+                error = buffer_append_instruction(
+                    &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
+                    DATA_MOVE_FLAG_LOCAL_TO_DRAM0,
+                    ARRAY_TEST_OUTPUT1_LOCAL_ADDRESS(j),
+                    ARRAY_TEST_OUTPUT_DRAM0_ADDRESS(i1, j),
+                    ARRAY_TEST_INSTRUCTION_SIZE - 1);
 
-            if (error)
-                goto cleanup;
+                if (error)
+                    goto cleanup;
+            }
         }
 
         error = driver_setup_buffer_postamble(driver);
@@ -515,7 +561,9 @@ error_t driver_run_array_test(struct driver *driver, bool verbose) {
 
             if (compare_scalars(driver->arch.data_type, from_buffer[k],
                                 to_buffer[k])) {
-                bad_indexes[bad_indexes_size++] = k;
+
+                bad_indexes_size++;
+                // bad_indexes[bad_indexes_size++] = k;
 
                 if (bad_indexes_size == TEST_MAX_BAD_INDEXES_SIZE)
                     break;
@@ -534,7 +582,7 @@ error_t driver_run_array_test(struct driver *driver, bool verbose) {
             backoff_barrier = false;
             curr_barrier++;
         } else {
-            barriers[curr_barrier]--;
+            barriers[curr_barrier] -= 10;
             if (!barriers[curr_barrier])
                 curr_barrier++;
         }

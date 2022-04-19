@@ -30,20 +30,19 @@ import tensil.tools.compiler.MemoryAddressHelper
 import tensil.{InstructionLayout}
 
 import tensil.axi
-import tensil.tcu.LocalDataFlowControl
+import tensil.tcu.{LocalDataFlowControl, TCUOptions}
 import tensil.tcu.instruction.{
   Opcode,
   Instruction,
   DataMoveFlags,
   DataMoveArgs,
-  DataMoveKind
+  DataMoveKind,
+  ConfigureArgs,
+  Configure
 }
 import tensil.mem.MemKind
 import tensil.tools.{Util, ResNet}
 import tensil.util.divCeil
-import tensil.tcu.TCUOptions
-import tensil.tcu.instruction.ConfigureArgs
-import tensil.tcu.instruction.Configure
 
 class AXIWrapperTCUSpec extends FunUnitSpec {
   val debug          = false

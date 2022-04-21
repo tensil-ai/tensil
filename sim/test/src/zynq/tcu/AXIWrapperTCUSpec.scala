@@ -30,13 +30,15 @@ import tensil.tools.compiler.MemoryAddressHelper
 import tensil.{InstructionLayout}
 
 import tensil.axi
-import tensil.tcu.LocalDataFlowControl
+import tensil.tcu.{LocalDataFlowControl, TCUOptions}
 import tensil.tcu.instruction.{
   Opcode,
   Instruction,
   DataMoveFlags,
   DataMoveArgs,
-  DataMoveKind
+  DataMoveKind,
+  ConfigureArgs,
+  Configure
 }
 import tensil.mem.MemKind
 import tensil.tools.{Util, ResNet}
@@ -497,6 +499,87 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
               }
             }
 
+          def sample(
+              programSize: Int,
+              interval: Int,
+              blockSize: Int
+          ) =
+            it(
+              s"should sample with size=$programSize, interval=$interval, blockSize=$blockSize",
+              Slow
+            ) {
+              test(
+                new AXIWrapperTCU(
+                  gen,
+                  layout,
+                  AXIWrapperTCUOptions(
+                    inner = TCUOptions(sampleBlockSize = blockSize),
+                    dramAxiConfig = axiConfig
+                  )
+                )
+              ).withAnnotations(Seq(VerilatorBackendAnnotation)) { m =>
+                m.setClocks()
+                m.clock.setTimeout(Int.MaxValue)
+
+                implicit val layout: InstructionLayout =
+                  m.setInstructionParameters()
+
+                val cycleCount = 3 * programSize
+
+                // drams to listen
+                fork {
+                  dram0.listen(m.clock, m.dram0)
+                }
+                fork {
+                  dram1.listen(m.clock, m.dram1)
+                }
+                val t0 = fork {
+                  m.sample.ready.poke(true.B)
+
+                  val samples = (0 until cycleCount / interval).map({
+                    case 0 => (1, false)
+                    case x =>
+                      (
+                        Math.min(x * interval - 1, 1000),
+                        (x + 1) % blockSize == 0
+                      )
+                  })
+
+                  for ((programCounter, last) <- samples) {
+                    m.sample.waitForValid()
+                    m.sample.bits.bits.programCounter.expect(programCounter.U)
+                    m.sample.bits.last.expect(last.B)
+
+                    m.clock.step()
+                  }
+                }
+                val t1 = fork {
+                  var pc = 0
+
+                  m.instruction.enqueue(
+                    Instruction(
+                      Opcode.Configure,
+                      ConfigureArgs(Configure.sampleInterval, interval)
+                    )
+                  )
+
+                  m.instruction.enqueue(
+                    Instruction(
+                      Opcode.Configure,
+                      ConfigureArgs(Configure.programCounter, 0)
+                    )
+                  )
+
+                  for (_ <- 0 until programSize) {
+                    m.instruction.enqueue(Instruction(Opcode.NoOp))
+                  }
+                }
+
+                t0.join()
+                t1.join()
+              }
+            }
+
           val dataMoveSizes =
             (1 to 7)
               .map(Math.pow(2, _).toInt)
@@ -505,14 +588,16 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
               .distinct
               .filter(_ <= arch.accumulatorDepth)
 
-          val tests = Seq(
-            () => xor4(batchSize = 1),
-            () => xor4(batchSize = 2),
-            () => xor4(batchSize = 4),
-            () => resnet(batchSize = 1, inputSize = 1),
-            () => resnet(batchSize = 10, inputSize = 10),
-          ) ++ dataMoveSizes.map(size => () => dataMove(size, 4, true)) ++
-            dataMoveSizes.map(size => () => dataMove(size, 4, false))
+          val tests =
+            Seq(
+              () => sample(programSize = 1000, interval = 10, blockSize = 16),
+              () => xor4(batchSize = 1),
+              () => xor4(batchSize = 2),
+              () => xor4(batchSize = 4),
+              () => resnet(batchSize = 1, inputSize = 1),
+              () => resnet(batchSize = 10, inputSize = 10),
+            ) ++ dataMoveSizes.map(size => () => dataMove(size, 4, true)) ++
+              dataMoveSizes.map(size => () => dataMove(size, 4, false))
 
           for (t <- tests) {
             if (randomizeDrams) {

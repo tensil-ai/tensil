@@ -533,7 +533,7 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
                 fork {
                   dram1.listen(m.clock, m.dram1)
                 }
-                fork {
+                val t0 = fork {
                   m.sample.ready.poke(true.B)
 
                   val samples = (0 until cycleCount / interval).map({
@@ -553,8 +553,7 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
                     m.clock.step()
                   }
                 }
-
-                fork {
+                val t1 = fork {
                   var pc = 0
 
                   m.instruction.enqueue(
@@ -576,9 +575,8 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
                   }
                 }
 
-                for (_ <- 0 until cycleCount) {
-                  m.clock.step()
-                }
+                t0.join()
+                t1.join()
               }
             }
 

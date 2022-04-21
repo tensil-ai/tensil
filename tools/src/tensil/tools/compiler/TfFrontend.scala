@@ -11,7 +11,11 @@ import org.tensorflow.framework.graph.GraphDef
 import org.tensorflow.framework.node_def.NodeDef
 import org.tensorflow.framework.types.DataType
 
-import _root_.tensil.tools.{CompilerException, TracepointCondition}
+import _root_.tensil.tools.{
+  CompilerException,
+  TracepointCondition,
+  CompilerOptions
+}
 import _root_.tensil.tools.data.{Shape, TensorData}
 import _root_.tensil.tools.util
 import _root_.tensil.{TablePrinter, Architecture}
@@ -23,11 +27,8 @@ object TfFrontend {
 class TfFrontend(
     graphDef: GraphDef,
     arch: Architecture,
-    inputBatchSize: Int,
     graphStream: Option[OutputStream],
-    printSchedulerSummary: Boolean,
-    printLayersSummary: Boolean,
-    printProgress: Boolean
+    options: CompilerOptions
 ) extends Frontend {
 
   private object VarsDimensions {
@@ -352,22 +353,14 @@ class TfFrontend(
   private var layerIndex = 0
 
   private def startLayer(nodeDefs: Seq[NodeDef]): Scheduler = {
-    val name = s"LAYER $layerIndex"
-
-    if (printLayersSummary) {
-      val tb = new TablePrinter(Some(s"$name SUMMARY"))
-      for (nodeDef <- nodeDefs)
-        tb.addNamedLine(nodeDef.op, nodeDef.name)
-      print(tb)
-    }
+    val name = s"LAYER $layerIndex (${nodeDefs.map(_.name).mkString(",")})"
 
     layerIndex += 1
 
     new Scheduler(
       name,
       arch,
-      printSchedulerSummary,
-      printProgress
+      options
     )
   }
 
@@ -587,7 +580,7 @@ class TfFrontend(
     val placeholderShape =
       if (shape(0) == -1)
         Shape(
-          inputBatchSize +: shape
+          options.inputBatchSize +: shape
             .takeRight(shape.size - 1)
             .toArray
         )

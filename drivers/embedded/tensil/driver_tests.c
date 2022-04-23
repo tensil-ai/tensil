@@ -341,7 +341,7 @@ error_t driver_run_array_test(struct driver *driver, bool verbose) {
         goto cleanup;
     }
 
-    size_t barriers[] = {128, 10000, 10000, 10000};
+    size_t barriers[] = {100, 10000, 10000, 10000};
     size_t curr_barrier = 0;
     bool backoff_barrier = false;
 

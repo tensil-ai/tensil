@@ -16,8 +16,9 @@ import scala.util.hashing.MurmurHash3
 
 import _root_.tensil.tools.{
   CompilerException,
+  CompilerOptions,
   TraceContext,
-  TracepointCondition,  
+  TracepointCondition,
 }
 import _root_.tensil.tools.compiler.scheduler._
 import _root_.tensil.tools.util
@@ -36,17 +37,17 @@ case class SchedulerResult(
 class Scheduler(
     name: String,
     arch: Architecture,
-    printSummary: Boolean = false,
-    printProgress: Boolean = false
+    options: CompilerOptions
 ) {
-  if (printProgress)
-    println(s"Emitting HIR for $name ...")
+  if (options.printProgress) {
+    println(s"$name, emitting HIR ...")
+  }
 
   private var tempOutputNodes =
     mutable.Map.empty[MemoryAddress, TempOutputNode]
   private var varOutputNodes = mutable.Map.empty[MemoryAddress, VarOutputNode]
 
-  private var macsCount = 0L
+  private var macs = 0L
 
   private def countMacs(
       weightsObj: MemoryObject,
@@ -54,7 +55,7 @@ class Scheduler(
   ): Unit =
     for (pair <- inputOutputPairs)
       if (pair.input.isDefined)
-        macsCount += (weightsObj.dims.width * weightsObj.dims.height * pair.input.get.dims.number)
+        macs += (weightsObj.dims.width * weightsObj.dims.height * pair.input.get.dims.number)
 
   def emitMatMul(
       weightsObj: MemoryObject,
@@ -396,8 +397,12 @@ class Scheduler(
       backendStats: Option[BackendStats] = None,
       backendBufferSize: Int = 256 * 1024
   ): SchedulerResult = {
-    if (printProgress)
-      println(s"Planning stages and partition for $name ...")
+    if (options.printProgress) {
+      println(
+        s"Emitted ${varOutputNodes.size} root and ${tempOutputNodes.size} non-root node(s)"
+      )
+      println(s"Planning stages and partition ...")
+    }
 
     /** Root's stage signature is a combination of the address
       * value for the first stage const (the first weight vector)
@@ -645,8 +650,22 @@ class Scheduler(
     val layerStats =
       if (collectStats) Some(new BackendStats()) else None
 
-    if (printProgress)
-      println(s"Emitting LIR for $name ...")
+    if (options.printProgress) {
+      println(
+        s"Planned ${numberOfCombinedStages} stage(s) and ${numberOfPartitions} partition(s)"
+      )
+      println(s"Emitting LIR ...")
+    }
+
+    def printPartitionsSummary(
+        stream: BackendStream,
+        stats: Option[BackendStats]
+    ) =
+      if (options.printPartitionsSummary && collectStats) {
+        val tb = new TablePrinter(Some(s"${stream.name} SCHEDULER SUMMARY"))
+        BackendStats.printSummary(stats.get, tb, arch)
+        print(tb)
+      }
 
     val instructionsCounts = stages.zipWithIndex.par
       .map({
@@ -680,6 +699,8 @@ class Scheduler(
       .seq
       .map({
         case ((initStream, initStats, partitionStreamAndStats)) => {
+          printPartitionsSummary(initStream, initStats)
+
           val buffer = Array.fill[Byte](backendBufferSize)(0)
           backend.writeStream(initStream, buffer)
 
@@ -687,6 +708,8 @@ class Scheduler(
 
           val instructionsCounts = partitionStreamAndStats.map {
             case (partitionStream, partitionStats) => {
+              printPartitionsSummary(partitionStream, partitionStats)
+
               backend.writeStream(partitionStream, buffer)
 
               if (collectStats)
@@ -702,11 +725,21 @@ class Scheduler(
 
     if (collectStats) backendStats.get.add(layerStats.get)
 
+    if (options.printProgress) {
+      println(
+        s"Emitted ${instructionsCounts.map(pair => pair._1 + pair._2.sum).sum} instruction(s)"
+      )
+    }
+
     val stageInitInstructionCounts = instructionsCounts.map(_._1)
     val partitionInstructionCounts = instructionsCounts.map(_._2).flatten
+    val macEfficiency =
+      if (collectStats)
+        BackendStats.macEfficiency(layerStats.get, arch, macs)
+      else 0f
 
-    if (printSummary) {
-      val tb = new TablePrinter(Some("SCHEDULER SUMMARY"))
+    if (options.printSchedulerSummary) {
+      val tb = new TablePrinter(Some(s"$name SCHEDULER SUMMARY"))
       tb.addNamedLine("Stages", numberOfStages)
       tb.addNamedLine("Combined Stages", numberOfCombinedStages)
       tb.addNamedLine("Partitions", numberOfPartitions)
@@ -730,7 +763,7 @@ class Scheduler(
         partitionInstructionCounts.sum / partitionInstructionCounts.size
       )
       if (collectStats)
-        BackendStats.printSummary(layerStats.get, tb, arch, Some(macsCount))
+        BackendStats.printSummary(layerStats.get, tb, arch, Some(macs))
       tb.addNamedLine(
         "Total number of instructions",
         stageInitInstructionCounts.sum + partitionInstructionCounts.sum
@@ -740,14 +773,25 @@ class Scheduler(
         accumulatorUtilization * 100f
       )
       tb.addNamedLine("Local utilization (%)", localUtilization * 100f)
-      tb.addNamedLine("True MACs (M)", macsCount.toFloat / 1e6f)
+      val (macsLetter, macsDivisor) =
+        BackendStats.getUnitsLetterAndDivisor(macs)
+      tb.addNamedLine(
+        s"True MACs (${macsLetter}MAC)",
+        macs.toFloat / macsDivisor
+      )
+      if (collectStats)
+        tb.addNamedLine("MAC efficiency (%)", macEfficiency * 100f)
       print(tb)
+    }
 
-      if (collectStats) {
-        BackendStats.printCompositionSummary(layerStats.get)
-        BackendStats.printCyclesSummary(layerStats.get)
-        BackendStats.printEnergySummary(layerStats.get)
+    if (collectStats) {
+      if (options.printInstructionsSummary) {
+        BackendStats.printCompositionSummary(name, layerStats.get)
+        BackendStats.printCyclesSummary(name, layerStats.get)
+        BackendStats.printEnergySummary(name, layerStats.get)
+      }
 
+      if (options.printStridesSummary) {
         def printStrideStats(
             title: String,
             select: StrideStats => Any
@@ -763,10 +807,13 @@ class Scheduler(
           print(tb)
         }
 
-        printStrideStats("STRIDES COUNT SUMMARY", stats => stats.count)
-        printStrideStats("STRIDES MAX SIZE SUMMARY", stats => stats.maxSize)
+        printStrideStats(s"$name STRIDES COUNT SUMMARY", stats => stats.count)
         printStrideStats(
-          "STRIDES AVERAGE SIZE SUMMARY",
+          s"$name STRIDES MAX SIZE SUMMARY",
+          stats => stats.maxSize
+        )
+        printStrideStats(
+          s"$name STRIDES AVERAGE SIZE SUMMARY",
           stats => Math.round(stats.totalSize.toFloat / stats.count.toFloat)
         )
       }
@@ -778,11 +825,8 @@ class Scheduler(
       numberOfStages = numberOfStages,
       numberOfCombinedStages = numberOfCombinedStages,
       numberOfPartitions = numberOfPartitions,
-      macs = macsCount,
-      macEfficiency =
-        if (collectStats)
-          BackendStats.macEfficiency(layerStats.get, arch, macsCount)
-        else 0f
+      macs = macs,
+      macEfficiency = macEfficiency
     )
   }
 

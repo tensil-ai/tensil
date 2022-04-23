@@ -16,6 +16,12 @@ case class Args(
     inputBatchSize: Int = 1,
     verbose: Boolean = false,
     summary: Boolean = false,
+    layersSummary: Boolean = false,
+    schedulerSummary: Boolean = false,
+    partitionsSummary: Boolean = false,
+    stridesSummary: Boolean = false,
+    instructionsSummary: Boolean = false,
+    backendStats: Boolean = true,
 )
 
 object Main extends App {
@@ -50,7 +56,38 @@ object Main extends App {
 
     opt[Boolean]('s', "summary")
       .valueName("true|false")
-      .action((x, c) => c.copy(summary = x)),
+      .action((x, c) => c.copy(summary = x))
+      .text("Print summary, defaults to false")
+
+    opt[Boolean]("layers-summary")
+      .valueName("true|false")
+      .action((x, c) => c.copy(layersSummary = x))
+      .text("Print layer summary, defaults to false")
+
+    opt[Boolean]("scheduler-summary")
+      .valueName("true|false")
+      .action((x, c) => c.copy(schedulerSummary = x))
+      .text("Print scheduler summary, defaults to false")
+
+    opt[Boolean]("partitions-summary")
+      .valueName("true|false")
+      .action((x, c) => c.copy(partitionsSummary = x))
+      .text("Print partitions summary, defaults to false")
+
+    opt[Boolean]("strides-summary")
+      .valueName("true|false")
+      .action((x, c) => c.copy(stridesSummary = x))
+      .text("Print strides summary, defaults to false")
+
+    opt[Boolean]("instructions-summary")
+      .valueName("true|false")
+      .action((x, c) => c.copy(instructionsSummary = x))
+      .text("Print instructions summary, defaults to false")
+
+    opt[Boolean]("backend-stats")
+      .valueName("true|false")
+      .action((x, c) => c.copy(backendStats = x))
+      .text("Collect backend stats, defaults to true")
   }
 
   argParser.parse(args, Args()) match {
@@ -62,6 +99,12 @@ object Main extends App {
         inputBatchSize = args.inputBatchSize,
         printProgress = args.verbose,
         printSummary = args.summary,
+        printLayersSummary = args.layersSummary,
+        printSchedulerSummary = args.schedulerSummary,
+        printPartitionsSummary = args.partitionsSummary,
+        printStridesSummary = args.stridesSummary,
+        printInstructionsSummary = args.instructionsSummary,
+        collectBackendStats = args.backendStats
       )
 
       val archName = args.archFile.getName().split("\\.")(0)

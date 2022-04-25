@@ -43,3 +43,15 @@ ultra96 = Architecture(
     stride0_depth=8,
     stride1_depth=8,
 )
+
+zcu104 = Architecture(
+    data_type=DataType.FP16BP8,
+    array_size=32,
+    dram0_depth=2097152,
+    dram1_depth=2097152,
+    local_depth=16384,
+    accumulator_depth=4096,
+    simd_registers_depth=1,
+    stride0_depth=8,
+    stride1_depth=8,
+)

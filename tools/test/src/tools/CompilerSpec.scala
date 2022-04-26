@@ -1251,6 +1251,23 @@ class CompilerSpec extends FlatSpec {
     localDepth = 256,
   )
 
+  it should "Compile ONNX Reshape from 1D(NCHW) to 4D(NHWC)" in {
+    val name = "reshape_1d_4d"
+    val options = CompilerOptions(
+      arch = Conv2DTiny4x4Architecure,
+      printSummary = true
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/reshape_1d_4d.onnx",
+      List("output"),
+      options
+    )
+
+    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+  }
+
   it should "Compile TF Conv2D (VALID padding) 3x3x4 image with 2x2x4x4 kernel" in {
     val name = "conv2d_4x4_valid"
     val options = CompilerOptions(

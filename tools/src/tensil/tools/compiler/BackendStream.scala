@@ -201,13 +201,24 @@ class BackendStats {
     mutable.Map.empty[String, InstructionStats]
   private val currentStrideStats =
     mutable.Map.empty[String, mutable.Map[Int, mutable.Map[Int, StrideStats]]]
+  private val innerConcurrentStatsBuffer =
+    mutable.ArrayBuffer.empty[Seq[BackendStats]]
 
   def instructionCounts = currentInstructionStats.toMap
   def strideStats =
     currentStrideStats.mapValues(_.mapValues(_.toMap).toMap).toMap
 
-  def totalCycles = currentInstructionStats.values.map(_.cycles).sum
-  def totalEnergy = currentInstructionStats.values.map(_.energy).sum
+  def totalCycles: Long =
+    if (innerConcurrentStatsBuffer.isEmpty)
+      currentInstructionStats.values.map(_.cycles).sum
+    else
+      innerConcurrentStatsBuffer.map(_.map(_.totalCycles).max).sum
+
+  def totalEnergy: Long =
+    if (innerConcurrentStatsBuffer.isEmpty)
+      currentInstructionStats.values.map(_.energy).sum
+    else
+      innerConcurrentStatsBuffer.map(_.map(_.totalEnergy).sum).sum
 
   def countInstruction(
       mnemonic: String,
@@ -274,20 +285,28 @@ class BackendStats {
     )
   }
 
-  def add(stats: BackendStats): Unit = {
-    stats.instructionCounts.foreach({
-      case (mnemonic, stats) =>
-        doCountInstruction(
-          mnemonic,
-          stats.count,
-          stats.cycles,
-          stats.energy,
-          stats.totalSize
-        )
-    })
+  def add(stats: BackendStats): Unit =
+    addConcurrent(Seq(stats))
+
+  def addConcurrent(concurrentStats: Seq[BackendStats]): Unit = {
+    innerConcurrentStatsBuffer += concurrentStats
+
+    concurrentStats
+      .map(_.instructionCounts)
+      .flatten
+      .foreach({
+        case (mnemonic, stats) =>
+          doCountInstruction(
+            mnemonic,
+            stats.count,
+            stats.cycles,
+            stats.energy,
+            stats.totalSize
+          )
+      })
 
     for (
-      (mnemonic, mnemonicStats) <- stats.strideStats;
+      (mnemonic, mnemonicStats) <- concurrentStats.map(_.strideStats).flatten;
       (operand, operandStats)   <- mnemonicStats;
       (stride, strideStats)     <- operandStats
     )
@@ -395,7 +414,7 @@ class BackendStream(
           flags == DataMoveFlags.DRAM0ToLocal ||
           flags == DataMoveFlags.DRAM1ToLocal
         ) {
-          val transfersPerVector = divCeil(
+          /*val transfersPerVector = divCeil(
             dataType.sizeBytes * layout.arch.arraySize * 8,
             DRAMTransferWidthBits
           )
@@ -411,7 +430,10 @@ class BackendStream(
 
           val cycles =
             (size.get + 1) * transfersPerVector * transferCycles + setupCycles
-          val energy = (size.get + 1) * transfersPerVector * DRAMTransferEnergy
+          val energy = (size.get + 1) * transfersPerVector * DRAMTransferEnergy*/
+
+          val cycles = (size.get + 1) * 1
+          val energy = (size.get + 1) * 1
 
           (cycles, energy)
         } else {

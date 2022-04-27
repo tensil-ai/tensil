@@ -43,15 +43,20 @@ object Reshape {
     val output =
       new DataInputStream(new ByteArrayInputStream(bytes))
 
+    val outputSize = arraySize * 4
+
     val result = Util
-      .readResult(dataType, output, arraySize, arraySize * 4)
-      .grouped(arraySize)
-      .map(_.take(2))
+      .readResult(dataType, output, arraySize, outputSize)
+      .toArray
+
+    val golden = Golden
+      .grouped(2)
+      .map(_ ++ Array.fill(arraySize - 2)(0f))
       .flatten
       .toArray
 
-    for (i <- 0 until 8)
-      rmse.addSample(result(i), Golden(i))
+    for (i <- 0 until outputSize)
+      rmse.addSample(result(i), golden(i))
 
     assert(rmse.compute < dataType.error)
   }

@@ -95,6 +95,8 @@ object GoldenProcessorHelper {
       ResNet.prepareInputStream(dataType, arraySize, count)
     else if (modelName.startsWith("resnet50v2"))
       ResNet50.prepareInputStream(dataType, arraySize, count)
+    else if (modelName.startsWith("reshape_1d_4d"))
+      Reshape.prepareInputStream(dataType, arraySize, count)
     else if (yoloPattern.findFirstIn(modelName).isDefined) {
       val yoloPattern(yoloSize) = modelName
       TinyYolo(yoloSize.toInt, onnx = modelName.endsWith("onnx"))
@@ -174,6 +176,8 @@ object GoldenProcessorHelper {
       ResNet.assertOutput(dataType, arraySize, bytes, count)
     else if (modelName.startsWith("resnet50v2"))
       ResNet50.assertOutput(dataType, arraySize, bytes, count)
+    else if (modelName.startsWith("reshape_1d_4d"))
+      Reshape.assertOutput(dataType, arraySize, bytes, count)
     else if (yoloPattern.findFirstIn(modelName).isDefined) {
       val yoloPattern(yoloSize) = modelName
       TinyYolo(yoloSize.toInt, onnx = modelName.endsWith("onnx"))

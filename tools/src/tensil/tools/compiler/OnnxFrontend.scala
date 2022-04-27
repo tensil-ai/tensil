@@ -975,11 +975,39 @@ class OnnxFrontend(
       throw new CompilerException("Scalar sizes must match for reshape")
 
     val indexesAndOffsetsPairs =
-      for (i <- 0 until inputDims.sizeScalars) yield {
-        val (inputIndex, inputOffset)   = inputDims.vectorIndexOffsetAt(i)
-        val (outputIndex, outputOffset) = outputDims.vectorIndexOffsetAt(i)
-        ((outputIndex, inputIndex), (outputOffset, inputOffset))
-      }
+      if (inputDims.order == 2 && outputDims.order == 4) {
+        // when reshaping from 1D to 4D, a NCHW to NHWC permute(transpose)
+        // need to be performed to match ONNX's behavior.
+
+        val dimMap    = (3 to 0 by -1).map(shape.takeRight(_).fold(1)(_ * _))
+        val outShape  = Seq(shape(0), shape(2), shape(3), shape(1))
+        val dimMapOut = (3 to 0 by -1).map(outShape.takeRight(_).fold(1)(_ * _))
+
+        for (
+          n <- 0 until shape(0);
+          c <- 0 until shape(1);
+          h <- 0 until shape(2);
+          w <- 0 until shape(3)
+        ) yield {
+
+          val from = Array(n, c, h, w).zipWithIndex
+            .map { case (e, i) => dimMap(i) * e }
+            .fold(0)(_ + _)
+
+          val to = Array(n, h, w, c).zipWithIndex
+            .map { case (e, i) => dimMapOut(i) * e }
+            .fold(0)(_ + _)
+
+          val (inputIndex, inputOffset)   = inputDims.vectorIndexOffsetAt(from)
+          val (outputIndex, outputOffset) = outputDims.vectorIndexOffsetAt(to)
+          ((outputIndex, inputIndex), (outputOffset, inputOffset))
+        }
+      } else
+        for (i <- 0 until inputDims.sizeScalars) yield {
+          val (inputIndex, inputOffset)   = inputDims.vectorIndexOffsetAt(i)
+          val (outputIndex, outputOffset) = outputDims.vectorIndexOffsetAt(i)
+          ((outputIndex, inputIndex), (outputOffset, inputOffset))
+        }
 
     val groupedByOffsetPairs = indexesAndOffsetsPairs
       .groupBy(_._1)

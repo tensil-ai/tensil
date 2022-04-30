@@ -196,7 +196,7 @@ object BackendStats {
   }
 }
 
-class BackendStats {
+class BackendStats(val name: String) {
   private val currentInstructionStats =
     mutable.Map.empty[String, InstructionStats]
   private val currentStrideStats =

@@ -237,7 +237,7 @@ object Compiler {
       traceContext = traceContext
     )
     val backendStats =
-      if (options.collectBackendStats) Some(new BackendStats()) else None
+      if (options.collectBackendStats) Some(new BackendStats("TOTAL")) else None
 
     var layerSchedulerResults: List[SchedulerResult] = Nil
     var macs                                         = 0L

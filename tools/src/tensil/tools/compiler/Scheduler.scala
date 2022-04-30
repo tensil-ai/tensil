@@ -23,6 +23,7 @@ import _root_.tensil.tools.{
 import _root_.tensil.tools.compiler.scheduler._
 import _root_.tensil.tools.util
 import _root_.tensil.{TablePrinter, TableLine, Architecture}
+import java.io.DataOutputStream
 
 case class SchedulerResult(
     accumulatorUtilization: Float,
@@ -648,7 +649,7 @@ class Scheduler(
 
     val collectStats = backendStats.isDefined
     val layerStats =
-      if (collectStats) Some(new BackendStats()) else None
+      if (collectStats) Some(new BackendStats(name)) else None
 
     if (options.printProgress) {
       println(
@@ -667,43 +668,38 @@ class Scheduler(
         print(tb)
       }
 
+    //val stream = new DataOutputStream(new FileOutputStream("threads.csv", true))
+
     val instructionsCounts = stages.zipWithIndex.par
       .map({
         case (stage, i) =>
+          val initName = s"$name, STAGE $i, INIT"
           val initStats =
-            if (collectStats) Some(new BackendStats()) else None
-          val initStream = backend.mkStream(s"$name, STAGE $i, INIT", initStats)
+            if (collectStats) Some(new BackendStats(initName)) else None
+          val initStream = backend.mkStream(initName, initStats)
           val stageInit  = emitStageInit(initStream, stage.constsToLoad)
 
           val partitionStreamAndStats = stage.partitions.zipWithIndex.par
             .map({
               case (partition, j) =>
+                val loadName    = s"$name, STAGE $i, PARTITION $j, LOAD"
+                val computeName = s"$name, STAGE $i, PARTITION $j"
+                val saveName    = s"$name, STAGE $i, PARTITION $j, SAVE"
+
                 val (loadStats, computeStats, saveStats) =
                   if (collectStats)
                     (
-                      Some(new BackendStats()),
-                      Some(new BackendStats()),
-                      Some(new BackendStats())
+                      Some(new BackendStats(loadName)),
+                      Some(new BackendStats(computeName)),
+                      Some(new BackendStats(saveName))
                     )
                   else (None, None, None)
 
                 val (loadStream, computeStream, saveStream) =
                   (
-                    backend
-                      .mkStream(
-                        s"$name, STAGE $i, PARTITION $j, LOAD",
-                        loadStats
-                      ),
-                    backend
-                      .mkStream(
-                        s"$name, STAGE $i, PARTITION $j, COMPUTE",
-                        computeStats
-                      ),
-                    backend
-                      .mkStream(
-                        s"$name, STAGE $i, PARTITION $j, SAVE",
-                        saveStats
-                      )
+                    backend.mkStream(loadName, loadStats),
+                    backend.mkStream(computeName, computeStats),
+                    backend.mkStream(saveName, saveStats)
                   )
 
                 emitStagePartition(
@@ -732,20 +728,39 @@ class Scheduler(
           val buffer = Array.fill[Byte](backendBufferSize)(0)
           backend.writeStream(initStream, buffer)
 
-          if (collectStats) layerStats.get.add(initStats.get)
-
+          var firstPartition = true
           val instructionsCounts =
             partitionStreamAndStats.map(streamAndStats => {
               if (collectStats) {
                 val Seq(loadStats, computeStats, saveStats) =
                   streamAndStats.map(_._2.get)
 
-                val loadSaveStats = new BackendStats()
-                loadSaveStats.add(loadStats)
-                loadSaveStats.add(saveStats)
+                val loadSaveStats = if (firstPartition) {
+                  firstPartition = false
+
+                  val stats =
+                    new BackendStats(
+                      s"${initStats.get.name} | ${loadStats.name} | ${saveStats.name}"
+                    )
+                  stats.add(initStats.get)
+                  stats.add(loadStats)
+                  stats.add(saveStats)
+                  stats
+
+                } else {
+                  val stats =
+                    new BackendStats(s"${loadStats.name} | ${saveStats.name}")
+                  stats.add(loadStats)
+                  stats.add(saveStats)
+                  stats
+                }
 
                 layerStats.get
                   .addConcurrent(Seq(loadSaveStats, computeStats))
+
+                /*stream.writeBytes(
+                  s""""${computeStats.name}",${loadSaveStats.totalCycles},${computeStats.totalCycles}\r\n"""
+                )*/
               }
 
               for ((partitionStream, partitionStats) <- streamAndStats) yield {
@@ -760,6 +775,8 @@ class Scheduler(
           (initStream.instructionsCount, instructionsCounts.flatten)
         }
       })
+
+    //stream.close()
 
     if (collectStats) backendStats.get.add(layerStats.get)
 

@@ -35,28 +35,28 @@ class Processor[T : NumericWithMAC : ClassTag](
     dataType: ArchitectureDataTypeWithBase[T],
     arch: Architecture
 ) {
-  val decoder   = new Decoder(arch)
-  val executive = new ProcessorExecutive(arch)
+  val decoder      = new Decoder(arch)
+  val lirExecutive = new LIRExecutive(arch)
 
   private def arrayToStream(bytes: Array[Byte]): InputStream = {
     new ByteArrayInputStream(bytes)
   }
 
   def writeDRAM0(addresses: Seq[MemoryAddressRaw], stream: InputStream): Unit =
-    executive.writeDRAM0(addresses, new DataInputStream(stream))
+    lirExecutive.writeDRAM0(addresses, new DataInputStream(stream))
   def writeDRAM0(addresses: Seq[MemoryAddressRaw], bytes: Array[Byte]): Unit =
     writeDRAM0(addresses, arrayToStream(bytes))
 
   def readDRAM0(addresses: Seq[MemoryAddressRaw], stream: OutputStream): Unit =
-    executive.readDRAM0(addresses, new DataOutputStream(stream))
+    lirExecutive.readDRAM0(addresses, new DataOutputStream(stream))
   def readDRAM0(addresses: Seq[MemoryAddressRaw]): Array[Byte] = {
     val bytesStream = new ByteArrayOutputStream()
-    executive.readDRAM0(addresses, new DataOutputStream(bytesStream))
+    lirExecutive.readDRAM0(addresses, new DataOutputStream(bytesStream))
     bytesStream.toByteArray()
   }
 
   def writeDRAM1(size: MemoryAddressRaw, stream: InputStream) =
-    executive.writeDRAM1(0L until size, new DataInputStream(stream))
+    lirExecutive.writeDRAM1(0L until size, new DataInputStream(stream))
   def writeDRAM1(size: MemoryAddressRaw, bytes: Array[Byte]): Unit =
     writeDRAM1(size, arrayToStream(bytes))
 
@@ -67,8 +67,8 @@ class Processor[T : NumericWithMAC : ClassTag](
     val startTime = System.nanoTime()
 
     try {
-      val lirTrace = new LIRTrace(trace, executive)
-      val lir      = new LIRBroadcast(Seq(lirTrace, executive))
+      val lirTrace = new LIRTrace(trace, lirExecutive)
+      val lir      = new LIRBroadcast(Seq(lirTrace, lirExecutive))
 
       decoder.decode(
         stream,
@@ -138,7 +138,7 @@ class Processor[T : NumericWithMAC : ClassTag](
     ): Unit = runTrace()
   }
 
-  class ProcessorExecutive(arch: Architecture) extends Executive with LIR {
+  class LIRExecutive(arch: Architecture) extends Executive with LIR {
     val zero = implicitly[Numeric[T]].zero
     val one  = implicitly[Numeric[T]].one
 

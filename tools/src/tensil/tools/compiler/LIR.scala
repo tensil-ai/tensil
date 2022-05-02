@@ -1,6 +1,6 @@
 package tensil.tools.compiler
 
-abstract class LIR {
+abstract trait LIR {
   def emitNoOp(): Unit
 
   def emitWait(tidToWait: Int): Unit

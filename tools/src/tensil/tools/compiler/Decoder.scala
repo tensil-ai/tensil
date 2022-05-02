@@ -1,68 +1,23 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /* Copyright © 2019-2022 Tensil AI Company */
 
-package tensil.tools.golden
+package tensil.tools.compiler
 
 import java.io._
 
-import tensil.tools.compiler.{DataMoveFlags, MemoryAddressRaw}
-import tensil.tools.compiler.Opcode
 import tensil.tools.{TraceContext}
 import tensil.{Architecture, InstructionLayout}
-
-abstract class Executive {
-  def peekAccumulator(address: MemoryAddressRaw): Array[Float]
-  def peekLocal(address: MemoryAddressRaw): Array[Float]
-  def peekDRAM0(address: MemoryAddressRaw): Array[Float]
-  def peekDRAM1(address: MemoryAddressRaw): Array[Float]
-
-  def execMatMul(
-      flags: Int,
-      localStride: Int,
-      localAddress: MemoryAddressRaw,
-      accumulatorStride: Int,
-      accumulatorAddress: MemoryAddressRaw,
-      size: MemoryAddressRaw
-  ): Unit
-  def execDataMove(
-      flags: Int,
-      localStride: Int,
-      localAddress: MemoryAddressRaw,
-      accumulatorOrDRAMStride: Int,
-      accumulatorOrDRAMAddress: MemoryAddressRaw,
-      size: MemoryAddressRaw
-  ): Unit
-  def execLoadWeights(
-      flags: Int,
-      localStride: Int,
-      localAddress: MemoryAddressRaw,
-      size: MemoryAddressRaw
-  ): Unit
-  def execSIMD(
-      flags: Int,
-      simdOp: Int,
-      simdSourceLeft: Int,
-      simdSourceRight: Int,
-      simdDestination: Int,
-      writeAccumulatorAddress: MemoryAddressRaw,
-      readAccumulatorAddress: MemoryAddressRaw
-  ): Unit
-}
 
 class Decoder(arch: Architecture) {
   val layout = new InstructionLayout(arch)
 
   def decode(
       stream: InputStream,
-      executive: Executive,
-      trace: ExecutiveTrace
+      lir: LIR
   ): Unit = {
-    val bytes             = Array.fill[Byte](layout.instructionSizeBytes + 1)(0);
-    var instructionOffset = 0L
+    val bytes = Array.fill[Byte](layout.instructionSizeBytes + 1)(0);
 
     while (stream.read(bytes, 0, layout.instructionSizeBytes) != -1) {
-      trace.runTrace(instructionOffset, executive)
-
       val instruction      = BigInt(bytes.reverse)
       var decodedSize: Int = 0
 
@@ -124,64 +79,119 @@ class Decoder(arch: Architecture) {
 
       if (opcode == Opcode.Wait) {
         skipBits(layout.operandsSizeBits)
+
+        lir.emitNoOp()
       } else if (opcode == Opcode.MatMul) {
         val (localAddress, localStride)             = decodeAddressOperand0()
         val (accumulatorAddress, accumulatorStride) = decodeAddressOperand1()
         val size                                    = decodeSizeOperand2()
+        val accumulate                              = (flags & MatMulFlags.Accumulate) != 0
+        val localTag =
+          if ((flags & MatMulFlags.Zeroes) != 0) MemoryTag.Zeroes
+          else MemoryTag.Local
 
-        executive.execMatMul(
-          flags,
+        lir.emitMatMul(
+          accumulate,
           localStride,
-          localAddress,
+          MemoryAddress(
+            localTag,
+            MemoryRef.Invalid,
+            localAddress
+          ),
           accumulatorStride,
-          accumulatorAddress,
+          MemoryAddress(
+            MemoryTag.Accumulators,
+            MemoryRef.Invalid,
+            accumulatorAddress
+          ),
           size
         )
       } else if (opcode == Opcode.DataMove) {
-
         val (localAddress, localStride) = decodeAddressOperand0()
         val (accumulatorOrDRAMAddress, accumulatorOrDRAMStride) =
           decodeAddressOperand1()
-        val size = decodeSizeOperand2()
+        val size       = decodeSizeOperand2()
+        val accumulate = flags == DataMoveFlags.LocalToAccumulatorAccumulate
+        val toLocal = flags match {
+          case DataMoveFlags.DRAM0ToLocal | DataMoveFlags.DRAM1ToLocal |
+              DataMoveFlags.AccumulatorToLocal =>
+            true
+          case _ => false
+        }
+        val accumulatorOrDRAMTag = flags match {
+          case DataMoveFlags.AccumulatorToLocal |
+              DataMoveFlags.LocalToAccumulator |
+              DataMoveFlags.LocalToAccumulatorAccumulate =>
+            MemoryTag.Accumulators
+          case DataMoveFlags.DRAM0ToLocal | DataMoveFlags.LocalToDRAM0 =>
+            MemoryTag.Vars
+          case DataMoveFlags.DRAM1ToLocal | DataMoveFlags.LocalToDRAM1 =>
+            MemoryTag.Consts
+        }
 
-        executive.execDataMove(
-          flags,
+        lir.emitDataMove(
+          toLocal,
+          accumulate,
           localStride,
-          localAddress,
+          MemoryAddress(
+            MemoryTag.Local,
+            MemoryRef.Invalid,
+            localAddress
+          ),
           accumulatorOrDRAMStride,
-          accumulatorOrDRAMAddress,
+          MemoryAddress(
+            accumulatorOrDRAMTag,
+            MemoryRef.Invalid,
+            accumulatorOrDRAMAddress
+          ),
           size
         )
       } else if (opcode == Opcode.LoadWeights) {
-
         val (localAddress, localStride) = decodeAddressOperand0()
         val size                        = decodeSizeOperand1()
+        val localTag =
+          if ((flags & LoadWeightsFlags.Zeroes) != 0) MemoryTag.Zeroes
+          else MemoryTag.Local
         skipBits(layout.operand2SizeBits)
 
-        executive.execLoadWeights(flags, localStride, localAddress, size)
+        lir.emitLoadWeights(
+          localStride,
+          MemoryAddress(localTag, MemoryRef.Invalid, localAddress),
+          size
+        )
       } else if (opcode == Opcode.SIMD) {
-
         val (writeAccumulatorAddress, _) = decodeAddressOperand0()
         val (readAccumulatorAddress, _)  = decodeAddressOperand1()
         val (simdDestination, simdSourceRight, simdSourceLeft, simdOp) =
           decodeSimdInstructionOperand2()
+        val accumulate = (flags & SIMDFlags.Accumulate) != 0
+        val readAccumulatorTag =
+          if ((flags & SIMDFlags.Read) != 0) MemoryTag.Accumulators
+          else MemoryTag.Invalid
+        val writeAccumulatorTag =
+          if ((flags & SIMDFlags.Write) != 0) MemoryTag.Accumulators
+          else MemoryTag.Invalid
 
-        executive.execSIMD(
-          flags,
+        lir.emitSIMD(
+          accumulate,
           simdOp,
           simdSourceLeft,
           simdSourceRight,
           simdDestination,
-          writeAccumulatorAddress,
-          readAccumulatorAddress
+          MemoryAddress(
+            writeAccumulatorTag,
+            MemoryRef.Invalid,
+            writeAccumulatorAddress
+          ),
+          MemoryAddress(
+            readAccumulatorTag,
+            MemoryRef.Invalid,
+            readAccumulatorAddress
+          )
         )
       }
 
       require(decodedSize == layout.operandsSizeBits)
-
-      instructionOffset += 1
     }
-
-    trace.runTrace(instructionOffset, executive)
   }
 }

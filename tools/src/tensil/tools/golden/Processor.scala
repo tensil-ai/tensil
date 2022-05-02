@@ -13,6 +13,7 @@ import tensil.tools.data.Tensor
 import tensil.tools.{TraceContext}
 import tensil.{Architecture, ArchitectureDataTypeWithBase, TablePrinter, golden}
 import tensil.tools.compiler.{
+  Decoder,
   LoadWeightsFlags,
   SIMDFlags,
   SIMDOp,
@@ -20,9 +21,15 @@ import tensil.tools.compiler.{
   DataMoveFlags,
   SIMDSource,
   SIMDDestination,
-  MemoryAddressRaw
+  MemoryTag,
+  MemoryAddressRaw,
+  MemoryAddress,
+  MemoryAddressHelper,
+  LIR,
+  LIRBroadcast
 }
 import tensil.NumericWithMAC
+import tensil.tools.compiler.LIRBroadcast
 
 class Processor[T : NumericWithMAC : ClassTag](
     dataType: ArchitectureDataTypeWithBase[T],
@@ -60,11 +67,15 @@ class Processor[T : NumericWithMAC : ClassTag](
     val startTime = System.nanoTime()
 
     try {
+      val lirTrace = new LIRTrace(trace, executive)
+      val lir      = new LIRBroadcast(Seq(lirTrace, executive))
+
       decoder.decode(
         stream,
-        executive,
-        trace
+        lir
       )
+
+      lirTrace.runTrace()
     } finally {
       val endTime = System.nanoTime()
 
@@ -79,7 +90,55 @@ class Processor[T : NumericWithMAC : ClassTag](
     }
   }
 
-  class ProcessorExecutive(arch: Architecture) extends Executive {
+  class LIRTrace(trace: ExecutiveTrace, executive: Executive) extends LIR {
+    var instructionOffset = 0L
+
+    def runTrace(): Unit = {
+      trace.runTrace(instructionOffset, executive)
+      instructionOffset += 1
+    }
+
+    def emitNoOp(): Unit = runTrace()
+
+    def emitWait(tidToWait: Int): Unit = runTrace()
+
+    def emitMatMul(
+        accumulate: Boolean,
+        localStride: Int,
+        localAddress: MemoryAddress,
+        accumulatorStride: Int,
+        accumulatorAddress: MemoryAddress,
+        size: MemoryAddressRaw
+    ): Unit = runTrace()
+
+    def emitSIMD(
+        accumulate: Boolean,
+        simdOp: Int,
+        simdSourceLeft: Int,
+        simdSourceRight: Int,
+        simdDestination: Int,
+        writeAccumulatorAddress: MemoryAddress,
+        readAccumulatorAddress: MemoryAddress
+    ): Unit = runTrace()
+
+    def emitDataMove(
+        toLocal: Boolean,
+        accumulate: Boolean,
+        localStride: Int,
+        localAddress: MemoryAddress,
+        stride: Int,
+        address: MemoryAddress,
+        size: MemoryAddressRaw
+    ): Unit = runTrace()
+
+    def emitLoadWeights(
+        localStride: Int,
+        localAddress: MemoryAddress,
+        size: MemoryAddressRaw
+    ): Unit = runTrace()
+  }
+
+  class ProcessorExecutive(arch: Architecture) extends Executive with LIR {
     val zero = implicitly[Numeric[T]].zero
     val one  = implicitly[Numeric[T]].one
 
@@ -159,16 +218,20 @@ class Processor[T : NumericWithMAC : ClassTag](
           dram1Array(i.toInt * arch.arraySize + j) = dataType.readConst(stream)
     }
 
-    def execMatMul(
-        flags: Int,
+    def emitNoOp(): Unit = {}
+
+    def emitWait(tidToWait: Int): Unit = {}
+
+    def emitMatMul(
+        accumulate: Boolean,
         localStride: Int,
-        localAddress: MemoryAddressRaw,
+        localAddress: MemoryAddress,
         accumulatorStride: Int,
-        accumulatorAddress: MemoryAddressRaw,
+        accumulatorAddress: MemoryAddress,
         size: MemoryAddressRaw
     ): Unit = {
-      val localBase       = localAddress.toInt * arch.arraySize.toInt
-      val accumulatorBase = accumulatorAddress.toInt * arch.arraySize.toInt
+      val localBase       = localAddress.raw.toInt * arch.arraySize.toInt
+      val accumulatorBase = accumulatorAddress.raw.toInt * arch.arraySize.toInt
 
       val localStep       = 1 << localStride
       val accumulatorStep = 1 << accumulatorStride
@@ -176,7 +239,7 @@ class Processor[T : NumericWithMAC : ClassTag](
       for (i <- 0 to size.toInt) {
         val x =
           Array(
-            Array[T](one) ++ (if ((flags & MatMulFlags.Zeroes) != 0)
+            Array[T](one) ++ (if (localAddress.tag == MemoryTag.Zeroes)
                                 Array.fill(arch.arraySize)(zero)
                               else {
                                 val k =
@@ -187,8 +250,10 @@ class Processor[T : NumericWithMAC : ClassTag](
 
         val y = golden.Ops.matMul(x, currentWeights)
 
+        println(s"y=${y.toList}")
+
         for (j <- 0 until arch.arraySize)
-          if ((flags & MatMulFlags.Accumulate) != 0)
+          if (accumulate)
             accumulatorArray(
               accumulatorBase + i * arch.arraySize * accumulatorStep + j
             ) += y(0)(j)
@@ -199,71 +264,60 @@ class Processor[T : NumericWithMAC : ClassTag](
       }
     }
 
-    def execDataMove(
-        flags: Int,
+    def emitDataMove(
+        toLocal: Boolean,
+        accumulate: Boolean,
         localStride: Int,
-        localAddress: MemoryAddressRaw,
+        localAddress: MemoryAddress,
         accumulatorOrDRAMStride: Int,
-        accumulatorOrDRAMAddress: MemoryAddressRaw,
+        accumulatorOrDRAMAddress: MemoryAddress,
         size: MemoryAddressRaw
     ): Unit = {
-      val localBase = localAddress.toInt * arch.arraySize.toInt
+      val localBase = localAddress.raw.toInt * arch.arraySize.toInt
       val accumulatorOrDRAMBase =
-        accumulatorOrDRAMAddress.toInt * arch.arraySize.toInt
+        accumulatorOrDRAMAddress.raw.toInt * arch.arraySize.toInt
 
       val localStep             = 1 << localStride
       val accumulatorOrDRAMStep = 1 << accumulatorOrDRAMStride
 
       for (i <- 0 to size.toInt) {
-        val x = flags match {
-          case DataMoveFlags.AccumulatorToLocal =>
-            val k =
-              accumulatorOrDRAMBase + i * arch.arraySize * accumulatorOrDRAMStep
-            accumulatorArray.slice(k, k + arch.arraySize)
-          case DataMoveFlags.DRAM0ToLocal =>
-            val k =
-              accumulatorOrDRAMBase + i * arch.arraySize * accumulatorOrDRAMStep
-            dram0Array.slice(k, k + arch.arraySize)
-          case DataMoveFlags.DRAM1ToLocal =>
-            val k =
-              accumulatorOrDRAMBase + i * arch.arraySize * accumulatorOrDRAMStep
-            dram1Array.slice(k, k + arch.arraySize)
-          case DataMoveFlags.LocalToAccumulator |
-              DataMoveFlags.LocalToAccumulatorAccumulate |
-              DataMoveFlags.LocalToDRAM0 | DataMoveFlags.LocalToDRAM1 =>
-            val k = localBase + i * arch.arraySize * localStep
-            localArray.slice(k, k + arch.arraySize)
+        val x = if (toLocal) {
+          val k =
+            accumulatorOrDRAMBase + i * arch.arraySize * accumulatorOrDRAMStep
+
+          accumulatorOrDRAMAddress.tag match {
+            case MemoryTag.Accumulators =>
+              accumulatorArray.slice(k, k + arch.arraySize)
+
+            case MemoryTag.Vars =>
+              dram0Array.slice(k, k + arch.arraySize)
+
+            case MemoryTag.Consts =>
+              dram1Array.slice(k, k + arch.arraySize)
+          }
+        } else {
+          val k = localBase + i * arch.arraySize * localStep
+          localArray.slice(k, k + arch.arraySize)
         }
 
-        val (y, yBase, accumulate) = flags match {
-          case DataMoveFlags.AccumulatorToLocal | DataMoveFlags.DRAM0ToLocal |
-              DataMoveFlags.DRAM1ToLocal =>
-            (localArray, localBase + i * arch.arraySize * localStep, false)
-          case DataMoveFlags.LocalToDRAM0 =>
-            (
-              dram0Array,
-              accumulatorOrDRAMBase + i * arch.arraySize * accumulatorOrDRAMStep,
-              false
-            )
-          case DataMoveFlags.LocalToDRAM1 =>
-            (
-              dram1Array,
-              accumulatorOrDRAMBase + i * arch.arraySize * accumulatorOrDRAMStep,
-              false
-            )
-          case DataMoveFlags.LocalToAccumulator =>
-            (
-              accumulatorArray,
-              accumulatorOrDRAMBase + i * arch.arraySize * accumulatorOrDRAMStep,
-              false
-            )
-          case DataMoveFlags.LocalToAccumulatorAccumulate =>
-            (
-              accumulatorArray,
-              accumulatorOrDRAMBase + i * arch.arraySize * accumulatorOrDRAMStep,
-              true
-            )
-        }
+        val (y, yBase) =
+          if (toLocal)
+            (localArray, localBase + i * arch.arraySize * localStep)
+          else {
+            val base =
+              accumulatorOrDRAMBase + i * arch.arraySize * accumulatorOrDRAMStep
+
+            accumulatorOrDRAMAddress.tag match {
+              case MemoryTag.Accumulators =>
+                (accumulatorArray, base)
+
+              case MemoryTag.Vars =>
+                (dram0Array, base)
+
+              case MemoryTag.Consts =>
+                (dram1Array, base)
+            }
+          }
 
         for (j <- 0 until arch.arraySize)
           if (accumulate)
@@ -273,10 +327,9 @@ class Processor[T : NumericWithMAC : ClassTag](
       }
     }
 
-    def execLoadWeights(
-        flags: Int,
+    def emitLoadWeights(
         localStride: Int,
-        localAddress: MemoryAddressRaw,
+        localAddress: MemoryAddress,
         size: MemoryAddressRaw
     ): Unit = {
       val localStep = 1 << localStride
@@ -287,32 +340,31 @@ class Processor[T : NumericWithMAC : ClassTag](
             arch.arraySize - (j + 1)
           )
 
-        flags match {
-          case LoadWeightsFlags.None =>
-            val base = localAddress.toInt * arch.arraySize.toInt
-            val k    = base + i * arch.arraySize * localStep
+        if (localAddress.tag == MemoryTag.Zeroes)
+          currentWeights(0) = Array.fill(arch.arraySize)(zero)
+        else {
+          val base = localAddress.raw.toInt * arch.arraySize.toInt
+          val k    = base + i * arch.arraySize * localStep
 
-            currentWeights(0) = localArray.slice(k, k + arch.arraySize)
-          case LoadWeightsFlags.Zeroes =>
-            currentWeights(0) = Array.fill(arch.arraySize)(zero)
+          currentWeights(0) = localArray.slice(k, k + arch.arraySize)
         }
       }
     }
 
-    def execSIMD(
-        flags: Int,
+    def emitSIMD(
+        accumulate: Boolean,
         simdOp: Int,
         simdSourceLeft: Int,
         simdSourceRight: Int,
         simdDestination: Int,
-        writeAccumulatorAddress: MemoryAddressRaw,
-        readAccumulatorAddress: MemoryAddressRaw
+        writeAccumulatorAddress: MemoryAddress,
+        readAccumulatorAddress: MemoryAddress
     ): Unit = {
       val readAccumulatorBase =
-        readAccumulatorAddress.toInt * arch.arraySize.toInt
+        readAccumulatorAddress.raw.toInt * arch.arraySize.toInt
 
       val left = if (simdSourceLeft == SIMDSource.Input) {
-        if ((flags & SIMDFlags.Read) != 0)
+        if (readAccumulatorAddress.tag == MemoryTag.Accumulators)
           accumulatorArray.slice(
             readAccumulatorBase,
             readAccumulatorBase + arch.arraySize
@@ -325,7 +377,7 @@ class Processor[T : NumericWithMAC : ClassTag](
       }
 
       val right = if (simdSourceRight == SIMDSource.Input) {
-        if ((flags & SIMDFlags.Read) != 0)
+        if (readAccumulatorAddress.tag == MemoryTag.Accumulators)
           accumulatorArray.slice(
             readAccumulatorBase,
             readAccumulatorBase + arch.arraySize
@@ -337,21 +389,19 @@ class Processor[T : NumericWithMAC : ClassTag](
         simdRegistersArray.slice(base, base + arch.arraySize)
       }
 
-      var (y, base, accumulate) =
+      var (y, base) =
         if (simdDestination == SIMDDestination.Output) {
-          if ((flags & SIMDFlags.Write) != 0)
+          if (writeAccumulatorAddress.tag == MemoryTag.Accumulators)
             (
               accumulatorArray,
-              writeAccumulatorAddress.toInt * arch.arraySize.toInt,
-              (flags & SIMDFlags.Accumulate) != 0
+              writeAccumulatorAddress.raw.toInt * arch.arraySize.toInt
             )
           else
-            (mkArray(arch.arraySize), 0, false)
+            (mkArray(arch.arraySize), 0)
         } else {
           (
             simdRegistersArray,
-            (simdDestination - 1) * arch.arraySize.toInt,
-            false
+            (simdDestination - 1) * arch.arraySize.toInt
           )
         }
 

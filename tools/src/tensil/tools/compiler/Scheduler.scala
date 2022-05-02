@@ -39,7 +39,7 @@ class Scheduler(
     name: String,
     arch: Architecture,
     options: CompilerOptions
-) {
+) extends HIR {
   if (options.printProgress) {
     println(s"$name, emitting HIR ...")
   }
@@ -62,7 +62,7 @@ class Scheduler(
       weightsObj: MemoryObject,
       biasObj: Option[MemoryObject],
       inputOutputPairs: Seq[MemoryOptionalInputOutputObjects]
-  ) {
+  ): Unit = {
     countMacs(weightsObj, inputOutputPairs)
 
     if (

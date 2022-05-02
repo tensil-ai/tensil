@@ -331,7 +331,7 @@ class BackendStream(
     tracepointConditions: Seq[TracepointCondition],
     tracepointResolveRefToObject: (MemoryRef) => Option[MemoryObject] = (ref) =>
       None
-) {
+) extends LIR {
   private var previousOpcode = Opcode.Wait
   private var previousFlags  = 0
 
@@ -474,14 +474,9 @@ class BackendStream(
     file.delete()
   }
 
-  def emitNoOp(
-      mkComment: (Seq[MemoryAddress]) => Option[String] = (_) => None
-  ): Unit = emitWait(currentTid, mkComment)
+  def emitNoOp(): Unit = emitWait(currentTid)
 
-  def emitWait(
-      tidToWait: Int,
-      mkComment: (Seq[MemoryAddress]) => Option[String] = (_) => None
-  ): Unit = {
+  def emitWait(tidToWait: Int): Unit = {
     beforeEmit(Opcode.Wait)
 
     emitTidOperand0(tidToWait)
@@ -491,7 +486,6 @@ class BackendStream(
       printOp(
         "Wait",
         "",
-        if (printComments) mkComment(Nil) else None,
         currentInstruction
       )
 
@@ -509,8 +503,7 @@ class BackendStream(
       localAddress: MemoryAddress,
       accumulatorStride: Int,
       accumulatorAddress: MemoryAddress,
-      size: MemoryAddressRaw,
-      mkComment: (Seq[MemoryAddress]) => Option[String] = (_) => None
+      size: MemoryAddressRaw
   ): Unit = {
     require(
       localAddress.tag == MemoryTag.Local || localAddress.tag == MemoryTag.Zeroes
@@ -543,8 +536,6 @@ class BackendStream(
       printOp(
         mnemonic + suffix,
         s"${formatAddress(localStride, localAddress)} ${formatAddress(accumulatorStride, accumulatorAddress)}${formatSize(size)}",
-        if (printComments) mkComment(Seq(accumulatorAddress, localAddress))
-        else None,
         currentInstruction
       )
     }
@@ -584,8 +575,7 @@ class BackendStream(
       simdSourceRight: Int,
       simdDestination: Int,
       writeAccumulatorAddress: MemoryAddress,
-      readAccumulatorAddress: MemoryAddress,
-      mkComment: (Seq[MemoryAddress]) => Option[String] = (_) => None
+      readAccumulatorAddress: MemoryAddress
   ): Unit = {
     require(
       writeAccumulatorAddress.tag == MemoryTag.Accumulators || writeAccumulatorAddress.tag == MemoryTag.Invalid
@@ -648,18 +638,12 @@ class BackendStream(
           s"${formatDestination(simdDestination)}=${formatSource(simdSourceLeft)}"
       }
 
-      val comment =
-        if (printComments)
-          mkComment(Seq(writeAccumulatorAddress, readAccumulatorAddress))
-        else None
-
       if (
         readAccumulatorAddress.tag == MemoryTag.Accumulators && writeAccumulatorAddress.tag == MemoryTag.Accumulators && accumulate
       ) {
         printOp(
           mnemonic + "(RWA)",
           s"${subInstructionName} W${MemoryAddressHelper(writeAccumulatorAddress)} R${MemoryAddressHelper(readAccumulatorAddress)}",
-          comment,
           currentInstruction
         )
       } else if (
@@ -668,7 +652,6 @@ class BackendStream(
         printOp(
           mnemonic + "(WA)",
           s"${subInstructionName} W${MemoryAddressHelper(writeAccumulatorAddress)}",
-          comment,
           currentInstruction
         )
       } else if (
@@ -677,28 +660,24 @@ class BackendStream(
         printOp(
           mnemonic + "(RW)",
           s"${subInstructionName} W${MemoryAddressHelper(writeAccumulatorAddress)} R${MemoryAddressHelper(readAccumulatorAddress)}",
-          comment,
           currentInstruction
         )
       } else if (writeAccumulatorAddress.tag == MemoryTag.Accumulators) {
         printOp(
           mnemonic + "(W)",
           s"${subInstructionName} W${MemoryAddressHelper(writeAccumulatorAddress)}",
-          comment,
           currentInstruction
         )
       } else if (readAccumulatorAddress.tag == MemoryTag.Accumulators) {
         printOp(
           mnemonic + "(R)",
           s"${subInstructionName} R${MemoryAddressHelper(readAccumulatorAddress)}",
-          comment,
           currentInstruction
         )
       } else
         printOp(
           mnemonic,
           subInstructionName,
-          comment,
           currentInstruction
         )
     }
@@ -719,8 +698,7 @@ class BackendStream(
       localAddress: MemoryAddress,
       stride: Int,
       address: MemoryAddress,
-      size: MemoryAddressRaw,
-      mkComment: (Seq[MemoryAddress]) => Option[String] = (_) => None
+      size: MemoryAddressRaw
   ): Unit = {
     require(
       localAddress.tag == MemoryTag.Local
@@ -776,7 +754,6 @@ class BackendStream(
       printOp(
         mnemonic + suffix,
         s"${formatAddress(localStride, localAddress)} ${formatAddress(stride, address)}${formatSize(size)}",
-        if (printComments) mkComment(Seq(localAddress, address)) else None,
         currentInstruction
       )
     }
@@ -813,8 +790,7 @@ class BackendStream(
   def emitLoadWeights(
       localStride: Int,
       localAddress: MemoryAddress,
-      size: MemoryAddressRaw,
-      mkComment: (Seq[MemoryAddress]) => Option[String] = (_) => None
+      size: MemoryAddressRaw
   ): Unit = {
     require(
       localAddress.tag == MemoryTag.Local || localAddress.tag == MemoryTag.Zeroes
@@ -837,7 +813,6 @@ class BackendStream(
       printOp(
         mnemonic,
         s"${formatAddress(localStride, localAddress)}${formatSize(size)}",
-        if (printComments) mkComment(Seq(localAddress)) else None,
         currentInstruction
       )
     }
@@ -1063,7 +1038,6 @@ class BackendStream(
   private def printOp(
       mnemonic: String,
       operands: String,
-      comment: Option[String],
       instruction: BigInt
   ): Unit = {
     val bytes     = mkInstructionBytes()
@@ -1074,21 +1048,10 @@ class BackendStream(
       hexBuffer.append(if (s.size == 1) s"0x0$s," else s"0x$s,")
     }
 
-    val comments = if (comment.isDefined) {
-      val parts = comment.get.split(",").toIndexedSeq
-      if (parts.size == 1)
-        IndexedSeq(s"; ${parts(0)}")
-      else
-        s"; ${parts(0)}," +: parts
-          .slice(1, parts.size - 1)
-          .map(c => s";     ${c},") :+ s";     ${parts.last}"
-    } else Nil
-
     instructionLinesBuffer += TableLine(
       hexBuffer,
       mnemonic,
-      operands,
-      comments
+      operands
     )
   }
 

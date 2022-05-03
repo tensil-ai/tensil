@@ -109,6 +109,26 @@ rm main.tar.gz
 ./mill __.test -l org.scalatest.tags.Slow
 ```
 
+To run a single RTL test in, for example, the Accumulator module, and also output a VCD file, do:
+
+```
+./mill rtl.test.testOnly tensil.tcu.AccumulatorSpec -- -DwriteVcd=true -z "should accumulate values"
+```
+
+### View VCD files
+
+To view the latest VCD file generated:
+
+```
+./scripts/gtkwave/display-latest-vcd.py
+```
+
+To view a specific VCD file:
+
+```
+./scripts/gtkwave/display-vcd.sh <vcd_file>
+```
+
 ## Get help
 
 - Say hello and ask a question on our [Discord](https://discord.gg/TSw34H3PXr)

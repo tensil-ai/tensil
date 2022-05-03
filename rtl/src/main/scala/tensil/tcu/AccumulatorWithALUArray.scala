@@ -5,6 +5,7 @@ package tensil.tcu
 
 import chisel3._
 import chisel3.util.{Decoupled, DecoupledIO, Queue}
+import tensil.mem.OutQueue
 import tensil.PlatformConfig
 import tensil.tcu.simd.ALUArray
 import tensil.util.{DecoupledHelper, reportThroughput}
@@ -47,15 +48,8 @@ class AccumulatorWithALUArray[T <: Data with Num[T]](
   )
   val aluOutput            = alu.io.output
   val aluOutputForAccInput = Wire(Decoupled(chiselTypeOf(alu.io.output.bits)))
-  // val aluOutputForAccInput = Queue(alu.io.output, 2)
-  // val input                = QueueWithReporting(io.input, 1 << 1) // 5
-  // val input   = QueueWithReporting(io.input, 1 << 7)   // 5
-  // val input   = QueueWithReporting(io.input, 1 << 1)   // 5
-  // val control = QueueWithReporting(io.control, 1 << 1) // 6
-  val input   = io.input
-  val control = io.control
-  // val control = QueueWithReporting(io.control, 1 << 5) // 6
-  // control.ready := true.B // ready for next command by default
+  val input                = io.input
+  val control              = io.control
   // TODO if control.bits.read is not set, but at least one of the ALU sources
   //   is 0, then we need to feed the ALU some dummy data to avoid a stall.
   //   Just feed it some hard-coded 0s (we need a new aluInputMux).
@@ -71,38 +65,41 @@ class AccumulatorWithALUArray[T <: Data with Num[T]](
   io.nooped.bits := true.B
   io.nooped.valid := control.bits.instruction.op === 0.U && !control.bits.read && !control.bits.write && control.ready
 
-  // reportThroughput(control, 100, "Acc.control")
-  // reportThroughput(input, 100, "Acc.input")
-
   acc.io.tracepoint := io.tracepoint
   acc.io.programCounter := io.programCounter
 
-  val muxControlQueueSize = 1 << 1 // 3
-  // val muxControlQueueSize = 1 << 5 // 3
-  // val muxControlQueueSize = 1 << 1 // 3
-
-  val aluOutputDemux =
+  val aluOutputDemux = OutQueue(
     decoupled.Demux(
-      // alu.io.output,
       aluOutput,
       aluOutputSink.io.in,
       aluOutputForAccInput,
-      controlQueueSize = muxControlQueueSize,
       name = "accalu.aluOutput"
-    )
-  val accInputMux = decoupled.Mux(
-    input,
-    aluOutputForAccInput,
-    acc.io.input,
-    // controlQueueSize = muxControlQueueSize,
-    name = "accalu.accInput"
+    ),
+    1,
+    pipe = true,
+    flow = true
   )
-  val accOutputDemux = decoupled.Demux(
-    acc.io.output,
-    io.output,
-    alu.io.input,
-    controlQueueSize = muxControlQueueSize,
-    name = "accalu.accOutput"
+  val accInputMux = OutQueue(
+    decoupled.Mux(
+      input,
+      aluOutputForAccInput,
+      acc.io.input,
+      name = "accalu.accInput"
+    ),
+    1,
+    pipe = true,
+    flow = true
+  )
+  val accOutputDemux = OutQueue(
+    decoupled.Demux(
+      acc.io.output,
+      io.output,
+      alu.io.input,
+      name = "accalu.accOutput"
+    ),
+    1,
+    pipe = true,
+    flow = true
   )
   aluOutputDemux.tieOff()
   accInputMux.tieOff()
@@ -259,9 +256,6 @@ class AccumulatorWithALUArray[T <: Data with Num[T]](
     }
     control.ready := dataPathReady
   }
-  // }.otherwise {
-  //   control.ready := false.B
-  // }
 
   def writeControl(): AccumulatorControl = {
     val w = Wire(acc.io.control.bits.cloneType.asInstanceOf[AccumulatorControl])

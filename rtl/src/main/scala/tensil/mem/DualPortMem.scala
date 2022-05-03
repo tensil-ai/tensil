@@ -36,12 +36,13 @@ class DualPortMem[T <: Data](
   connectPort(io.portA, mem.io.portA, "A")
   connectPort(io.portB, mem.io.portB, "B")
 
-  def connectPort(port: Port[T], inner: InnerPort[T], portName: String) {
+  def connectPort(
+      port: Port[T],
+      inner: InnerPort[T],
+      portName: String
+  ): Unit = {
     val control = port.control
     val input   = port.input
-
-    // reportThroughput(control, 100, "Mem" + portName + ".control")
-    // reportThroughput(input, 100, "Mem" + portName + ".input")
 
     val readDelay        = 1
     val outputBufferSize = 2

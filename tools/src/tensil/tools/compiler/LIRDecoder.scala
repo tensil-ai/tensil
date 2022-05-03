@@ -71,10 +71,10 @@ class LIRDecoder(arch: Architecture) {
 
       val header = instruction >> layout.operandsSizeBits
 
-      val opcode: Int =
-        (header >> (layout.flagsSizeBits + layout.tidSizeBits)).toByte
       val tid: Int =
-        ((header >> layout.flagsSizeBits) & ((1 << layout.tidSizeBits) - 1)).toByte
+        (header >> (layout.opcodeSizeBits + layout.flagsSizeBits)).toByte
+      val opcode: Int =
+        ((header >> layout.flagsSizeBits) & ((1 << layout.opcodeSizeBits) - 1)).toByte
       val flags: Int = (header & ((1 << layout.flagsSizeBits) - 1)).toByte
 
       if (opcode == Opcode.Wait) {

@@ -222,7 +222,7 @@ class CompilerBackendSpec extends FlatSpec {
         // Size
         0x10, 0x32, 0x54, 0x00,
         // Header
-        0x20,
+        0x10,
         // Local Address
         0x45, 0x23, 0x01, 0x80,
         // Accumulator Address
@@ -230,7 +230,7 @@ class CompilerBackendSpec extends FlatSpec {
         // Size
         0x10, 0x32, 0x54, 0x00,
         // Header
-        0x21,
+        0x11,
         // Local Address
         0x45, 0x23, 0x01, 0x00,
         // Accumulator Address
@@ -238,7 +238,7 @@ class CompilerBackendSpec extends FlatSpec {
         // Size
         0x10, 0x32, 0x54, 0x00,
         // Header
-        0x22,
+        0x12,
         // Local Address
         0x45, 0x23, 0x01, 0x00,
         // Accumulator Address
@@ -246,7 +246,7 @@ class CompilerBackendSpec extends FlatSpec {
         // Size
         0x10, 0x32, 0x54, 0x00,
         // Header
-        0x23,
+        0x13,
       ).map(_.toByte)
     )
   }
@@ -288,7 +288,7 @@ class CompilerBackendSpec extends FlatSpec {
         // Padding
         0, 0, 0,
         // Header
-        0x80,
+        0x40,
         // Write Accumulator Address
         0x45, 0x23, 0x01, 0x00,
         // Read Accumulator Address
@@ -298,7 +298,7 @@ class CompilerBackendSpec extends FlatSpec {
         // Padding
         0, 0, 0,
         // Header
-        0x83,
+        0x43,
       ).map(_.toByte)
     )
   }
@@ -384,7 +384,7 @@ class CompilerBackendSpec extends FlatSpec {
         // Size
         0x10, 0x32, 0x54, 0x00,
         // Header
-        0x40,
+        0x20,
         // Local Address
         0x45, 0x23, 0x01, 0x80,
         // Vars Address
@@ -392,7 +392,7 @@ class CompilerBackendSpec extends FlatSpec {
         // Size
         0x10, 0x32, 0x54, 0x00,
         // Header
-        0x41,
+        0x21,
         // Local Address
         0x45, 0x23, 0x01, 0xc0,
         // Consts Address
@@ -400,7 +400,7 @@ class CompilerBackendSpec extends FlatSpec {
         // Size
         0x10, 0x32, 0x54, 0x00,
         // Header
-        0x42,
+        0x22,
         // Local Address
         0x45, 0x23, 0x01, 0x40,
         // Consts Address
@@ -408,7 +408,7 @@ class CompilerBackendSpec extends FlatSpec {
         // Size
         0x10, 0x32, 0x54, 0x00,
         // Header
-        0x43,
+        0x23,
         // Local Address
         0x45, 0x23, 0x01, 0x40,
         // Accumulator Address
@@ -416,7 +416,7 @@ class CompilerBackendSpec extends FlatSpec {
         // Size
         0x10, 0x32, 0x54, 0x00,
         // Header
-        0x4c,
+        0x2c,
         // Local Address
         0x45, 0x23, 0x01, 0x80,
         // Accumulator Address
@@ -424,7 +424,7 @@ class CompilerBackendSpec extends FlatSpec {
         // Size
         0x10, 0x32, 0x54, 0x00,
         // Header
-        0x4d,
+        0x2d,
         // Local Address
         0x45, 0x23, 0x01, 0xc0,
         // Accumulator Address
@@ -432,7 +432,7 @@ class CompilerBackendSpec extends FlatSpec {
         // Size
         0x10, 0x32, 0x54, 0x00,
         // Header
-        0x4f,
+        0x2f,
       ).map(_.toByte)
     )
   }
@@ -479,7 +479,7 @@ class CompilerBackendSpec extends FlatSpec {
         // Padding
         0, 0, 0, 0,
         // Header
-        0x60,
+        0x30,
         // Weights Address
         0x45, 0x23, 0x01, 0x40,
         // Weights Size
@@ -487,7 +487,7 @@ class CompilerBackendSpec extends FlatSpec {
         // Padding
         0, 0, 0, 0,
         // Header
-        0x60,
+        0x30,
         // Weights Address
         0x45, 0x23, 0x01, 0x80,
         // Weights Size
@@ -495,7 +495,7 @@ class CompilerBackendSpec extends FlatSpec {
         // Padding
         0, 0, 0, 0,
         // Header
-        0x60,
+        0x30,
         // Weights Address
         0x45, 0x23, 0x01, 0xc0,
         // Weights Size
@@ -503,7 +503,7 @@ class CompilerBackendSpec extends FlatSpec {
         // Padding
         0, 0, 0, 0,
         // Header
-        0x60,
+        0x30,
         // Weights Address
         0, 0, 0, 0,
         // Weights Size
@@ -511,7 +511,7 @@ class CompilerBackendSpec extends FlatSpec {
         // Padding
         0, 0, 0, 0,
         // Header
-        0x61
+        0x31
       ).map(_.toByte)
     )
   }

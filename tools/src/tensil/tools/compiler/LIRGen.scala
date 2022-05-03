@@ -35,13 +35,13 @@ class LIRGen(
   private var currentInstructionSizeBits: Int = 0
   private var currentInstruction: BigInt      = 0
 
-  private val binaryDataStream                      = new DataOutputStream(stream)
+  private val binaryDataStream = new DataOutputStream(stream)
 
   def emitNoOp(): Unit = emitWait(currentTid)
 
   def emitWait(tidToWait: Int): Unit = {
     emitTidOperand0(tidToWait)
-    emitHeader(Opcode.Wait, currentTid)
+    emitHeader(currentTid, Opcode.Wait)
     emitInstruction()
   }
 
@@ -68,7 +68,7 @@ class LIRGen(
       accumulatorAddress.raw
     )
     emitLocalAndAccumulatorSizeOperand2(size)
-    emitHeader(Opcode.MatMul, currentTid, flags)
+    emitHeader(currentTid, Opcode.MatMul, flags)
     emitInstruction()
   }
 
@@ -127,7 +127,7 @@ class LIRGen(
       simdSourceRight,
       simdDestination
     )
-    emitHeader(Opcode.SIMD, currentTid, flags)
+    emitHeader(currentTid, Opcode.SIMD, flags)
     emitInstruction()
   }
 
@@ -163,7 +163,7 @@ class LIRGen(
         emitLocalAndDRAM1SizeOperand2(size)
     }
 
-    emitHeader(Opcode.DataMove, currentTid, flags)
+    emitHeader(currentTid, Opcode.DataMove, flags)
     emitInstruction()
   }
 
@@ -183,7 +183,7 @@ class LIRGen(
 
     emitLocalStrideAddressOperand0(localStride, localAddress.raw)
     emitLocalSizeOperand1(size)
-    emitHeader(Opcode.LoadWeights, currentTid, flags)
+    emitHeader(currentTid, Opcode.LoadWeights, flags)
     emitInstruction()
   }
 
@@ -345,20 +345,20 @@ class LIRGen(
     )
   }
 
-  private def emitHeader(opcode: Int, tid: Int = 0, flags: Int = 0): Unit = {
-    require(opcode >= 0 && tid >= 0 && flags >= 0)
-
-    if (opcode >= (1 << layout.opcodeSizeBits))
-      throw new CompilerException("Opcode overflow")
+  private def emitHeader(tid: Int, opcode: Int, flags: Int = 0): Unit = {
+    require(tid >= 0 && opcode >= 0 && flags >= 0)
 
     if (tid >= (1 << layout.tidSizeBits))
       throw new CompilerException("TID overflow")
+
+    if (opcode >= (1 << layout.opcodeSizeBits))
+      throw new CompilerException("Opcode overflow")
 
     if (flags >= (1 << layout.flagsSizeBits))
       throw new CompilerException("Flags overflow")
 
     val header = BigInt(
-      (opcode << (layout.tidSizeBits + layout.flagsSizeBits)) | (tid << layout.flagsSizeBits) | flags
+      (tid << (layout.opcodeSizeBits + layout.flagsSizeBits)) | (opcode << layout.flagsSizeBits) | flags
     )
 
     currentInstruction |= (header << layout.operandsSizeBits)

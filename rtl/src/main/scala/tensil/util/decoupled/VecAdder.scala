@@ -14,8 +14,7 @@ class VecAdder[T <: Data with Num[T]](gen: T, size: Int) extends Module {
     val output = Decoupled(Vec(size, gen))
   })
 
-  val left = Queue(io.left, 1, pipe = true, flow = true)
-  // val right = io.right
+  val left  = Queue(io.left, 1, pipe = true, flow = true)
   val right = Queue(io.right, 1, pipe = true, flow = true)
 
   for (i <- 0 until size) {

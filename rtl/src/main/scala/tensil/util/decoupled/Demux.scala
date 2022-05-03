@@ -19,12 +19,7 @@ class Demux[T <: Data](
     val out = Vec(n, Decoupled(gen))
   })
 
-  // val in  = QueueWithReporting(io.in, 1 << 1, name=name) // 7
-  // val in  = QueueWithReporting(io.in, 1 << 5, name = name) // 7
-  // val in = Queue(io.in, 2, flow = true)
-  val in = io.in
-  // val sel = QueueWithReporting(io.sel, controlQueueSize, name = name)
-  // val sel = Queue(io.sel, 2, flow = true)
+  val in  = io.in
   val sel = io.sel
 
   for (i <- 0 until n) {

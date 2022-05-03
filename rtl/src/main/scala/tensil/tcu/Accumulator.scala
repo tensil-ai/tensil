@@ -44,16 +44,17 @@ class Accumulator[T <: Data with Num[T]](
     )
   )
   val adder   = Module(new VecAdder(gen, height))
-  val control = io.control
+  val control = Queue(io.control, 1, pipe = true, flow = true)
   val input   = Queue(io.input, 2)
 
   val portA        = mem.io.portA
   val portB        = mem.io.portB
+  val portAControl = portA.control
   val portBControl = OutQueue(portB.control, 1, pipe = true, flow = true)
 
   mem.io.programCounter := io.programCounter
   mem.io.tracepoint := io.tracepoint
-  portA.control.tieOff()
+  portAControl.tieOff()
   portBControl.tieOff()
   portA.status.ready := true.B
   portA.inputStatus.ready := true.B
@@ -65,11 +66,16 @@ class Accumulator[T <: Data with Num[T]](
   portB.input <> adder.io.output
   portB.output.ready := false.B
 
-  val inputDemux = decoupled.Demux(
-    input,
-    portA.input,
-    adder.io.left,
-    name = "acc.input"
+  val inputDemux = OutQueue(
+    decoupled.Demux(
+      input,
+      portA.input,
+      adder.io.left,
+      name = "acc.input"
+    ),
+    1,
+    pipe = true,
+    flow = true
   )
   val memOutputDemux = OutQueue(
     decoupled.Demux(
@@ -105,7 +111,7 @@ class Accumulator[T <: Data with Num[T]](
       control.ready := accEnqueuer.enqueue(
         control.valid,
         // read
-        portA.control,
+        portAControl,
         MemControl(depth)(control.bits.address, false.B),
         memOutputDemux,
         1.U,
@@ -119,7 +125,7 @@ class Accumulator[T <: Data with Num[T]](
       // just write
       control.ready := writeEnqueuer.enqueue(
         control.valid,
-        portA.control,
+        portAControl,
         MemControl(depth)(control.bits.address, true.B),
         inputDemux,
         0.U,
@@ -130,7 +136,7 @@ class Accumulator[T <: Data with Num[T]](
     when(!writeAccumulating) {
       control.ready := readEnqueuer.enqueue(
         control.valid,
-        portA.control,
+        portAControl,
         MemControl(depth)(control.bits.address, false.B),
         memOutputDemux,
         0.U
@@ -141,8 +147,3 @@ class Accumulator[T <: Data with Num[T]](
     }
   }
 }
-
-// object Accumulator extends App {
-//   implicit val config = PlatformConfig.default.copy(verification = true)
-//   util.emitToBuildDir(new Accumulator(SInt(4.W), 2, 8), "Accumulator.sv")
-// }

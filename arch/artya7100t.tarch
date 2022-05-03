@@ -7,5 +7,6 @@
     "accumulator_depth": 2048,
     "simd_registers_depth": 1,
     "stride0_depth": 8,
-    "stride1_depth": 8
+    "stride1_depth": 8,
+    "number_of_threads": 1
   }

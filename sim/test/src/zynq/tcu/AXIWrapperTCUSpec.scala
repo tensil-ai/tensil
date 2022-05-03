@@ -313,7 +313,7 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
                   }
 
                   // wait until it's done
-                  for (l <- 0 until 6700000 * batchSize) {
+                  for (l <- 0 until 3700000 * batchSize) {
 
                     if (l % 1000 == 0)
                       println(s"CYCLE: $l")

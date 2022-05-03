@@ -5,80 +5,191 @@ package tensil.tools.compiler
 
 import java.io._
 import scala.collection.mutable
-import tensil.tools.{
-  TraceContext,
-  TracepointCondition
-}
-import tensil.{TablePrinter, TableLine, ArchitectureDataType, InstructionLayout}
+import tensil.tools.{TraceContext, TracepointCondition, TracepointsMap}
+import tensil.{ArchitectureDataType, InstructionLayout}
 
-class Backend(
-    programStream: OutputStream,
+class BackendSegment(
+    val key: BackendSegmentKey,
     layout: InstructionLayout,
-    dataType: ArchitectureDataType,
-    printProgramStream: Option[DataOutputStream] = None,
-    printComments: Boolean = false,
-    tracepointConditions: Seq[TracepointCondition] = Nil,
-    tracepointResolveRefToObject: (MemoryRef) => Option[MemoryObject] = (ref) =>
-      None,
-    traceContext: TraceContext = TraceContext.empty,
-) {
-  private val programStringWriter    = new StringWriter()
-  private val instructionLinesBuffer = mutable.ArrayBuffer.empty[TableLine]
+    stats: Option[BackendStats],
+    tracepointConditions: Seq[TracepointCondition],
+    resolveRefToObject: (MemoryRef) => Option[MemoryObject] = (ref) => None
+) extends LIR {
+  val file = File.createTempFile("segment_", ".tprog")
 
-  private var instructionOffset: InstructionAddress = InstructionAddress.Zero
+  private val fileStream = new FileOutputStream(file)
 
-  def mkStream(
-      name: String,
-      stats: Option[BackendStats] = None
-  ): BackendStream =
-    new BackendStream(
-      name = name,
-      layout = layout,
-      dataType = dataType,
-      printProgram = printProgramStream.isDefined,
-      printComments = printComments,
-      stats = stats,
-      tracepointConditions = tracepointConditions,
-      tracepointResolveRefToObject = tracepointResolveRefToObject
+  private val lirTracepointCollector = new LIRTracepointCollector(
+    tracepointConditions,
+    resolveRefToObject
+  )
+
+  private val lirBroadcast = new LIRBroadcast(
+    Seq(
+      new LIRGen(layout, fileStream),
+      lirTracepointCollector
+    ) ++ (if (stats.isDefined) Seq(new LIREstimator(layout, stats.get))
+          else
+            Nil)
+  )
+
+  def instructionsCount = lirTracepointCollector.instructionsCount
+  def instructionTracepointsMaps =
+    lirTracepointCollector.instructionTracepointsMaps
+
+  def close(): Unit = fileStream.close()
+
+  def emitNoOp(): Unit = lirBroadcast.emitNoOp()
+
+  def emitWait(tidToWait: Int): Unit = lirBroadcast.emitWait(tidToWait)
+
+  def emitMatMul(
+      accumulate: Boolean,
+      localStride: Int,
+      localAddress: MemoryAddress,
+      accumulatorStride: Int,
+      accumulatorAddress: MemoryAddress,
+      size: MemoryAddressRaw
+  ): Unit =
+    lirBroadcast.emitMatMul(
+      accumulate,
+      localStride,
+      localAddress,
+      accumulatorStride,
+      accumulatorAddress,
+      size
     )
 
-  def writeStream(
-      stream: BackendStream,
-      buffer: Array[Byte] = Array.fill[Byte](256)(0)
-  ): Unit = {
-    stream.closeAndWriteToOutputStream(programStream, buffer)
+  def emitSIMD(
+      accumulate: Boolean,
+      simdOp: Int,
+      simdSourceLeft: Int,
+      simdSourceRight: Int,
+      simdDestination: Int,
+      writeAccumulatorAddress: MemoryAddress,
+      readAccumulatorAddress: MemoryAddress
+  ): Unit =
+    lirBroadcast.emitSIMD(
+      accumulate,
+      simdOp,
+      simdSourceLeft,
+      simdSourceRight,
+      simdDestination,
+      writeAccumulatorAddress,
+      readAccumulatorAddress
+    )
 
-    if (printProgramStream.isDefined) {
-      val tb = new TablePrinter(Some(stream.name))
+  def emitDataMove(
+      toLocal: Boolean,
+      accumulate: Boolean,
+      localStride: Int,
+      localAddress: MemoryAddress,
+      stride: Int,
+      address: MemoryAddress,
+      size: MemoryAddressRaw
+  ): Unit =
+    lirBroadcast.emitDataMove(
+      toLocal,
+      accumulate,
+      localStride,
+      localAddress,
+      stride,
+      address,
+      size
+    )
 
-      var i = 0
-      for (instructionLine <- stream.instructionLines) {
-        val printProgramOffset = instructionOffset + i
+  def emitLoadWeights(
+      localStride: Int,
+      localAddress: MemoryAddress,
+      size: MemoryAddressRaw
+  ): Unit = lirBroadcast.emitLoadWeights(localStride, localAddress, size)
+}
 
-        tb.addLine(
-          TableLine(
-            s"P[$printProgramOffset]",
-            instructionLine
-          )
-        )
+object BackendSegmentKey {
+  val Init    = 0
+  val Load    = 1
+  val Compute = 2
+  val Save    = 3
 
-        i += 1
-      }
+  def apply(
+      layer: Int,
+      stage: Int,
+      partition: Int,
+      kind: Int
+  ): BackendSegmentKey = (layer, stage, partition, kind)
+}
 
-      printProgramStream.get.writeBytes(tb.toString())
-    }
+class Backend(
+    layout: InstructionLayout,
+    tracepointConditions: Seq[TracepointCondition] = Nil,
+    resolveRefToObject: (MemoryRef) => Option[MemoryObject] = (ref) => None,
+    traceContext: TraceContext = TraceContext.empty,
+) {
+  private val segments =
+    mutable.SortedMap.empty[BackendSegmentKey, BackendSegment]
 
-    for (
-      (offset, instructionTracepointsMap) <- stream.instructionTracepointsMaps
-    ) {
-      traceContext.emitTracepoints(
-        instructionOffset + offset,
-        instructionTracepointsMap
-      )
-    }
+  def mkSegment(
+      key: BackendSegmentKey,
+      stats: Option[BackendStats] = None
+  ): BackendSegment =
+    new BackendSegment(
+      key = key,
+      layout = layout,
+      stats = stats,
+      tracepointConditions = tracepointConditions,
+      resolveRefToObject = resolveRefToObject
+    )
 
-    instructionOffset += stream.instructionsCount
+  def finalizeSegment(segment: BackendSegment): Unit = {
+    segment.close()
+    segments(segment.key) = segment
   }
 
-  def instructionsCount = instructionOffset
+  def writeSegments(
+      programStream: OutputStream,
+      printProgramStream: Option[DataOutputStream] = None
+  ): Unit = {
+    var instructionOffset: Long = 0
+    val lir = new LIRBroadcast(
+      Seq(new LIRGen(layout, programStream)) ++ (if (
+                                                   printProgramStream.isDefined
+                                                 )
+                                                   Seq(
+                                                     new LIRPrinter(
+                                                       printProgramStream.get
+                                                     )
+                                                   )
+                                                 else Nil)
+    )
+
+    for ((key, segment) <- segments) {
+
+      if (printProgramStream.isDefined)
+        printProgramStream.get.writeBytes(
+          s";\r\n; ${BackendSegmentKeyHelper(key)}\r\n;\r\n"
+        )
+
+      val inputStream = new FileInputStream(segment.file)
+      val lirDecoder  = new LIRDecoder(layout.arch)
+
+      lirDecoder.decode(inputStream, lir)
+
+      inputStream.close()
+      segment.file.delete()
+
+      for (
+        (offset, instructionTracepointsMap) <-
+          segment.instructionTracepointsMaps
+      ) {
+        traceContext.emitTracepoints(
+          instructionOffset + offset,
+          instructionTracepointsMap
+        )
+      }
+
+      instructionOffset += segment.instructionsCount
+    }
+  }
+
+  def instructionsCount = segments.values.map(_.instructionsCount).sum
 }

@@ -8,7 +8,7 @@ import java.io._
 import tensil.tools.{TraceContext}
 import tensil.{Architecture, InstructionLayout}
 
-class Decoder(arch: Architecture) {
+class LIRDecoder(arch: Architecture) {
   val layout = new InstructionLayout(arch)
 
   def decode(

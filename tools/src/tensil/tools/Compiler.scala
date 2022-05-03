@@ -227,13 +227,9 @@ object Compiler {
     val layout =
       InstructionLayout(options.arch)
     val backend = new Backend(
-      programStream = programStream,
       layout = layout,
-      dataType = options.arch.dataType,
-      printProgramStream = printProgramStream.map(new DataOutputStream(_)),
-      printComments = options.printProgramWithComments,
       tracepointConditions = options.tracepointConditions,
-      tracepointResolveRefToObject = mm.resolveRefToObject(_),
+      resolveRefToObject = mm.resolveRefToObject(_),
       traceContext = traceContext
     )
     val backendStats =
@@ -269,6 +265,8 @@ object Compiler {
         mm.freeConsumedObjects()
         r
       }
+
+      backend.writeSegments(programStream, printProgramStream.map(new DataOutputStream(_)))
 
       layerSchedulerResults = emitResults.filter(_.isDefined).map(_.get).toList
       macs = layerSchedulerResults.map(_.macs).sum

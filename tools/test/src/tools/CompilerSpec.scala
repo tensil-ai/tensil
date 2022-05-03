@@ -8,7 +8,7 @@ import org.scalatest._
 import org.scalatest.tagobjects.Slow
 import org.tensorflow.framework.types.DataType
 import tensil.{ArchitectureDataType, Architecture}
-import tensil.tools.golden.ExecutiveTraceContext
+import tensil.tools.emulator.ExecutiveTraceContext
 import tensil.tools.compiler.{MemoryDimensions, MemoryTag}
 
 class CompilerSpec extends FlatSpec {
@@ -197,7 +197,7 @@ class CompilerSpec extends FlatSpec {
       ).map(_.toByte)
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -274,7 +274,7 @@ class CompilerSpec extends FlatSpec {
       ).map(_.toByte)
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -362,7 +362,7 @@ class CompilerSpec extends FlatSpec {
       ).map(_.toByte)
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -490,7 +490,7 @@ class CompilerSpec extends FlatSpec {
       ).map(_.toByte)
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -573,7 +573,7 @@ class CompilerSpec extends FlatSpec {
       ).map(_.toByte)
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -701,7 +701,7 @@ class CompilerSpec extends FlatSpec {
       ).map(_.toByte)
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -801,7 +801,7 @@ class CompilerSpec extends FlatSpec {
       ).map(_.toByte)
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -952,7 +952,7 @@ class CompilerSpec extends FlatSpec {
       ).map(_.toByte)
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -1084,7 +1084,7 @@ class CompilerSpec extends FlatSpec {
       ).map(_.toByte)
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1158,7 +1158,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1179,7 +1179,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1199,7 +1199,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1220,7 +1220,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1240,7 +1240,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1262,7 +1262,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1304,7 +1304,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1324,7 +1324,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1341,7 +1341,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1358,7 +1358,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1375,7 +1375,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1392,7 +1392,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1409,7 +1409,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1426,7 +1426,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1443,7 +1443,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1463,7 +1463,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1482,7 +1482,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1502,7 +1502,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1519,7 +1519,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1539,7 +1539,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1556,7 +1556,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1576,7 +1576,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1593,7 +1593,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1613,7 +1613,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1630,7 +1630,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1647,7 +1647,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1664,7 +1664,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1684,7 +1684,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1703,7 +1703,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1723,7 +1723,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1740,7 +1740,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1786,7 +1786,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1806,7 +1806,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1827,7 +1827,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1847,7 +1847,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1867,7 +1867,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1889,7 +1889,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1910,7 +1910,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1950,7 +1950,7 @@ class CompilerSpec extends FlatSpec {
       traceContext
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -1980,7 +1980,7 @@ class CompilerSpec extends FlatSpec {
       traceContext
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -2004,7 +2004,7 @@ class CompilerSpec extends FlatSpec {
       traceContext
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -2035,7 +2035,7 @@ class CompilerSpec extends FlatSpec {
       traceContext
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -2096,7 +2096,7 @@ class CompilerSpec extends FlatSpec {
       traceContext
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -2119,7 +2119,7 @@ class CompilerSpec extends FlatSpec {
       traceContext
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -2142,7 +2142,7 @@ class CompilerSpec extends FlatSpec {
       traceContext
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -2172,7 +2172,7 @@ class CompilerSpec extends FlatSpec {
       traceContext
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -2217,7 +2217,7 @@ class CompilerSpec extends FlatSpec {
       traceContext
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -2240,7 +2240,7 @@ class CompilerSpec extends FlatSpec {
       traceContext
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -2263,7 +2263,7 @@ class CompilerSpec extends FlatSpec {
       traceContext
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -2292,7 +2292,7 @@ class CompilerSpec extends FlatSpec {
       traceContext
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -2315,7 +2315,7 @@ class CompilerSpec extends FlatSpec {
       traceContext
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -2344,7 +2344,7 @@ class CompilerSpec extends FlatSpec {
       traceContext
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -2367,7 +2367,7 @@ class CompilerSpec extends FlatSpec {
       traceContext
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -2393,7 +2393,7 @@ class CompilerSpec extends FlatSpec {
       traceContext
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext

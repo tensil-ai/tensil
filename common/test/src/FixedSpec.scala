@@ -23,12 +23,12 @@ class FixedSpec extends FlatSpec {
     val b =
       Array(Array(.1f, .2f, .3f), Array(.4f, .5f, .6f), Array(.7f, .8f, .9f))
 
-    val yExpected = golden.Ops.matMul(a, b).flatten
+    val yExpected = emulator.Ops.matMul(a, b).flatten
 
     val af = a.map(_.map(Fixed16bp8.fromDouble(_)))
     val bf = b.map(_.map(Fixed16bp8.fromDouble(_)))
 
-    val yf = golden.Ops.matMul(af, bf)
+    val yf = emulator.Ops.matMul(af, bf)
 
     val y = yf.map(_.map(_.toDouble())).flatten
 
@@ -52,12 +52,12 @@ class FixedSpec extends FlatSpec {
     val b =
       Array(Array(.1f, .2f, .3f), Array(.4f, .5f, .6f), Array(.7f, .8f, .9f))
 
-    val yExpected = golden.Ops.matMul(a, b).flatten
+    val yExpected = emulator.Ops.matMul(a, b).flatten
 
     val af = a.map(_.map(Fixed18bp10.fromDouble(_)))
     val bf = b.map(_.map(Fixed18bp10.fromDouble(_)))
 
-    val yf = golden.Ops.matMul(af, bf)
+    val yf = emulator.Ops.matMul(af, bf)
 
     val y = yf.map(_.map(_.toDouble())).flatten
 
@@ -81,12 +81,12 @@ class FixedSpec extends FlatSpec {
     val b =
       Array(Array(.1f, .2f, .3f), Array(.4f, .5f, .6f), Array(.7f, .8f, .9f))
 
-    val yExpected = golden.Ops.matMul(a, b).flatten
+    val yExpected = emulator.Ops.matMul(a, b).flatten
 
     val af = a.map(_.map(Fixed32bp16.fromDouble(_)))
     val bf = b.map(_.map(Fixed32bp16.fromDouble(_)))
 
-    val yf = golden.Ops.matMul(af, bf)
+    val yf = emulator.Ops.matMul(af, bf)
 
     val y = yf.map(_.map(_.toDouble())).flatten
 

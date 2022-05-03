@@ -351,15 +351,14 @@ class TfFrontend(
   ): Seq[Emitter] =
     recursiveRewrite(defs, emitter +: emitters)
 
-  private var layerIndex = 0
+  private var nextLayerIndex = 0
 
   private def startLayer(nodeDefs: Seq[NodeDef]): Scheduler = {
-    val name = s"LAYER $layerIndex (${nodeDefs.map(_.name).mkString(",")})"
-
-    layerIndex += 1
+    val layerIndex = nextLayerIndex
+    nextLayerIndex += 1
 
     new Scheduler(
-      name,
+      layerIndex,
       arch,
       options
     )
@@ -388,7 +387,7 @@ class TfFrontend(
   ): Emitter =
     (context: EmitContext) => {
       if (graphPrinter.isDefined)
-        graphPrinter.get.startLayer(s"layer_$layerIndex")
+        graphPrinter.get.startLayer(s"layer_$nextLayerIndex")
 
       val scheduler = startLayer(
         Seq(Some(nodeDef), biasDef, addDef, normDef, activateDef, poolDef)

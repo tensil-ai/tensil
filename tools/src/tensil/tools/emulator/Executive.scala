@@ -1,4 +1,4 @@
-package tensil.tools.golden
+package tensil.tools.emulator
 
 import tensil.tools.compiler.{MemoryAddressRaw}
 

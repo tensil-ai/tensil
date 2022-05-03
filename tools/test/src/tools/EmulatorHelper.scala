@@ -5,7 +5,7 @@ package tensil.tools
 
 import java.io._
 import scala.reflect.ClassTag
-import tensil.tools.golden.{Processor, ExecutiveTraceContext}
+import tensil.tools.emulator.{Emulator, ExecutiveTraceContext, ExecutiveTrace}
 import scala.collection.mutable
 import tensil.{
   Architecture,
@@ -15,9 +15,8 @@ import tensil.{
   FloatAsIfIntegralWithMAC
 }
 import tensil.tools.model.Model
-import tensil.tools.golden.ExecutiveTrace
 
-object GoldenProcessorHelper {
+object EmulatorHelper {
   def test(
       modelName: String,
       inputBatchSize: Int = 1,
@@ -201,7 +200,7 @@ object GoldenProcessorHelper {
       inputBatchSize: Int,
       traceContext: ExecutiveTraceContext
   ): Unit = {
-    val processor = new Processor(
+    val processor = new Emulator(
       dataType = dataType,
       arch = model.arch
     )

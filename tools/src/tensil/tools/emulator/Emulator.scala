@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /* Copyright © 2019-2022 Tensil AI Company */
 
-package tensil.tools.golden
+package tensil.tools.emulator
 
 import java.io._
 
@@ -11,9 +11,9 @@ import scala.reflect.ClassTag
 
 import tensil.tools.data.Tensor
 import tensil.tools.{TraceContext}
-import tensil.{Architecture, ArchitectureDataTypeWithBase, TablePrinter, golden}
+import tensil.{Architecture, ArchitectureDataTypeWithBase, TablePrinter, emulator}
 import tensil.tools.compiler.{
-  Decoder,
+  LIRDecoder,
   LoadWeightsFlags,
   SIMDFlags,
   SIMDOp,
@@ -31,32 +31,32 @@ import tensil.tools.compiler.{
 import tensil.NumericWithMAC
 import tensil.tools.compiler.LIRBroadcast
 
-class Processor[T : NumericWithMAC : ClassTag](
+class Emulator[T : NumericWithMAC : ClassTag](
     dataType: ArchitectureDataTypeWithBase[T],
     arch: Architecture
 ) {
-  val decoder      = new Decoder(arch)
-  val lirExecutive = new LIRExecutive(arch)
+  private val lirDecoder        = new LIRDecoder(arch)
+  private val emulatorExecutive = new EmulatorExecutive(arch)
 
   private def arrayToStream(bytes: Array[Byte]): InputStream = {
     new ByteArrayInputStream(bytes)
   }
 
   def writeDRAM0(addresses: Seq[MemoryAddressRaw], stream: InputStream): Unit =
-    lirExecutive.writeDRAM0(addresses, new DataInputStream(stream))
+    emulatorExecutive.writeDRAM0(addresses, new DataInputStream(stream))
   def writeDRAM0(addresses: Seq[MemoryAddressRaw], bytes: Array[Byte]): Unit =
     writeDRAM0(addresses, arrayToStream(bytes))
 
   def readDRAM0(addresses: Seq[MemoryAddressRaw], stream: OutputStream): Unit =
-    lirExecutive.readDRAM0(addresses, new DataOutputStream(stream))
+    emulatorExecutive.readDRAM0(addresses, new DataOutputStream(stream))
   def readDRAM0(addresses: Seq[MemoryAddressRaw]): Array[Byte] = {
     val bytesStream = new ByteArrayOutputStream()
-    lirExecutive.readDRAM0(addresses, new DataOutputStream(bytesStream))
+    emulatorExecutive.readDRAM0(addresses, new DataOutputStream(bytesStream))
     bytesStream.toByteArray()
   }
 
   def writeDRAM1(size: MemoryAddressRaw, stream: InputStream) =
-    lirExecutive.writeDRAM1(0L until size, new DataInputStream(stream))
+    emulatorExecutive.writeDRAM1(0L until size, new DataInputStream(stream))
   def writeDRAM1(size: MemoryAddressRaw, bytes: Array[Byte]): Unit =
     writeDRAM1(size, arrayToStream(bytes))
 
@@ -67,15 +67,15 @@ class Processor[T : NumericWithMAC : ClassTag](
     val startTime = System.nanoTime()
 
     try {
-      val lirTrace = new LIRTrace(trace, lirExecutive)
-      val lir      = new LIRBroadcast(Seq(lirTrace, lirExecutive))
+      val emulatorTrace = new EmulatorTrace(trace, emulatorExecutive)
+      val lir           = new LIRBroadcast(Seq(emulatorTrace, emulatorExecutive))
 
-      decoder.decode(
+      lirDecoder.decode(
         stream,
         lir
       )
 
-      lirTrace.runTrace()
+      emulatorTrace.runTrace()
     } finally {
       val endTime = System.nanoTime()
 
@@ -90,7 +90,8 @@ class Processor[T : NumericWithMAC : ClassTag](
     }
   }
 
-  class LIRTrace(trace: ExecutiveTrace, executive: Executive) extends LIR {
+  private class EmulatorTrace(trace: ExecutiveTrace, executive: Executive)
+      extends LIR {
     var instructionOffset = 0L
 
     def runTrace(): Unit = {
@@ -138,7 +139,9 @@ class Processor[T : NumericWithMAC : ClassTag](
     ): Unit = runTrace()
   }
 
-  class LIRExecutive(arch: Architecture) extends Executive with LIR {
+  private class EmulatorExecutive(arch: Architecture)
+      extends Executive
+      with LIR {
     val zero = implicitly[Numeric[T]].zero
     val one  = implicitly[Numeric[T]].one
 
@@ -248,9 +251,7 @@ class Processor[T : NumericWithMAC : ClassTag](
                               })
           )
 
-        val y = golden.Ops.matMul(x, currentWeights)
-
-        println(s"y=${y.toList}")
+        val y = emulator.Ops.matMul(x, currentWeights)
 
         for (j <- 0 until arch.arraySize)
           if (accumulate)

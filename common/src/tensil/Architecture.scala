@@ -89,7 +89,7 @@ object Architecture {
       simdRegistersDepth: Int = 1,
       stride0Depth: Int = 1,
       stride1Depth: Int = 1,
-      numberOfThreads: Int = 2,
+      numberOfThreads: Int = 1,
   ): Architecture =
     Architecture(
       dataType = dataType,
@@ -116,7 +116,7 @@ object Architecture {
     simdRegistersDepth = 1,
     stride0Depth = 8,
     stride1Depth = 8,
-    numberOfThreads = 2,
+    numberOfThreads = 1,
   )
 
   val formal = Architecture(
@@ -129,6 +129,6 @@ object Architecture {
     simdRegistersDepth = 1,
     stride0Depth = 2,
     stride1Depth = 2,
-    numberOfThreads = 2,
+    numberOfThreads = 1,
   )
 }

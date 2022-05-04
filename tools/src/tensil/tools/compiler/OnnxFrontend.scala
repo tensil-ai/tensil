@@ -9,7 +9,11 @@ import scala.collection.mutable
 
 import onnx.onnx.{NodeProto, ModelProto, TensorProto, ValueInfoProto}
 
-import _root_.tensil.tools.{CompilerException, TracepointCondition, CompilerOptions}
+import _root_.tensil.tools.{
+  CompilerException,
+  TracepointCondition,
+  CompilerOptions
+}
 import _root_.tensil.tools.data.{Shape, TensorData}
 import _root_.tensil.tools.util
 import _root_.tensil.{TablePrinter, Architecture}
@@ -231,7 +235,7 @@ class OnnxFrontend(
       case Nil => emitters
       case nodeProto :: remainingProtos =>
         nodeProto.opType.get match {
-          case "Gemm" | "Conv" =>
+          case "MatMul" | "Gemm" | "Conv" =>
             rewriteLayer(remainingProtos, nodeProto, emitters)
           case "Reshape" =>
             rewriteSimple(remainingProtos, emitReshape(_, nodeProto), emitters)
@@ -312,7 +316,7 @@ class OnnxFrontend(
    * This function takes `layerStepOps`, which describes
    * the pattern to which we expect nodes to adhere in order
    * to form a layer. The initial and the only required node is
-   * matched in `recursiveRewrite` to be either `Gemm` or
+   * matched in `recursiveRewrite` to be either `MatMul`, `Gemm` or
    * `Conv`. This node is followed by "layer step operations"
    * where each step can optionally be one of the operations
    * included in the set.
@@ -383,7 +387,8 @@ class OnnxFrontend(
   private var layerIndex = 0
 
   private def startLayer(nodeProtos: Seq[NodeProto]): Scheduler = {
-    val name = s"LAYER $layerIndex (${nodeProtos.map(_.name.get).mkString(",")})"
+    val name =
+      s"LAYER $layerIndex (${nodeProtos.map(_.name.get).mkString(",")})"
 
     layerIndex += 1
 
@@ -441,7 +446,13 @@ class OnnxFrontend(
         )
 
       val matMulTemp =
-        if (nodeProto.opType.get == "Gemm")
+        if (nodeProto.opType.get == "MatMul")
+          emitLayerMatMul(
+            context,
+            scheduler,
+            nodeProto
+          )
+        else if (nodeProto.opType.get == "Gemm")
           emitLayerGemm(
             context,
             scheduler,
@@ -2037,6 +2048,55 @@ class OnnxFrontend(
         Seq(("Weights", weights)) ++ (if (bias.isDefined)
                                         Seq(("Bias", bias.get))
                                       else Nil)
+      )
+
+    outputTemp
+  }
+
+  private def emitLayerMatMul(
+      context: EmitContext,
+      scheduler: Scheduler,
+      matMulProto: NodeProto
+  ): MemoryObject = {
+    context.mm.addPendingConst(
+      matMulProto.input(1),
+      getTensorData(tensorProtos(matMulProto.input(1)))
+    )
+
+    val (weights, bias) =
+      context.mm.getOrEmitWeightsAndBiasObjects(
+        matMulProto.input(1),
+        None
+      )
+
+    val inputVars =
+      context.mm.consumeObject(matMulProto.input(0), Seq(matMulProto.name.get))
+
+    val outputTemp =
+      context.mm.allocateTempObject(
+        matMulProto.output(0),
+        VarsDimensions(
+          inputVars.dims.number,
+          weights.dims.width
+        )
+      )
+
+    val pairs = Seq(
+      MemoryOptionalInputOutputObjects(Some(inputVars), outputTemp)
+    )
+
+    scheduler.emitMatMul(
+      weights,
+      bias,
+      pairs
+    )
+
+    if (graphPrinter.isDefined)
+      graphPrinter.get.printOp(
+        matMulProto,
+        Seq(outputTemp),
+        Seq(inputVars),
+        Seq(("Weights", weights))
       )
 
     outputTemp

@@ -152,8 +152,8 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
   )
   io.dram0 <> dram0Handler.io.out
   io.dram1 <> dram1Handler.io.out
-  val dram0 = dram0Handler.io.in
-  val dram1 = dram1Handler.io.in
+  val dram0 = OutQueue(dram0Handler.io.in, 1, pipe = true, flow = true)
+  val dram1 = OutQueue(dram1Handler.io.in, 1, pipe = true, flow = true)
   //// local
   val memPortAGen = new MemControlWithStride(arch.localDepth, arch.stride0Depth)
   val memPortBGen = new MemControlWithStride(arch.localDepth, arch.stride0Depth)
@@ -195,7 +195,13 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
   io.acc.bits := accHandler.io.out.bits.toAccumulatorWithALUArrayControl()
   io.acc.valid := accHandler.io.out.valid
   accHandler.io.out.ready := io.acc.ready
-  val acc = accHandler.io.in
+  val acc =
+    OutQueue(
+      accHandler.io.in,
+      layout.arch.arraySize * 2,
+      pipe = true,
+      flow = true
+    )
   //// array
   val arrayInGen  = new SystolicArrayControlWithSize(arch.localDepth)
   val arrayOutGen = new SystolicArrayControl
@@ -209,9 +215,15 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
     )
   )
   io.array <> arrayHandler.io.out
-  val array = arrayHandler.io.in
+  val array = OutQueue(
+    arrayHandler.io.in,
+    layout.arch.arraySize * 2,
+    pipe = true,
+    flow = true
+  )
   //// router
-  val dataflow = io.dataflow
+  val dataflow =
+    OutQueue(io.dataflow, layout.arch.arraySize * 2, pipe = true, flow = true)
   //// host router
   val hostDataflowHandler = Module(
     new SizeHandler(
@@ -221,7 +233,8 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
     )
   )
   io.hostDataflow <> hostDataflowHandler.io.out
-  val hostDataflow = hostDataflowHandler.io.in
+  val hostDataflow =
+    OutQueue(hostDataflowHandler.io.in, 1, pipe = true, flow = true)
 
   setDefault(memPortA)
   setDefault(memPortB)

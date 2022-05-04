@@ -6,6 +6,7 @@ package tensil.util
 import chisel3._
 import chisel3.util.{Decoupled, DecoupledIO}
 import tensil.mem.SizeHandler
+import tensil.mem.OutQueue
 
 package object decoupled {
   def asTypeOf[S <: Data, T <: Data](
@@ -25,13 +26,15 @@ package object decoupled {
       muxSel: DecoupledIO[UInt],
       depth: Long,
       size: UInt,
+      bufferSize: Int = 1,
   ): (DecoupledIO[MuxSelWithSize], UInt => MuxSelWithSize) = {
     val inGen  = new MuxSelWithSize(n, depth)
     val outGen = new MuxSel(n)
     val sizeHandler = Module(
       new SizeHandler(inGen, outGen, depth, name = name)
     )
-    val muxSelWithSize = sizeHandler.io.in
+    val muxSelWithSize =
+      OutQueue(sizeHandler.io.in, bufferSize, pipe = true, flow = true)
     muxSel.bits := sizeHandler.io.out.bits.sel
     muxSel.valid := sizeHandler.io.out.valid
     sizeHandler.io.out.ready := muxSel.ready

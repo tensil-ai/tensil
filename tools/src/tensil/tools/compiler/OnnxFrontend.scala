@@ -404,12 +404,7 @@ class OnnxFrontend(
   }*/
 
   private def finishLayer(scheduler: Scheduler, context: EmitContext) =
-    Some(
-      scheduler.emit(
-        context.backend,
-        context.backendStats
-      )
-    )
+    Some(scheduler.emit(context.backend))
 
   private def doRewriteLayer(
       nodeProto: NodeProto,

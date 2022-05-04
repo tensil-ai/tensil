@@ -20,8 +20,7 @@ case class Args(
     schedulerSummary: Boolean = false,
     partitionsSummary: Boolean = false,
     stridesSummary: Boolean = false,
-    instructionsSummary: Boolean = false,
-    backendStats: Boolean = true,
+    instructionsSummary: Boolean = false
 )
 
 object Main extends App {
@@ -85,11 +84,6 @@ object Main extends App {
       .valueName("true|false")
       .action((x, c) => c.copy(instructionsSummary = x))
       .text("Print instructions summary, defaults to false")
-
-    opt[Boolean]("backend-stats")
-      .valueName("true|false")
-      .action((x, c) => c.copy(backendStats = x))
-      .text("Collect backend stats, defaults to true")
   }
 
   argParser.parse(args, Args()) match {
@@ -105,8 +99,7 @@ object Main extends App {
         printSchedulerSummary = args.schedulerSummary,
         printPartitionsSummary = args.partitionsSummary,
         printStridesSummary = args.stridesSummary,
-        printInstructionsSummary = args.instructionsSummary,
-        collectBackendStats = args.backendStats
+        printInstructionsSummary = args.instructionsSummary
       )
 
       val archName = args.archFile.getName().split("\\.")(0)

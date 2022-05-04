@@ -26,11 +26,13 @@ import _root_.tensil.{TablePrinter, TableLine, Architecture}
 import java.io.DataOutputStream
 
 case class SchedulerResult(
-    accumulatorUtilization: Float,
-    localUtilization: Float,
     numberOfCombinedStages: Int,
     numberOfStages: Int,
     numberOfPartitions: Int,
+    cycles: Long,
+    energy: Long,
+    accumulatorUtilization: Float,
+    localUtilization: Float,
     macs: Long,
     macEfficiency: Float
 ) {}
@@ -395,7 +397,6 @@ class Scheduler(
 
   def emit(
       backend: Backend,
-      backendStats: Option[BackendStats] = None,
       backendBufferSize: Int = 256 * 1024
   ): SchedulerResult = {
     if (options.printProgress) {
@@ -648,10 +649,7 @@ class Scheduler(
       accumulatorSize.toFloat / arch.accumulatorDepth.toFloat
     val localUtilization = localSize.toFloat / arch.localDepth.toFloat
 
-    val collectStats = backendStats.isDefined
-
-    val layerStats =
-      if (collectStats) Some(new BackendStats(name)) else None
+    val stats = new Stats()
 
     if (options.printProgress) {
       println(
@@ -660,28 +658,15 @@ class Scheduler(
       println(s"Emitting LIR ...")
     }
 
-    def printPartitionsSummary(
-        stats: Option[BackendStats]
-    ) =
-      if (options.printPartitionsSummary && collectStats) {
-        val tb = new TablePrinter(Some(s"${stats.get.name} SCHEDULER SUMMARY"))
-        BackendStats.printSummary(stats.get, tb, arch)
-        print(tb)
-      }
-
-    //val stream = new DataOutputStream(new FileOutputStream("threads.csv", true))
-
     val instructionsCounts = stages.zipWithIndex.par
       .map({
         case (stage, i) =>
           val initKey =
             BackendSegmentKey(layerIndex, i, -1, BackendSegmentKey.Init)
-          val initStats =
-            if (collectStats) Some(new BackendStats(initKey.toString()))
-            else None
+          val initStats = new Stats()
           val initSegment = backend.mkSegment(
             initKey,
-            initStats
+            Some(initStats)
           )
           val stageInit = emitStageInit(initSegment, stage.constsToLoad)
 
@@ -708,27 +693,21 @@ class Scheduler(
                 )
 
                 val (loadStats, computeStats, saveStats) =
-                  if (collectStats)
-                    (
-                      Some(new BackendStats(loadKey.toString())),
-                      Some(new BackendStats(computeKey.toString())),
-                      Some(new BackendStats(saveKey.toString()))
-                    )
-                  else (None, None, None)
+                  (new Stats(), new Stats(), new Stats())
 
                 val (loadSegment, computeSegment, saveSegment) =
                   (
                     backend.mkSegment(
                       loadKey,
-                      loadStats
+                      Some(loadStats)
                     ),
                     backend.mkSegment(
                       computeKey,
-                      computeStats
+                      Some(computeStats)
                     ),
                     backend.mkSegment(
                       saveKey,
-                      saveStats
+                      Some(saveStats)
                     )
                   )
 
@@ -755,50 +734,16 @@ class Scheduler(
         case ((initSegment, initStats, partitionSegmentAndStats)) => {
           backend.finalizeSegment(initSegment)
 
-          printPartitionsSummary(initStats)
+          stats.add(initStats)
 
-          val buffer = Array.fill[Byte](backendBufferSize)(0)
-
-          var firstPartition = true
           val instructionsCounts =
             partitionSegmentAndStats.map(segmentAndStats => {
-              if (collectStats) {
-                val Seq(loadStats, computeStats, saveStats) =
-                  segmentAndStats.map(_._2.get)
-
-                val loadSaveStats = if (firstPartition) {
-                  firstPartition = false
-
-                  val stats =
-                    new BackendStats(
-                      s"${initStats.get.name} | ${loadStats.name} | ${saveStats.name}"
-                    )
-                  stats.add(initStats.get)
-                  stats.add(loadStats)
-                  stats.add(saveStats)
-                  stats
-
-                } else {
-                  val stats =
-                    new BackendStats(s"${loadStats.name} | ${saveStats.name}")
-                  stats.add(loadStats)
-                  stats.add(saveStats)
-                  stats
-                }
-
-                layerStats.get
-                  .addConcurrent(Seq(loadSaveStats, computeStats))
-
-                /*stream.writeBytes(
-                  s""""${computeStats.name}",${loadSaveStats.totalCycles},${computeStats.totalCycles}\r\n"""
-                )*/
-              }
+              segmentAndStats.foreach(v => stats.add(v._2))
 
               for ((partitionSegment, partitionStats) <- segmentAndStats)
                 yield {
                   backend.finalizeSegment(partitionSegment)
 
-                  printPartitionsSummary(partitionStats)
                   partitionSegment.instructionsCount
                 }
             })
@@ -806,10 +751,6 @@ class Scheduler(
           (initSegment.instructionsCount, instructionsCounts.flatten)
         }
       })
-
-    //stream.close()
-
-    if (collectStats) backendStats.get.add(layerStats.get)
 
     if (options.printProgress) {
       println(
@@ -819,10 +760,7 @@ class Scheduler(
 
     val stageInitInstructionCounts = instructionsCounts.map(_._1)
     val partitionInstructionCounts = instructionsCounts.map(_._2).flatten
-    val macEfficiency =
-      if (collectStats)
-        BackendStats.macEfficiency(layerStats.get, arch, macs)
-      else 0f
+    val macEfficiency              = Stats.macEfficiency(stats, arch, macs)
 
     if (options.printSchedulerSummary) {
       val tb = new TablePrinter(Some(s"$name SCHEDULER SUMMARY"))
@@ -848,8 +786,7 @@ class Scheduler(
         "Partition average number of instructions",
         partitionInstructionCounts.sum / partitionInstructionCounts.size
       )
-      if (collectStats)
-        BackendStats.printSummary(layerStats.get, tb, arch, Some(macs))
+      Stats.printSummary(stats, tb, arch, Some(macs))
       tb.addNamedLine(
         "Total number of instructions",
         stageInitInstructionCounts.sum + partitionInstructionCounts.sum
@@ -860,21 +797,18 @@ class Scheduler(
       )
       tb.addNamedLine("Local utilization (%)", localUtilization * 100f)
       val (macsLetter, macsDivisor) =
-        BackendStats.getUnitsLetterAndDivisor(macs)
+        Stats.getUnitsLetterAndDivisor(macs)
       tb.addNamedLine(
         s"True MACs (${macsLetter}MAC)",
         macs.toFloat / macsDivisor
       )
-      if (collectStats)
-        tb.addNamedLine("MAC efficiency (%)", macEfficiency * 100f)
+      tb.addNamedLine("MAC efficiency (%)", macEfficiency * 100f)
       print(tb)
-    }
 
-    if (collectStats) {
       if (options.printInstructionsSummary) {
-        BackendStats.printCompositionSummary(name, layerStats.get)
-        BackendStats.printCyclesSummary(name, layerStats.get)
-        BackendStats.printEnergySummary(name, layerStats.get)
+        Stats.printCompositionSummary(name, stats)
+        Stats.printCyclesSummary(name, stats)
+        Stats.printEnergySummary(name, stats)
       }
 
       if (options.printStridesSummary) {
@@ -883,10 +817,10 @@ class Scheduler(
             select: StrideStats => Any
         ): Unit = {
           val tb = new TablePrinter(Some(title), true)
-          BackendStats.printStrideStats(
+          Stats.printStrideStats(
             arch.stride0Depth,
             arch.stride1Depth,
-            layerStats.get,
+            stats,
             select,
             tb
           )
@@ -906,13 +840,15 @@ class Scheduler(
     }
 
     SchedulerResult(
-      accumulatorUtilization = accumulatorUtilization,
-      localUtilization = localUtilization,
       numberOfStages = numberOfStages,
       numberOfCombinedStages = numberOfCombinedStages,
       numberOfPartitions = numberOfPartitions,
+      cycles = stats.totalCycles,
+      energy = stats.totalEnergy,
+      accumulatorUtilization = accumulatorUtilization,
+      localUtilization = localUtilization,
       macs = macs,
-      macEfficiency = macEfficiency
+      macEfficiency = macEfficiency,
     )
   }
 

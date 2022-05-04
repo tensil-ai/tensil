@@ -23,6 +23,5 @@ case class CompilerOptions(
     printProgramWithComments: Boolean = false,
     printProgramFileName: Option[String] = None,
     printGraphFileName: Option[String] = None,
-    tracepointConditions: Seq[TracepointCondition] = Nil,
-    collectBackendStats: Boolean = false
+    tracepointConditions: Seq[TracepointCondition] = Nil
 )

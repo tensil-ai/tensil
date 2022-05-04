@@ -28,7 +28,7 @@ case class InstructionStats(
     energy: Long = 0
 ) {}
 
-object BackendStats {
+object Stats {
   def getUnitsLetterAndDivisor(v: Long): (String, Float) =
     if (v < 1000L)
       ("", 1f)
@@ -42,14 +42,14 @@ object BackendStats {
       ("T", 1e12f)
 
   def macEfficiency(
-      stats: BackendStats,
+      stats: Stats,
       arch: Architecture,
       macs: Long
   ): Float =
     (macs.toFloat / (arch.arraySize * arch.arraySize).toFloat / stats.totalCycles.toFloat)
 
   def printSummary(
-      stats: BackendStats,
+      stats: Stats,
       tb: TablePrinter,
       arch: Architecture,
       macs: Option[Long] = None
@@ -77,7 +77,7 @@ object BackendStats {
       )
   }
 
-  def printCompositionSummary(name: String, stats: BackendStats) {
+  def printCompositionSummary(name: String, stats: Stats) {
     val tb = new TablePrinter(
       Some(s"$name INSTRUCTIONS COMPOSITION (NUMBER/TOTAL SIZE)")
     )
@@ -100,7 +100,7 @@ object BackendStats {
     print(tb)
   }
 
-  def printCyclesSummary(name: String, stats: BackendStats) {
+  def printCyclesSummary(name: String, stats: Stats) {
     val tb = new TablePrinter(
       Some(s"$name INSTRUCTIONS LATENCY")
     )
@@ -128,7 +128,7 @@ object BackendStats {
     print(tb)
   }
 
-  def printEnergySummary(name: String, stats: BackendStats) {
+  def printEnergySummary(name: String, stats: Stats) {
     val tb = new TablePrinter(
       Some(s"$name INSTRUCTIONS ENERGY")
     )
@@ -159,7 +159,7 @@ object BackendStats {
   def printStrideStats(
       stride0Depth: Int,
       stride1Depth: Int,
-      stats: BackendStats,
+      stats: Stats,
       select: StrideStats => Any,
       tb: TablePrinter
   ) = {
@@ -196,29 +196,18 @@ object BackendStats {
   }
 }
 
-class BackendStats(val name: String) {
+class Stats {
   private val currentInstructionStats =
     mutable.Map.empty[String, InstructionStats]
   private val currentStrideStats =
     mutable.Map.empty[String, mutable.Map[Int, mutable.Map[Int, StrideStats]]]
-  private val innerConcurrentStatsBuffer =
-    mutable.ArrayBuffer.empty[Seq[BackendStats]]
 
   def instructionCounts = currentInstructionStats.toMap
   def strideStats =
     currentStrideStats.mapValues(_.mapValues(_.toMap).toMap).toMap
 
-  def totalCycles: Long =
-    if (innerConcurrentStatsBuffer.isEmpty)
-      currentInstructionStats.values.map(_.cycles).sum
-    else
-      innerConcurrentStatsBuffer.map(_.map(_.totalCycles).max).sum
-
-  def totalEnergy: Long =
-    if (innerConcurrentStatsBuffer.isEmpty)
-      currentInstructionStats.values.map(_.energy).sum
-    else
-      innerConcurrentStatsBuffer.map(_.map(_.totalEnergy).sum).sum
+  def totalCycles = currentInstructionStats.values.map(_.cycles).sum
+  def totalEnergy = currentInstructionStats.values.map(_.energy).sum
 
   def countInstruction(
       mnemonic: String,
@@ -285,28 +274,20 @@ class BackendStats(val name: String) {
     )
   }
 
-  def add(stats: BackendStats): Unit =
-    addConcurrent(Seq(stats))
-
-  def addConcurrent(concurrentStats: Seq[BackendStats]): Unit = {
-    innerConcurrentStatsBuffer += concurrentStats
-
-    concurrentStats
-      .map(_.instructionCounts)
-      .flatten
-      .foreach({
-        case (mnemonic, stats) =>
-          doCountInstruction(
-            mnemonic,
-            stats.count,
-            stats.cycles,
-            stats.energy,
-            stats.totalSize
-          )
-      })
+  def add(stats: Stats): Unit = {
+    stats.instructionCounts.foreach({
+      case (mnemonic, stats) =>
+        doCountInstruction(
+          mnemonic,
+          stats.count,
+          stats.cycles,
+          stats.energy,
+          stats.totalSize
+        )
+    })
 
     for (
-      (mnemonic, mnemonicStats) <- concurrentStats.map(_.strideStats).flatten;
+      (mnemonic, mnemonicStats) <- stats.strideStats;
       (operand, operandStats)   <- mnemonicStats;
       (stride, strideStats)     <- operandStats
     )

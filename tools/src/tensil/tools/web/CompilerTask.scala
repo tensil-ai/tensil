@@ -46,10 +46,7 @@ object CompilerTask {
         upickle.default.read[List[CompilerTask]](message.body)
 
       for (task <- tasks) {
-        val options = CompilerOptions(
-          arch = task.arch,
-          collectBackendStats = true
-        )
+        val options = CompilerOptions(arch = task.arch)
 
         taskTable.put(
           task.jobId,

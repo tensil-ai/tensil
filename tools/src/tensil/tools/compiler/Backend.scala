@@ -11,7 +11,7 @@ import tensil.{ArchitectureDataType, InstructionLayout}
 class BackendSegment(
     val key: BackendSegmentKey,
     layout: InstructionLayout,
-    stats: Option[BackendStats],
+    stats: Option[Stats],
     tracepointConditions: Seq[TracepointCondition],
     resolveRefToObject: (MemoryRef) => Option[MemoryObject] = (ref) => None
 ) extends LIR {
@@ -130,7 +130,7 @@ class Backend(
 
   def mkSegment(
       key: BackendSegmentKey,
-      stats: Option[BackendStats] = None
+      stats: Option[Stats] = None
   ): BackendSegment =
     new BackendSegment(
       key = key,
@@ -147,7 +147,8 @@ class Backend(
 
   def writeSegments(
       programStream: OutputStream,
-      printProgramStream: Option[DataOutputStream] = None
+      printProgramStream: Option[DataOutputStream] = None,
+      stats: Option[Stats] = None
   ): Unit = {
     var instructionOffset: Long = 0
     val lir = new LIRBroadcast(
@@ -159,7 +160,15 @@ class Backend(
                                                        printProgramStream.get
                                                      )
                                                    )
-                                                 else Nil)
+                                                 else
+                                                   Nil) ++ (if (stats.isDefined)
+                                                              Seq(
+                                                                new LIREstimator(
+                                                                  layout,
+                                                                  stats.get
+                                                                )
+                                                              )
+                                                            else Nil)
     )
 
     for ((key, segment) <- segments) {

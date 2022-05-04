@@ -27,7 +27,7 @@ import tensil.tools.compiler.{
   MemoryTag,
   MemoryAddressHelper,
   SchedulerResult,
-  BackendStats
+  Stats
 }
 
 class CompilerException(message: String) extends Exception(message) {}
@@ -232,12 +232,11 @@ object Compiler {
       resolveRefToObject = mm.resolveRefToObject(_),
       traceContext = traceContext
     )
-    val backendStats =
-      if (options.collectBackendStats) Some(new BackendStats("TOTAL")) else None
 
     var layerSchedulerResults: List[SchedulerResult] = Nil
     var macs                                         = 0L
     var macEfficiency                                = 0f
+    val backendStats                                 = new Stats()
 
     try {
       if (options.printProgress)
@@ -258,7 +257,7 @@ object Compiler {
         println(s"Rewritten to ${flowEmitters.size} emitter(s)")
       }
 
-      val context = EmitContext(backend, backendStats, mm, outputNames)
+      val context = EmitContext(backend, mm, outputNames)
 
       val emitResults = for (emitter <- flowEmitters) yield {
         val r = emitter(context)
@@ -266,15 +265,15 @@ object Compiler {
         r
       }
 
-      backend.writeSegments(programStream, printProgramStream.map(new DataOutputStream(_)))
+      backend.writeSegments(
+        programStream,
+        printProgramStream.map(new DataOutputStream(_)),
+        Some(backendStats)
+      )
 
       layerSchedulerResults = emitResults.filter(_.isDefined).map(_.get).toList
       macs = layerSchedulerResults.map(_.macs).sum
-      macEfficiency =
-        if (backendStats.isDefined)
-          BackendStats.macEfficiency(backendStats.get, options.arch, macs)
-        else
-          0f
+      macEfficiency = Stats.macEfficiency(backendStats, options.arch, macs)
 
       // TODO: fix leaks
       // mm.reportObjects()
@@ -290,8 +289,8 @@ object Compiler {
           programSizeBytes = programSizeBytes,
           constsScalarSize = mm.constsScalarSize,
           constsUtilization = mm.constsUtilization,
-          cycles = backendStats.map(_.totalCycles).getOrElse(0),
-          energy = backendStats.map(_.totalEnergy).getOrElse(0),
+          cycles = backendStats.totalCycles,
+          energy = backendStats.totalEnergy,
           macs = macs,
           macEfficiency = macEfficiency
         )
@@ -335,13 +334,12 @@ object Compiler {
           mm.varsAggSize * options.arch.arraySize
         )
         tb.addNamedLine("Number of layers", layerSchedulerResults.size)
-        if (backendStats.isDefined)
-          BackendStats.printSummary(
-            backendStats.get,
-            tb,
-            options.arch,
-            Some(macs)
-          )
+        Stats.printSummary(
+          backendStats,
+          tb,
+          options.arch,
+          Some(macs)
+        )
         tb.addNamedLine(
           "Total number of instructions",
           backend.instructionsCount
@@ -353,13 +351,12 @@ object Compiler {
         tb.addNamedLine("True consts scalar size", mm.constsScalarSize)
         tb.addNamedLine("Consts utilization (%)", mm.constsUtilization * 100f)
         val (macsLetter, macsDivisor) =
-          BackendStats.getUnitsLetterAndDivisor(macs)
+          Stats.getUnitsLetterAndDivisor(macs)
         tb.addNamedLine(
           s"True MACs (${macsLetter}MAC)",
           macs.toFloat / macsDivisor
         )
-        if (backendStats.isDefined)
-          tb.addNamedLine("MAC efficiency (%)", macEfficiency * 100f)
+        tb.addNamedLine("MAC efficiency (%)", macEfficiency * 100f)
         print(tb)
       }
 
@@ -399,12 +396,46 @@ object Compiler {
               ) ++ groupResultsWithIndex.map(_._1.numberOfPartitions)
             )
           )
+          val (cyclesLetter, cyclesDivisor) =
+            Stats.getUnitsLetterAndDivisor(
+              groupResultsWithIndex
+                .map(_._1.cycles)
+                .filter(v => v > 0)
+                .max
+            )
+          tb.addLine(
+            new TableLine(
+              List(
+                s"Latency (${cyclesLetter}Cycles):"
+              ) ++ groupResultsWithIndex
+                .map(_._1.cycles.toFloat)
+                .map(_ / cyclesDivisor)
+                .map(f => f"$f%.3f")
+            )
+          )
+          val (energyLetter, energyDivisor) =
+            Stats.getUnitsLetterAndDivisor(
+              groupResultsWithIndex
+                .map(_._1.energy)
+                .filter(v => v > 0)
+                .max
+            )
+          tb.addLine(
+            new TableLine(
+              List(
+                s"Energy (${energyLetter}Units):"
+              ) ++ groupResultsWithIndex
+                .map(_._1.energy.toFloat)
+                .map(_ / energyDivisor)
+                .map(f => f"$f%.3f")
+            )
+          )
           val (macsLetter, macsDivisor) =
-            BackendStats.getUnitsLetterAndDivisor(
+            Stats.getUnitsLetterAndDivisor(
               groupResultsWithIndex
                 .map(_._1.macs)
                 .filter(v => v > 0)
-                .min
+                .max
             )
           tb.addLine(
             new TableLine(
@@ -448,45 +479,43 @@ object Compiler {
         }
       }
 
-      if (backendStats.isDefined) {
-        if (options.printInstructionsSummary) {
-          BackendStats.printCompositionSummary("TOTAL", backendStats.get)
-          BackendStats.printCyclesSummary("TOTAL", backendStats.get)
-          BackendStats.printEnergySummary("TOTAL", backendStats.get)
-        }
-
-        if (options.printStridesSummary) {
-          def printStrideStats(
-              title: String,
-              select: StrideStats => Any
-          ): Unit = {
-            val tb = new TablePrinter(Some(title), true)
-            BackendStats.printStrideStats(
-              options.arch.stride0Depth,
-              options.arch.stride1Depth,
-              backendStats.get,
-              select,
-              tb
-            )
-            print(tb)
-          }
-
-          printStrideStats(
-            "TOTAL STRIDES COUNT SUMMARY",
-            stats => stats.count
-          )
-          printStrideStats(
-            "TOTAL STRIDES MAX SIZE SUMMARY",
-            stats => stats.maxSize
-          )
-          printStrideStats(
-            "TOTAL STRIDES AVERAGE SIZE SUMMARY",
-            stats => Math.round(stats.totalSize.toFloat / stats.count.toFloat)
-          )
-        }
-
-        options.arch.dataType.reportAndResetOverUnderflowStats()
+      if (options.printInstructionsSummary) {
+        Stats.printCompositionSummary("TOTAL", backendStats)
+        Stats.printCyclesSummary("TOTAL", backendStats)
+        Stats.printEnergySummary("TOTAL", backendStats)
       }
+
+      if (options.printStridesSummary) {
+        def printStrideStats(
+            title: String,
+            select: StrideStats => Any
+        ): Unit = {
+          val tb = new TablePrinter(Some(title), true)
+          Stats.printStrideStats(
+            options.arch.stride0Depth,
+            options.arch.stride1Depth,
+            backendStats,
+            select,
+            tb
+          )
+          print(tb)
+        }
+
+        printStrideStats(
+          "TOTAL STRIDES COUNT SUMMARY",
+          stats => stats.count
+        )
+        printStrideStats(
+          "TOTAL STRIDES MAX SIZE SUMMARY",
+          stats => stats.maxSize
+        )
+        printStrideStats(
+          "TOTAL STRIDES AVERAGE SIZE SUMMARY",
+          stats => Math.round(stats.totalSize.toFloat / stats.count.toFloat)
+        )
+      }
+
+      options.arch.dataType.reportAndResetOverUnderflowStats()
     }
   }
 }

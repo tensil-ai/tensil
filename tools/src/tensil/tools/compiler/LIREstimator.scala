@@ -2,7 +2,7 @@ package tensil.tools.compiler
 
 import tensil.InstructionLayout
 
-class LIREstimator(layout: InstructionLayout, stats: BackendStats) extends LIR {
+class LIREstimator(layout: InstructionLayout, stats: Stats) extends LIR {
   private var previousOpcode = Opcode.Wait
   private var previousFlags  = 0
 

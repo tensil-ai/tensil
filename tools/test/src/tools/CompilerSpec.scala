@@ -1964,7 +1964,6 @@ class CompilerSpec extends FlatSpec {
       arch = ResNetFp16bp8Architecture,
       printSummary = true,
       printLayersSummary = true,
-      collectBackendStats = true,
       printGraphFileName = Some(s"${name}.dot"),
       //printProgramFileName = Some(s"${name}.tasm"),
       tracepointConditions = List(
@@ -2019,7 +2018,6 @@ class CompilerSpec extends FlatSpec {
       inputShapes = CompilerInputShapes.mkWithBatchSize(10),
       printSummary = true,
       printLayersSummary = true,
-      collectBackendStats = true,
       printGraphFileName = Some(s"${name}.dot"),
       //printProgramFileName = Some(s"${name}.tasm"),
       tracepointConditions = List(
@@ -2156,7 +2154,6 @@ class CompilerSpec extends FlatSpec {
       arch = YoloTinyFp16bp8Architecture,
       printSummary = true,
       printLayersSummary = true,
-      collectBackendStats = true,
       printGraphFileName = Some(s"${name}.dot"),
       /*tracepointConditions = List(
         TracepointCondition(MemoryTag.Vars, "model/conv2d_17/BiasAdd"),
@@ -2277,7 +2274,6 @@ class CompilerSpec extends FlatSpec {
       arch = ResNetFp16bp8Architecture,
       printSummary = true,
       printLayersSummary = true,
-      collectBackendStats = true,
       printGraphFileName = Some(s"${name}.dot"),
       tracepointConditions = List(
         TracepointCondition(MemoryTag.Vars, "Identity:0")
@@ -2329,7 +2325,6 @@ class CompilerSpec extends FlatSpec {
       arch = ResNet50Fp16bp8Architecture,
       printSummary = true,
       printLayersSummary = true,
-      collectBackendStats = true,
       printGraphFileName = Some(s"${name}.dot"),
       tracepointConditions = List(
         TracepointCondition(MemoryTag.Vars, "Identity:0")
@@ -2381,7 +2376,6 @@ class CompilerSpec extends FlatSpec {
       arch = YoloTinyFp16bp8Architecture,
       printSummary = true,
       printLayersSummary = true,
-      collectBackendStats = true,
       printGraphFileName = Some(s"${name}.dot")
     )
 

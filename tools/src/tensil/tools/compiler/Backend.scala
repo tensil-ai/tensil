@@ -171,19 +171,124 @@ class Backend(
                                                             else Nil)
     )
 
-    for ((key, segment) <- segments) {
-
-      if (printProgramStream.isDefined)
-        printProgramStream.get.writeBytes(
-          s";\r\n; ${BackendSegmentKeyHelper(key)}\r\n;\r\n"
-        )
-
+    def decodeSegment(segment: BackendSegment, lir: LIR): Unit = {
       val inputStream = new FileInputStream(segment.file)
       val lirDecoder  = new LIRDecoder(layout.arch)
 
       lirDecoder.decode(inputStream, lir)
 
       inputStream.close()
+    }
+
+    var nextTid = 0
+
+    case class Block(
+        init: Option[BackendSegment] = None,
+        load: Option[BackendSegment] = None,
+        compute: Option[BackendSegment] = None,
+        save: Option[BackendSegment] = None,
+    ) {
+      val tid = nextTid
+
+      nextTid = (nextTid + 1) % 2
+    }
+
+    var prev0Block = Block()
+    var prev1Block = Block()
+
+    var curInit: Option[BackendSegment] = None
+
+    val blocks =
+      for (
+        blockSegments <-
+          segments
+            .groupBy(p => (p._1.layer, p._1.stage, p._1.partition))
+            .toSeq
+            .sortBy(_._1)
+            .map(_._2)
+      ) yield {
+        val kindSegments = blockSegments.map {
+          case (key, segment) => (key.kind, segment)
+        }
+
+        val init = if (blockSegments.head._1.partition == 0) {
+          curInit = kindSegments.get(BackendSegmentKey.Init)
+          curInit
+        } else if (blockSegments.head._1.partition == 1) {
+          curInit
+        } else None
+
+        Block(
+          init = init,
+          load = kindSegments.get(BackendSegmentKey.Load),
+          compute = kindSegments.get(BackendSegmentKey.Compute),
+          save = kindSegments.get(BackendSegmentKey.Save)
+        )
+      }
+
+    val stream = new DataOutputStream(new FileOutputStream("threads.csv"))
+    var index  = 0
+
+    def overlay(curBlock: Block, prev0Block: Block, prev1Block: Block) = {
+      val initLoadSaveStats = new Stats()
+      val computeStats      = new Stats()
+
+      val initLoadSaveLir = new LIREstimator(layout, initLoadSaveStats)
+      val computeLir      = new LIREstimator(layout, computeStats)
+
+      if (prev1Block.save.isDefined) {
+        println(
+          s"TID ${prev1Block.tid}: ${BackendSegmentKeyHelper(prev1Block.save.get.key)}"
+        )
+        decodeSegment(prev1Block.save.get, initLoadSaveLir)
+      }
+      if (curBlock.init.isDefined) {
+        println(
+          s"TID ${curBlock.tid}: ${BackendSegmentKeyHelper(curBlock.init.get.key)}"
+        )
+        decodeSegment(curBlock.init.get, initLoadSaveLir)
+      }
+      if (curBlock.load.isDefined) {
+        println(
+          s"TID ${curBlock.tid}: ${BackendSegmentKeyHelper(curBlock.load.get.key)}"
+        )
+        decodeSegment(curBlock.load.get, initLoadSaveLir)
+      }
+      if (prev0Block.compute.isDefined) {
+        println(
+          s"TID ${prev0Block.tid}: ${BackendSegmentKeyHelper(prev0Block.compute.get.key)}"
+        )
+        decodeSegment(prev0Block.compute.get, computeLir)
+      }
+
+      println("BARRIER")
+
+      stream.writeBytes(
+        s"${index},${initLoadSaveStats.totalCycles},${computeStats.totalCycles}\r\n"
+      )
+
+      index += 1
+    }
+
+    for (curBlock <- blocks) {
+      overlay(curBlock, prev0Block, prev1Block)
+
+      prev1Block = prev0Block
+      prev0Block = curBlock
+    }
+
+    overlay(Block(), prev0Block, prev1Block)
+    overlay(Block(), Block(), prev0Block)
+
+    stream.close()
+
+    for ((key, segment) <- segments) {
+      if (printProgramStream.isDefined)
+        printProgramStream.get.writeBytes(
+          s";\r\n; ${BackendSegmentKeyHelper(key)}\r\n;\r\n"
+        )
+
+      decodeSegment(segment, lir)
       segment.file.delete()
 
       for (

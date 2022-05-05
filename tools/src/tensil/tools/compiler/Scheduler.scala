@@ -662,7 +662,7 @@ class Scheduler(
       .map({
         case (stage, i) =>
           val initKey =
-            BackendSegmentKey(layerIndex, i, -1, BackendSegmentKey.Init)
+            BackendSegmentKey(layerIndex, i, 0, BackendSegmentKey.Init)
           val initStats = new Stats()
           val initSegment = backend.mkSegment(
             initKey,

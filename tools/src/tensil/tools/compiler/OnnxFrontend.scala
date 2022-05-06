@@ -2471,7 +2471,15 @@ class OnnxFrontend(
     val input1Name =
       if (addProto.input(0) == input0Temp.name) addProto.input(1)
       else addProto.input(0)
-    val input1Vars =
+
+    val input1Vars = if (tensorProtos.isDefinedAt(input1Name)) {
+      context.mm.addPendingConst(
+        input1Name,
+        getTensorData(tensorProtos(input1Name))
+      )
+
+      context.mm.getOrEmitConstObject(input1Name)
+    } else
       context.mm.consumeObject(input1Name, Seq(addProto.name.get))
 
     scheduler.emitAdd(

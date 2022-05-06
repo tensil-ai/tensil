@@ -96,7 +96,7 @@ object Main extends App {
 
       val options = CompilerOptions(
         arch = arch,
-        inputBatchSize = args.inputBatchSize,
+        inputShapes = CompilerInputShapes.mkWithBatchSize(args.inputBatchSize),
         printProgress = args.verbose,
         printSummary = args.summary,
         printLayersSummary = args.layersSummary,

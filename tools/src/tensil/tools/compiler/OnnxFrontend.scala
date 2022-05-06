@@ -12,7 +12,8 @@ import onnx.onnx.{NodeProto, ModelProto, TensorProto, ValueInfoProto}
 import _root_.tensil.tools.{
   CompilerException,
   TracepointCondition,
-  CompilerOptions
+  CompilerOptions,
+  CompilerInputShapesHelper
 }
 import _root_.tensil.tools.data.{Shape, TensorData}
 import _root_.tensil.tools.util
@@ -579,11 +580,10 @@ class OnnxFrontend(
 
   private def emitInput(context: EmitContext): EmitResult = {
     for ((name, valueInfoProto) <- inputValueInfoProtos) {
-      val shape = Shape(
+      val modelInputShape =
         valueInfoProto.`type`.get.value.tensorType.get.shape.get.dim
-          .map(_.value.dimValue.get.toInt)
-          .toArray
-      )
+          .map(_.value.dimValue.map(_.toInt))
+      val shape = options.inputShapes.deduceInputShape(name, modelInputShape)
 
       val consumers = inputNodeNames(name)
 

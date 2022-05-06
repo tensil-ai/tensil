@@ -12,7 +12,7 @@ case class TracepointCondition(
 
 case class CompilerOptions(
     arch: Architecture,
-    inputBatchSize: Int = 1,
+    inputShapes: CompilerInputShapes = CompilerInputShapes.mkWithBatchSize(1),
     printSummary: Boolean = false,
     printLayersSummary: Boolean = false,
     printSchedulerSummary: Boolean = false,

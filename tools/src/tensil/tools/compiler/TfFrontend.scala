@@ -14,7 +14,8 @@ import org.tensorflow.framework.types.DataType
 import _root_.tensil.tools.{
   CompilerException,
   TracepointCondition,
-  CompilerOptions
+  CompilerOptions,
+  CompilerInputShapesHelper
 }
 import _root_.tensil.tools.data.{Shape, TensorData}
 import _root_.tensil.tools.util
@@ -575,16 +576,12 @@ class TfFrontend(
       context: EmitContext,
       placeholderDef: NodeDef
   ): EmitResult = {
-    val shape = util.getShape(placeholderDef)
-
+    val modelInputShape = util
+      .getShape(placeholderDef)
+      .map(dim => if (dim >= 0) Some(dim) else None)
+      .toSeq
     val placeholderShape =
-      if (shape(0) == -1)
-        Shape(
-          options.inputBatchSize +: shape
-            .takeRight(shape.size - 1)
-            .toArray
-        )
-      else shape
+      options.inputShapes.deduceInputShape(placeholderDef.name, modelInputShape)
 
     val placeholderDims = VarsDimensions(placeholderShape)
 

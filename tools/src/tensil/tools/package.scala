@@ -41,7 +41,7 @@ package object tools {
 
                 if (modelDim.isDefined && modelDim.get != optionsDim)
                   throw new CompilerException(
-                    s"Specified input $name shape ${CompilerInputShapeHelper(optionsInputShape)} is incompatible with ${CompilerInputShapeHelper(modelInputShape)}"
+                    s"Specified input shape for $name ${CompilerInputShapeHelper(optionsInputShape)} is incompatible with model shape ${CompilerInputShapeHelper(modelInputShape)}"
                   )
 
                 optionsDim
@@ -50,7 +50,7 @@ package object tools {
                   modelDim.get
                 else
                   throw new CompilerException(
-                    s"Specified input $name shape ${CompilerInputShapeHelper(optionsInputShape)} is has unspecified dimensions for ${CompilerInputShapeHelper(modelInputShape)}"
+                    s"Specified input shape for $name ${CompilerInputShapeHelper(optionsInputShape)} has unspecified dimensions in model shape ${CompilerInputShapeHelper(modelInputShape)}"
                   )
               }
           })

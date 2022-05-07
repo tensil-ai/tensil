@@ -79,16 +79,106 @@ class Scratch extends Module {
       queue: DecoupledIO[Request],
       altQueue: DecoupledIO[Request],
   ): Bool = {
-    table.io.incr.address := in.bits.address
+    table.io.incr.address := in.bits.address >> blockSizeShift.U
     table.io.incr.enable := in.fire() && in.bits.write
-    table.io.decr.address := queue.bits.address
+    table.io.decr.address := queue.bits.address >> blockSizeShift.U
     table.io.decr.enable := queue.fire() && queue.bits.write
 
-    table.io.read.address := altQueue.bits.address
+    table.io.read.address := altQueue.bits.address >> blockSizeShift.U
     table.io.read.enable := altQueue.valid
     // safe for the alternate control queue to proceed
     val altSafe = !(table.io.read.enable && table.io.count =/= 0.U)
     altSafe
+  }
+}
+
+class ScratchSpec extends FunUnitSpec {
+  describe("Scratch") {
+    it("should block reads on B until the write on A is complete") {
+      test(new Scratch) { m =>
+        m.io.a.in.setSourceClock(m.clock)
+        m.io.a.out.setSinkClock(m.clock)
+        m.io.b.in.setSourceClock(m.clock)
+        m.io.b.out.setSinkClock(m.clock)
+
+        m.io.a.in.enqueue(Request(m.depth, 0, true))
+        m.io.b.in.enqueue(Request(m.depth, 0, false))
+
+        for (i <- 0 until 5) {
+          m.io.a.out.valid.expect(true.B)
+          m.io.b.out.valid.expect(false.B)
+        }
+
+        m.io.a.out.expectDequeue(Request(m.depth, 0, true))
+        m.io.b.out.expectDequeue(Request(m.depth, 0, false))
+      }
+    }
+
+    it("should block reads on A until the write on B is complete") {
+      test(new Scratch) { m =>
+        m.io.a.in.setSourceClock(m.clock)
+        m.io.a.out.setSinkClock(m.clock)
+        m.io.b.in.setSourceClock(m.clock)
+        m.io.b.out.setSinkClock(m.clock)
+
+        m.io.a.in.enqueue(Request(m.depth, 0, false))
+        m.io.b.in.enqueue(Request(m.depth, 0, true))
+
+        for (i <- 0 until 5) {
+          m.io.a.out.valid.expect(false.B)
+          m.io.b.out.valid.expect(true.B)
+        }
+
+        m.io.b.out.expectDequeue(Request(m.depth, 0, true))
+        m.io.a.out.expectDequeue(Request(m.depth, 0, false))
+      }
+    }
+
+    it(
+      "should give priority to A when both queues have reads and writes to same address"
+    ) {
+      test(new Scratch) { m =>
+        m.io.a.in.setSourceClock(m.clock)
+        m.io.a.out.setSinkClock(m.clock)
+        m.io.b.in.setSourceClock(m.clock)
+        m.io.b.out.setSinkClock(m.clock)
+
+        m.io.a.in.enqueue(Request(m.depth, 0, false))
+        m.io.a.in.enqueue(Request(m.depth, 0, true))
+        m.io.b.in.enqueue(Request(m.depth, 0, false))
+        m.io.b.in.enqueue(Request(m.depth, 0, true))
+
+        for (i <- 0 until 5) {
+          m.io.a.out.valid.expect(true.B)
+          m.io.b.out.valid.expect(false.B)
+        }
+
+        m.io.a.out.expectDequeue(Request(m.depth, 0, false))
+        m.io.a.out.expectDequeue(Request(m.depth, 0, true))
+        m.io.b.out.expectDequeue(Request(m.depth, 0, false))
+        m.io.b.out.expectDequeue(Request(m.depth, 0, true))
+      }
+    }
+
+    it("should not block when A and B are working on different blocks") {
+      test(new Scratch) { m =>
+        m.io.a.in.setSourceClock(m.clock)
+        m.io.a.out.setSinkClock(m.clock)
+        m.io.b.in.setSourceClock(m.clock)
+        m.io.b.out.setSinkClock(m.clock)
+
+        m.io.a.in.enqueue(Request(m.depth, 0, true))
+        m.io.b.in.enqueue(Request(m.depth, m.blockSize, false))
+
+        for (i <- 0 until 5) {
+          m.io.a.out.valid.expect(true.B)
+          m.io.b.out.valid.expect(true.B)
+        }
+
+        m.io.a.out.expectDequeue(Request(m.depth, 0, true))
+        m.io.b.out.expectDequeue(Request(m.depth, m.blockSize, false))
+      }
+    }
   }
 }
 
@@ -178,22 +268,6 @@ class CounterTableSpec extends FunUnitSpec {
           m.io.decr.enable.poke(false.B)
         }
       }
-    }
-  }
-}
-
-class ScratchSpec extends UnitSpec {
-  behavior of "Scratch"
-
-  it should "work" in {
-    test(new Scratch) { m =>
-      m.io.a.in.setSourceClock(m.clock)
-      m.io.a.out.setSinkClock(m.clock)
-      m.io.b.in.setSourceClock(m.clock)
-      m.io.b.out.setSinkClock(m.clock)
-
-      m.io.a.in.enqueue(Request(m.depth, 0, true))
-      m.io.b.in.enqueue(Request(m.depth, 0, false))
     }
   }
 }

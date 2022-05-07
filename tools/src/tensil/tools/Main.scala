@@ -41,14 +41,16 @@ object Main extends App {
       .text("Tensil architecture descrition (.tarch) file")
 
     opt[Seq[String]]('o', "output")
-      .valueName("<name>,...")
+      .valueName("<name>, ...")
       .action((x, c) => c.copy(outputNodes = x))
       .text("Optional list of output nodes, defaults to \"Identity\"")
 
     opt[String]('i', "input-shapes")
-      .valueName("<name>[<dim>,...],...")
+      .valueName("<name> [<dim>, ...], ...")
       .action((x, c) => c.copy(inputShapes = x))
-      .text("Optional input shapes, defaults to \"[1]\" (batch size of 1)")
+      .text(
+        "Optional input shapes, defaults to \"[1]\" (batch size of 1). The shape without <name> is a default for inputs that were not listed by name"
+      )
 
     opt[Boolean]('v', "verbose")
       .valueName("true|false")

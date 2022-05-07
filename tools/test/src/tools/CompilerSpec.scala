@@ -199,7 +199,7 @@ class CompilerSpec extends FlatSpec {
 
     GoldenProcessorHelper.test(
       name,
-      inputBatchSize = options.inputBatchSize,
+      inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
     )
   }
@@ -208,7 +208,7 @@ class CompilerSpec extends FlatSpec {
     val name = "xor_2x2_memory256_batch4"
     val options = CompilerOptions(
       arch = Tiny2x2Architecure,
-      inputBatchSize = 4,
+      inputShapes = CompilerInputShapes.mkWithBatchSize(4),
       printProgramFileName = Some(s"${name}.tasm")
     )
 
@@ -274,14 +274,17 @@ class CompilerSpec extends FlatSpec {
       ).map(_.toByte)
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF XOR for 2x2 array with 256 memories and input batch of 16" in {
     val name = "xor_2x2_memory256_batch16"
     val options = CompilerOptions(
       arch = Tiny2x2Architecure,
-      inputBatchSize = 16,
+      inputShapes = CompilerInputShapes.mkWithBatchSize(16),
       printProgramFileName = Some(s"${name}.tasm")
     )
 
@@ -359,7 +362,10 @@ class CompilerSpec extends FlatSpec {
       ).map(_.toByte)
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF oversized XOR for 4x4 array with 256 memories" in {
@@ -484,7 +490,10 @@ class CompilerSpec extends FlatSpec {
       ).map(_.toByte)
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF XOR for 2x2 array with 64K memories" in {
@@ -564,7 +573,10 @@ class CompilerSpec extends FlatSpec {
       ).map(_.toByte)
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF XOR4 for 4x4 array with 256 memories" in {
@@ -689,7 +701,10 @@ class CompilerSpec extends FlatSpec {
       ).map(_.toByte)
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF tiled XOR4 for 2x2 array with 128 memories and 2 strides" in {
@@ -786,7 +801,10 @@ class CompilerSpec extends FlatSpec {
       ).map(_.toByte)
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF tiled XOR4 for 2x2 array with 128 memories, 2 strides and input batch of 4" in {
@@ -794,7 +812,7 @@ class CompilerSpec extends FlatSpec {
     val traceContext = new ExecutiveTraceContext()
     val options = CompilerOptions(
       arch = Large2x2WithStridesArchitecure,
-      inputBatchSize = 4,
+      inputShapes = CompilerInputShapes.mkWithBatchSize(4),
       printSummary = true,
       printProgramFileName = Some(s"${name}.tasm"),
       printProgramWithComments = true,
@@ -936,7 +954,7 @@ class CompilerSpec extends FlatSpec {
 
     GoldenProcessorHelper.test(
       name,
-      inputBatchSize = options.inputBatchSize,
+      inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
     )
   }
@@ -945,7 +963,7 @@ class CompilerSpec extends FlatSpec {
     val name = "xor4_2x2_memory128_stride2_batch16"
     val options = CompilerOptions(
       arch = Large2x2WithStridesArchitecure,
-      inputBatchSize = 16,
+      inputShapes = CompilerInputShapes.mkWithBatchSize(16),
       printProgramFileName = Some(s"${name}.tasm")
     )
 
@@ -1066,7 +1084,10 @@ class CompilerSpec extends FlatSpec {
       ).map(_.toByte)
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   val MNIST784x784Architecture = Architecture.mkWithDefaults(
@@ -1137,14 +1158,17 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF MLP MNIST for 784x784 array with 64K memories and input batch of 4" in {
     val name = "mlp_mnist_784x784_batch4"
     val options = CompilerOptions(
       arch = MNIST784x784Architecture,
-      inputBatchSize = 4,
+      inputShapes = CompilerInputShapes.mkWithBatchSize(4),
       printSummary = true,
     )
 
@@ -1155,7 +1179,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF tiled MLP MNIST for 196x196 array with 64K memories" in {
@@ -1172,14 +1199,17 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF tiled MLP MNIST for 196x196 array with 64K memories and input batch of 10" in {
     val name = "mlp_mnist_196x196_batch10"
     val options = CompilerOptions(
       arch = MNIST196x196Architecture,
-      inputBatchSize = 10,
+      inputShapes = CompilerInputShapes.mkWithBatchSize(10),
       printSummary = true,
     )
 
@@ -1190,7 +1220,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF tiled MLP MNIST for 128x128 array with 64K memories" in {
@@ -1207,14 +1240,17 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF tiled MLP MNIST for 128x128 array with 64K memories and input batch of 10" in {
     val name = "mlp_mnist_128x128_batch10"
     val options = CompilerOptions(
       arch = MNIST128x128Architecture,
-      inputBatchSize = 10,
+      inputShapes = CompilerInputShapes.mkWithBatchSize(10),
       printSummary = true,
       printGraphFileName = Some(s"${name}.dot")
     )
@@ -1226,7 +1262,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   val Conv2DTiny2x2Architecure = Architecture.mkWithDefaults(
@@ -1265,7 +1304,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF Conv2D (VALID padding) 3x3x4 image with 2x2x4x4 kernel" in {
@@ -1282,7 +1324,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF Conv2D (VALID padding, 2x2 strides) 3x3x4 image with 2x2x4x4 kernel" in {
@@ -1296,7 +1341,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF Conv2D (SAME padding) 3x3x4 image with 2x2x4x4 kernel" in {
@@ -1310,7 +1358,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF Conv2D (SAME padding, 2x2 strides) 3x3x4 image with 2x2x4x4 kernel" in {
@@ -1324,7 +1375,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF tiled Conv2D (VALID padding) 3x3x4 image with 2x2x4x4 kernel" in {
@@ -1338,7 +1392,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF tiled Conv2D (SAME padding) 3x3x4 image with 2x2x4x4 kernel" in {
@@ -1352,7 +1409,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF oversized Conv2D (VALID padding) 3x3x4 image with 2x2x4x4 kernel" in {
@@ -1366,7 +1426,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF oversized Conv2D (SAME padding) 3x3x4 image with 2x2x4x4 kernel" in {
@@ -1380,7 +1443,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF Conv2D (SAME padding) 3x3x4 image with 2x2x4x4 kernel, Relu, MaxPool (VALID padding)" in {
@@ -1397,7 +1463,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF Conv2D (SAME padding) 3x3x4 image with 2x2x4x4 kernel, Relu, MaxPool (VALID padding, 1x1 stride)" in {
@@ -1413,7 +1482,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF Conv2D (VALID padding) 3x5x4 image with 3x2x4x4 kernel" in {
@@ -1430,7 +1502,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF Conv2D (SAME padding) 3x5x4 image with 3x2x4x4 kernel" in {
@@ -1444,7 +1519,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile tiled TF Conv2D (VALID padding) 3x5x4 image with 3x2x4x4 kernel" in {
@@ -1461,7 +1539,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile tiled TF Conv2D (SAME padding) 3x5x4 image with 3x2x4x4 kernel" in {
@@ -1475,7 +1556,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile oversized TF Conv2D (VALID padding) 3x5x4 image with 3x2x4x4 kernel" in {
@@ -1492,7 +1576,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile oversized TF Conv2D (SAME padding) 3x5x4 image with 3x2x4x4 kernel" in {
@@ -1506,7 +1593,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile ONNX Conv2D (VALID padding) 3x3x4 image with 2x2x4x4 kernel" in {
@@ -1523,7 +1613,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile ONNX Conv2D (VALID padding, 2x2 strides) 3x3x4 image with 2x2x4x4 kernel" in {
@@ -1537,7 +1630,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile ONNX Conv2D (SAME padding) 3x3x4 image with 2x2x4x4 kernel" in {
@@ -1551,7 +1647,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile ONNX Conv2D (SAME padding, 2x2 strides) 3x3x4 image with 2x2x4x4 kernel" in {
@@ -1565,7 +1664,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile ONNX Conv2D (SAME padding) 3x3x4 image with 2x2x4x4 kernel, Relu, MaxPool (VALID padding)" in {
@@ -1582,7 +1684,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile ONNX Conv2D (SAME padding) 3x3x4 image with 2x2x4x4 kernel, Relu, MaxPool (VALID padding, 1x1 stride)" in {
@@ -1598,7 +1703,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile ONNX Conv2D (VALID padding) 3x5x4 image with 3x2x4x4 kernel" in {
@@ -1615,7 +1723,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile ONNX Conv2D (SAME padding) 3x5x4 image with 3x2x4x4 kernel" in {
@@ -1629,7 +1740,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "print the compiled program for large" taggedAs (Slow) in {
@@ -1672,7 +1786,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF CNN MNIST for 64x64 array with 64K memories" in {
@@ -1689,14 +1806,17 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF CNN MNIST for 64x64 array with 64K memories and input batch of 10" in {
     val name = "cnn_mnist_64x64_batch10"
     val options = CompilerOptions(
       arch = MNIST64x64Architecture,
-      inputBatchSize = 10,
+      inputShapes = CompilerInputShapes.mkWithBatchSize(10),
       printSummary = true
     )
 
@@ -1707,7 +1827,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF tiled CNN MNIST for 16x16 array with 64K memories" in {
@@ -1724,7 +1847,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF tiled CNN MNIST for 16x16 array with 256/4K accumulators/local memories" in {
@@ -1741,14 +1867,17 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF tiled CNN MNIST for 16x16 array with 128K memories and input batch of 10" in {
     val name = "cnn_mnist_16x16_memory128k_batch10"
     val options = CompilerOptions(
       arch = MNIST16x16With128KArchitecture,
-      inputBatchSize = 10,
+      inputShapes = CompilerInputShapes.mkWithBatchSize(10),
       printSummary = true,
       printGraphFileName = Some(s"${name}.dot")
     )
@@ -1760,14 +1889,17 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   it should "Compile TF tiled CNN MNIST for 16x16 array with 256/4K accumulators/local memories and input batch of 10" in {
     val name = "cnn_mnist_16x16_acc256_loc4k_batch10"
     val options = CompilerOptions(
       arch = MNIST16x16With256Acc4KLocArchitecture,
-      inputBatchSize = 10,
+      inputShapes = CompilerInputShapes.mkWithBatchSize(10),
       printSummary = true,
     )
 
@@ -1778,7 +1910,10 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(name, inputBatchSize = options.inputBatchSize)
+    GoldenProcessorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize
+    )
   }
 
   val ResNetFloat32Architecture = Architecture.mkWithDefaults(
@@ -1817,7 +1952,7 @@ class CompilerSpec extends FlatSpec {
 
     GoldenProcessorHelper.test(
       name,
-      inputBatchSize = options.inputBatchSize,
+      inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
     )
   }
@@ -1847,7 +1982,7 @@ class CompilerSpec extends FlatSpec {
 
     GoldenProcessorHelper.test(
       name,
-      inputBatchSize = options.inputBatchSize,
+      inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
     )
   }
@@ -1857,7 +1992,7 @@ class CompilerSpec extends FlatSpec {
     val traceContext = new ExecutiveTraceContext()
     val options = CompilerOptions(
       arch = ResNetFloat32Architecture,
-      inputBatchSize = 10,
+      inputShapes = CompilerInputShapes.mkWithBatchSize(10),
       printSummary = true
     )
 
@@ -1871,7 +2006,7 @@ class CompilerSpec extends FlatSpec {
 
     GoldenProcessorHelper.test(
       name,
-      inputBatchSize = options.inputBatchSize,
+      inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
     )
   }
@@ -1881,7 +2016,7 @@ class CompilerSpec extends FlatSpec {
     val traceContext = new ExecutiveTraceContext()
     val options = CompilerOptions(
       arch = ResNetFp16bp8Architecture,
-      inputBatchSize = 10,
+      inputShapes = CompilerInputShapes.mkWithBatchSize(10),
       printSummary = true,
       printLayersSummary = true,
       collectBackendStats = true,
@@ -1902,7 +2037,7 @@ class CompilerSpec extends FlatSpec {
 
     GoldenProcessorHelper.test(
       name,
-      inputBatchSize = options.inputBatchSize,
+      inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
     )
   }
@@ -1963,7 +2098,7 @@ class CompilerSpec extends FlatSpec {
 
     GoldenProcessorHelper.test(
       name,
-      inputBatchSize = options.inputBatchSize,
+      inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
     )
   }
@@ -1986,7 +2121,7 @@ class CompilerSpec extends FlatSpec {
 
     GoldenProcessorHelper.test(
       name,
-      inputBatchSize = options.inputBatchSize,
+      inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
     )
   }
@@ -2009,7 +2144,7 @@ class CompilerSpec extends FlatSpec {
 
     GoldenProcessorHelper.test(
       name,
-      inputBatchSize = options.inputBatchSize,
+      inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
     )
   }
@@ -2039,7 +2174,7 @@ class CompilerSpec extends FlatSpec {
 
     GoldenProcessorHelper.test(
       name,
-      inputBatchSize = options.inputBatchSize,
+      inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
     )
   }
@@ -2084,7 +2219,7 @@ class CompilerSpec extends FlatSpec {
 
     GoldenProcessorHelper.test(
       name,
-      inputBatchSize = options.inputBatchSize,
+      inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
     )
   }
@@ -2107,7 +2242,7 @@ class CompilerSpec extends FlatSpec {
 
     GoldenProcessorHelper.test(
       name,
-      inputBatchSize = options.inputBatchSize,
+      inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
     )
   }
@@ -2130,7 +2265,7 @@ class CompilerSpec extends FlatSpec {
 
     GoldenProcessorHelper.test(
       name,
-      inputBatchSize = options.inputBatchSize,
+      inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
     )
   }
@@ -2159,7 +2294,7 @@ class CompilerSpec extends FlatSpec {
 
     GoldenProcessorHelper.test(
       name,
-      inputBatchSize = options.inputBatchSize,
+      inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
     )
   }
@@ -2182,7 +2317,7 @@ class CompilerSpec extends FlatSpec {
 
     GoldenProcessorHelper.test(
       name,
-      inputBatchSize = options.inputBatchSize,
+      inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
     )
   }
@@ -2211,7 +2346,7 @@ class CompilerSpec extends FlatSpec {
 
     GoldenProcessorHelper.test(
       name,
-      inputBatchSize = options.inputBatchSize,
+      inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
     )
   }
@@ -2234,7 +2369,7 @@ class CompilerSpec extends FlatSpec {
 
     GoldenProcessorHelper.test(
       name,
-      inputBatchSize = options.inputBatchSize,
+      inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
     )
   }
@@ -2260,7 +2395,7 @@ class CompilerSpec extends FlatSpec {
 
     GoldenProcessorHelper.test(
       name,
-      inputBatchSize = options.inputBatchSize,
+      inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
     )
   }

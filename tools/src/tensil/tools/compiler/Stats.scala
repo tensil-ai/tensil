@@ -211,15 +211,14 @@ class Stats {
 
   def countInstruction(
       mnemonic: String,
-      cycles: Long,
-      energy: Long,
+      estimate: Estimate,
       size: Option[Long] = None
   ) =
     doCountInstruction(
       mnemonic,
       1,
-      cycles,
-      energy,
+      estimate.cycles,
+      estimate.energy,
       if (size.isDefined) size.get + 1 else 1
     )
 

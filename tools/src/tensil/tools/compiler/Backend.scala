@@ -285,7 +285,7 @@ class Backend(
         streamsByTid
           .groupBy(_._1)
           .mapValues(
-            _.map(v => lirDecoder.mkDecoder(v._2)).toList
+            _.map(v => lirDecoder.mkStepDecoder(v._2)).toList
           )
           .toSeq: _*
       )
@@ -294,7 +294,7 @@ class Backend(
         .map(decodersTid =>
           new LIR {
             // TODO: Mixer will set desired TID and adjust local address
-            
+
             val tid       = decodersTid
             val estimator = new Estimator(layout)
             var curCycles = 0L

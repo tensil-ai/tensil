@@ -12,21 +12,17 @@ class LIRDecoder(arch: Architecture) {
   val layout = new InstructionLayout(arch)
 
   def decode(stream: InputStream, lir: LIR): Unit = {
-    val decoder = mkDecoder(stream)
+    val decoder = mkStepDecoder(stream)
 
     while (decoder(lir)) {}
   }
 
-  def mkDecoder(stream: InputStream): (LIR) => Boolean = {
+  def mkStepDecoder(stream: InputStream): (LIR) => Boolean = {
     val bytes =
       Array.fill[Byte](layout.instructionSizeBytes + 1)(0)
 
-    println(s"CREATED $stream")
-
     (lir) => {
       if (stream.read(bytes, 0, layout.instructionSizeBytes) != -1) {
-        println(s"NEXT")
-
         val instruction      = BigInt(bytes.reverse)
         var decodedSize: Int = 0
 
@@ -208,10 +204,8 @@ class LIRDecoder(arch: Architecture) {
         require(decodedSize == layout.operandsSizeBits)
 
         true
-      } else {
-        println(s"DONE")
+      } else
         false
-      }
     }
   }
 }

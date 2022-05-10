@@ -182,7 +182,7 @@ class Backend(
 
     var nextTid = 0
 
-    case class Block(
+    case class Tile(
         init: Option[BackendSegment] = None,
         load: Option[BackendSegment] = None,
         compute: Option[BackendSegment] = None,
@@ -193,32 +193,32 @@ class Backend(
       nextTid = (nextTid + 1) % 2
     }
 
-    var prev0Block = Block()
-    var prev1Block = Block()
+    var prev0Tile = Tile()
+    var prev1Tile = Tile()
 
     var curInit: Option[BackendSegment] = None
 
-    val blocks =
+    val tiles =
       for (
-        blockSegments <-
+        tileSegments <-
           segments
             .groupBy(p => (p._1.layer, p._1.stage, p._1.partition))
             .toSeq
             .sortBy(_._1)
             .map(_._2)
       ) yield {
-        val kindSegments = blockSegments.map {
+        val kindSegments = tileSegments.map {
           case (key, segment) => (key.kind, segment)
         }
 
-        val init = if (blockSegments.head._1.partition == 0) {
+        val init = if (tileSegments.head._1.partition == 0) {
           curInit = kindSegments.get(BackendSegmentKey.Init)
           curInit
-        } else if (blockSegments.head._1.partition == 1) {
+        } else if (tileSegments.head._1.partition == 1) {
           curInit
         } else None
 
-        Block(
+        Tile(
           init = init,
           load = kindSegments.get(BackendSegmentKey.Load),
           compute = kindSegments.get(BackendSegmentKey.Compute),
@@ -229,36 +229,36 @@ class Backend(
     val stream = new DataOutputStream(new FileOutputStream("threads.csv"))
     var index  = 0
 
-    def overlay(curBlock: Block, prev0Block: Block, prev1Block: Block) = {
+    def overlayTiles(curTile: Tile, prev0Tile: Tile, prev1Tile: Tile) = {
       val initLoadSaveStats = new Stats()
       val computeStats      = new Stats()
 
       val initLoadSaveLir = new LIREstimator(layout, initLoadSaveStats)
       val computeLir      = new LIREstimator(layout, computeStats)
 
-      if (prev1Block.save.isDefined) {
+      if (prev1Tile.save.isDefined) {
         println(
-          s"TID ${prev1Block.tid}: ${BackendSegmentKeyHelper(prev1Block.save.get.key)}"
+          s"TID ${prev1Tile.tid}: ${BackendSegmentKeyHelper(prev1Tile.save.get.key)}"
         )
-        decodeSegment(prev1Block.save.get, initLoadSaveLir)
+        decodeSegment(prev1Tile.save.get, initLoadSaveLir)
       }
-      if (curBlock.init.isDefined) {
+      if (curTile.init.isDefined) {
         println(
-          s"TID ${curBlock.tid}: ${BackendSegmentKeyHelper(curBlock.init.get.key)}"
+          s"TID ${curTile.tid}: ${BackendSegmentKeyHelper(curTile.init.get.key)}"
         )
-        decodeSegment(curBlock.init.get, initLoadSaveLir)
+        decodeSegment(curTile.init.get, initLoadSaveLir)
       }
-      if (curBlock.load.isDefined) {
+      if (curTile.load.isDefined) {
         println(
-          s"TID ${curBlock.tid}: ${BackendSegmentKeyHelper(curBlock.load.get.key)}"
+          s"TID ${curTile.tid}: ${BackendSegmentKeyHelper(curTile.load.get.key)}"
         )
-        decodeSegment(curBlock.load.get, initLoadSaveLir)
+        decodeSegment(curTile.load.get, initLoadSaveLir)
       }
-      if (prev0Block.compute.isDefined) {
+      if (prev0Tile.compute.isDefined) {
         println(
-          s"TID ${prev0Block.tid}: ${BackendSegmentKeyHelper(prev0Block.compute.get.key)}"
+          s"TID ${prev0Tile.tid}: ${BackendSegmentKeyHelper(prev0Tile.compute.get.key)}"
         )
-        decodeSegment(prev0Block.compute.get, computeLir)
+        decodeSegment(prev0Tile.compute.get, computeLir)
       }
 
       println("BARRIER")
@@ -270,15 +270,15 @@ class Backend(
       index += 1
     }
 
-    for (curBlock <- blocks) {
-      overlay(curBlock, prev0Block, prev1Block)
+    for (curTile <- tiles) {
+      overlayTiles(curTile, prev0Tile, prev1Tile)
 
-      prev1Block = prev0Block
-      prev0Block = curBlock
+      prev1Tile = prev0Tile
+      prev0Tile = curTile
     }
 
-    overlay(Block(), prev0Block, prev1Block)
-    overlay(Block(), Block(), prev0Block)
+    overlayTiles(Tile(), prev0Tile, prev1Tile)
+    overlayTiles(Tile(), Tile(), prev0Tile)
 
     stream.close()
 

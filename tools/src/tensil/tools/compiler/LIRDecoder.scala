@@ -14,23 +14,27 @@ class LIRDecoder(arch: Architecture) {
   def decode(stream: InputStream, lir: LIR): Unit = {
     val decoder = mkDecoder(stream)
 
-    decoder.foreach(_(lir))
+    while (decoder(lir)) {}
   }
 
-  def mkDecoder(stream: InputStream): Iterator[(LIR) => Unit] =
-    new Iterator[(LIR) => Unit] {
-      private val bytes = Array.fill[Byte](layout.instructionSizeBytes + 1)(0);
+  def mkDecoder(stream: InputStream): (LIR) => Boolean = {
+    val bytes =
+      Array.fill[Byte](layout.instructionSizeBytes + 1)(0)
 
-      override def hasNext: Boolean =
-        (stream.read(bytes, 0, layout.instructionSizeBytes) != -1)
+    println(s"CREATED $stream")
 
-      override def next(): (LIR) => Unit = {
+    (lir) => {
+      if (stream.read(bytes, 0, layout.instructionSizeBytes) != -1) {
+        println(s"NEXT")
+
         val instruction      = BigInt(bytes.reverse)
         var decodedSize: Int = 0
 
         def decodeInstructionBits(bitsSize: Int) = {
           val bits =
-            (instruction >> decodedSize) & ((BigInt(1) << bitsSize) - BigInt(1))
+            (instruction >> decodedSize) & ((BigInt(
+              1
+            ) << bitsSize) - BigInt(1))
           decodedSize += bitsSize
           bits.toLong
         }
@@ -87,40 +91,40 @@ class LIRDecoder(arch: Architecture) {
         val r = if (opcode == Opcode.Wait) {
           skipBits(layout.operandsSizeBits)
 
-          (lir: LIR) => lir.emitNoOp()
+          lir.emitNoOp()
         } else if (opcode == Opcode.MatMul) {
-          val (localAddress, localStride)             = decodeAddressOperand0()
-          val (accumulatorAddress, accumulatorStride) = decodeAddressOperand1()
-          val size                                    = decodeSizeOperand2()
-          val accumulate                              = (flags & MatMulFlags.Accumulate) != 0
+          val (localAddress, localStride) = decodeAddressOperand0()
+          val (accumulatorAddress, accumulatorStride) =
+            decodeAddressOperand1()
+          val size       = decodeSizeOperand2()
+          val accumulate = (flags & MatMulFlags.Accumulate) != 0
           val localTag =
             if ((flags & MatMulFlags.Zeroes) != 0) MemoryTag.Zeroes
             else MemoryTag.Local
 
-          (lir: LIR) =>
-            lir.emitMatMul(
-              accumulate,
-              localStride,
-              MemoryAddress(
-                localTag,
-                MemoryRef.Invalid,
-                localAddress
-              ),
-              accumulatorStride,
-              MemoryAddress(
-                MemoryTag.Accumulators,
-                MemoryRef.Invalid,
-                accumulatorAddress
-              ),
-              size
-            )
-
+          lir.emitMatMul(
+            accumulate,
+            localStride,
+            MemoryAddress(
+              localTag,
+              MemoryRef.Invalid,
+              localAddress
+            ),
+            accumulatorStride,
+            MemoryAddress(
+              MemoryTag.Accumulators,
+              MemoryRef.Invalid,
+              accumulatorAddress
+            ),
+            size
+          )
         } else if (opcode == Opcode.DataMove) {
           val (localAddress, localStride) = decodeAddressOperand0()
           val (accumulatorOrDRAMAddress, accumulatorOrDRAMStride) =
             decodeAddressOperand1()
-          val size       = decodeSizeOperand2()
-          val accumulate = flags == DataMoveFlags.LocalToAccumulatorAccumulate
+          val size = decodeSizeOperand2()
+          val accumulate =
+            flags == DataMoveFlags.LocalToAccumulatorAccumulate
           val toLocal = flags match {
             case DataMoveFlags.DRAM0ToLocal | DataMoveFlags.DRAM1ToLocal |
                 DataMoveFlags.AccumulatorToLocal =>
@@ -138,25 +142,23 @@ class LIRDecoder(arch: Architecture) {
               MemoryTag.Consts
           }
 
-          (lir: LIR) =>
-            lir.emitDataMove(
-              toLocal,
-              accumulate,
-              localStride,
-              MemoryAddress(
-                MemoryTag.Local,
-                MemoryRef.Invalid,
-                localAddress
-              ),
-              accumulatorOrDRAMStride,
-              MemoryAddress(
-                accumulatorOrDRAMTag,
-                MemoryRef.Invalid,
-                accumulatorOrDRAMAddress
-              ),
-              size
-            )
-
+          lir.emitDataMove(
+            toLocal,
+            accumulate,
+            localStride,
+            MemoryAddress(
+              MemoryTag.Local,
+              MemoryRef.Invalid,
+              localAddress
+            ),
+            accumulatorOrDRAMStride,
+            MemoryAddress(
+              accumulatorOrDRAMTag,
+              MemoryRef.Invalid,
+              accumulatorOrDRAMAddress
+            ),
+            size
+          )
         } else if (opcode == Opcode.LoadWeights) {
           val (localAddress, localStride) = decodeAddressOperand0()
           val size                        = decodeSizeOperand1()
@@ -165,12 +167,11 @@ class LIRDecoder(arch: Architecture) {
             else MemoryTag.Local
           skipBits(layout.operand2SizeBits)
 
-          (lir: LIR) =>
-            lir.emitLoadWeights(
-              localStride,
-              MemoryAddress(localTag, MemoryRef.Invalid, localAddress),
-              size
-            )
+          lir.emitLoadWeights(
+            localStride,
+            MemoryAddress(localTag, MemoryRef.Invalid, localAddress),
+            size
+          )
 
         } else if (opcode == Opcode.SIMD) {
           val (writeAccumulatorAddress, _) = decodeAddressOperand0()
@@ -185,30 +186,32 @@ class LIRDecoder(arch: Architecture) {
             if ((flags & SIMDFlags.Write) != 0) MemoryTag.Accumulators
             else MemoryTag.Invalid
 
-          (lir: LIR) =>
-            lir.emitSIMD(
-              accumulate,
-              simdOp,
-              simdSourceLeft,
-              simdSourceRight,
-              simdDestination,
-              MemoryAddress(
-                writeAccumulatorTag,
-                MemoryRef.Invalid,
-                writeAccumulatorAddress
-              ),
-              MemoryAddress(
-                readAccumulatorTag,
-                MemoryRef.Invalid,
-                readAccumulatorAddress
-              )
+          lir.emitSIMD(
+            accumulate,
+            simdOp,
+            simdSourceLeft,
+            simdSourceRight,
+            simdDestination,
+            MemoryAddress(
+              writeAccumulatorTag,
+              MemoryRef.Invalid,
+              writeAccumulatorAddress
+            ),
+            MemoryAddress(
+              readAccumulatorTag,
+              MemoryRef.Invalid,
+              readAccumulatorAddress
             )
-
-        } else (lir: LIR) => {}
+          )
+        }
 
         require(decodedSize == layout.operandsSizeBits)
 
-        r
+        true
+      } else {
+        println(s"DONE")
+        false
       }
     }
+  }
 }

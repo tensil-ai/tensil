@@ -180,7 +180,13 @@ class Backend(
       inputStream.close()
     }
 
-    var nextTid = 0
+    // TILED EXPERIMENT BEGINS
+
+    val tiledProgramStream = new DataOutputStream(
+      new FileOutputStream("tiled.tasm")
+    )
+    val tiledLir = new LIRPrinter(tiledProgramStream)
+    var nextTid  = 0
 
     case class Tile(
         init: Option[BackendSegment] = None,
@@ -226,48 +232,198 @@ class Backend(
         )
       }
 
-    val stream = new DataOutputStream(new FileOutputStream("threads.csv"))
-    var index  = 0
-
     def overlayTiles(curTile: Tile, prev0Tile: Tile, prev1Tile: Tile) = {
-      val initLoadSaveStats = new Stats()
-      val computeStats      = new Stats()
-
-      val initLoadSaveLir = new LIREstimator(layout, initLoadSaveStats)
-      val computeLir      = new LIREstimator(layout, computeStats)
+      val lirDecoder   = new LIRDecoder(layout.arch)
+      val streamsByTid = mutable.ArrayBuffer.empty[(Int, InputStream)]
 
       if (prev1Tile.save.isDefined) {
-        println(
-          s"TID ${prev1Tile.tid}: ${BackendSegmentKeyHelper(prev1Tile.save.get.key)}"
+        tiledProgramStream.writeBytes(
+          s"; TID ${prev1Tile.tid}: ${BackendSegmentKeyHelper(prev1Tile.save.get.key)}\r\n"
         )
-        decodeSegment(prev1Tile.save.get, initLoadSaveLir)
+        streamsByTid += (
+          (
+            prev1Tile.tid,
+            new FileInputStream(prev1Tile.save.get.file)
+          )
+        )
       }
       if (curTile.init.isDefined) {
-        println(
-          s"TID ${curTile.tid}: ${BackendSegmentKeyHelper(curTile.init.get.key)}"
+        tiledProgramStream.writeBytes(
+          s"; TID ${curTile.tid}: ${BackendSegmentKeyHelper(curTile.init.get.key)}\r\n"
         )
-        decodeSegment(curTile.init.get, initLoadSaveLir)
+        streamsByTid += (
+          (
+            curTile.tid,
+            new FileInputStream(curTile.init.get.file)
+          )
+        )
       }
       if (curTile.load.isDefined) {
-        println(
-          s"TID ${curTile.tid}: ${BackendSegmentKeyHelper(curTile.load.get.key)}"
+        tiledProgramStream.writeBytes(
+          s"; TID ${curTile.tid}: ${BackendSegmentKeyHelper(curTile.load.get.key)}\r\n"
         )
-        decodeSegment(curTile.load.get, initLoadSaveLir)
+        streamsByTid += (
+          (
+            curTile.tid,
+            new FileInputStream(curTile.load.get.file)
+          )
+        )
       }
       if (prev0Tile.compute.isDefined) {
-        println(
-          s"TID ${prev0Tile.tid}: ${BackendSegmentKeyHelper(prev0Tile.compute.get.key)}"
+        tiledProgramStream.writeBytes(
+          s"; TID ${prev0Tile.tid}: ${BackendSegmentKeyHelper(prev0Tile.compute.get.key)}\r\n"
         )
-        decodeSegment(prev0Tile.compute.get, computeLir)
+        streamsByTid += (
+          (
+            prev0Tile.tid,
+            new FileInputStream(prev0Tile.compute.get.file)
+          )
+        )
       }
 
-      println("BARRIER")
-
-      stream.writeBytes(
-        s"${index},${initLoadSaveStats.totalCycles},${computeStats.totalCycles}\r\n"
+      val decodersByTid = mutable.Map(
+        streamsByTid
+          .groupBy(_._1)
+          .mapValues(
+            _.map(v => lirDecoder.mkDecoder(v._2)).toList
+          )
+          .toSeq: _*
       )
 
-      index += 1
+      val mixers = decodersByTid.keys
+        .map(decodersTid =>
+          new LIR {
+            // TODO: Mixer will set desired TID and adjust local address
+            
+            val tid       = decodersTid
+            val estimator = new Estimator(layout)
+            var curCycles = 0L
+
+            override def emitNoOp(): Unit = {
+              curCycles += estimator.estimateCyclesAndEnergy(Opcode.Wait).cycles
+              tiledLir.emitNoOp()
+            }
+
+            override def emitWait(tidToWait: Int): Unit = {
+              curCycles += estimator.estimateCyclesAndEnergy(Opcode.Wait).cycles
+              tiledLir.emitWait(tidToWait)
+            }
+
+            override def emitMatMul(
+                accumulate: Boolean,
+                localStride: Int,
+                localAddress: MemoryAddress,
+                accumulatorStride: Int,
+                accumulatorAddress: MemoryAddress,
+                size: MemoryAddressRaw
+            ): Unit = {
+              curCycles += estimator
+                .estimateCyclesAndEnergy(Opcode.MatMul, Some(size))
+                .cycles
+              tiledLir.emitMatMul(
+                accumulate,
+                localStride,
+                localAddress,
+                accumulatorStride,
+                accumulatorAddress,
+                size
+              )
+            }
+
+            override def emitSIMD(
+                accumulate: Boolean,
+                simdOp: Int,
+                simdSourceLeft: Int,
+                simdSourceRight: Int,
+                simdDestination: Int,
+                writeAccumulatorAddress: MemoryAddress,
+                readAccumulatorAddress: MemoryAddress
+            ): Unit = {
+              curCycles += estimator.estimateCyclesAndEnergy(Opcode.SIMD).cycles
+              tiledLir.emitSIMD(
+                accumulate,
+                simdOp,
+                simdSourceLeft,
+                simdSourceRight,
+                simdDestination,
+                writeAccumulatorAddress,
+                readAccumulatorAddress
+              )
+            }
+
+            override def emitDataMove(
+                toLocal: Boolean,
+                accumulate: Boolean,
+                localStride: Int,
+                localAddress: MemoryAddress,
+                stride: Int,
+                address: MemoryAddress,
+                size: MemoryAddressRaw
+            ): Unit = {
+              curCycles += estimator
+                .estimateCyclesAndEnergy(
+                  Opcode.DataMove,
+                  Some(size),
+                  LIRGen.mkDataMoveFlags(toLocal, accumulate, address.tag)
+                )
+                .cycles
+              tiledLir.emitDataMove(
+                toLocal,
+                accumulate,
+                localStride,
+                localAddress,
+                stride,
+                address,
+                size
+              )
+            }
+
+            override def emitLoadWeights(
+                localStride: Int,
+                localAddress: MemoryAddress,
+                size: MemoryAddressRaw
+            ): Unit = {
+              curCycles += estimator
+                .estimateCyclesAndEnergy(Opcode.LoadWeights, Some(size))
+                .cycles
+              tiledLir.emitLoadWeights(localStride, localAddress, size)
+            }
+
+          }
+        )
+        .toSeq
+
+      /* Find mixer with remaning decoders and least cycles */
+      def nextMixer =
+        mixers
+          .filter(m => decodersByTid.contains(m.tid))
+          .sortBy(_.curCycles)
+          .headOption
+      var curMixer = nextMixer
+
+      while (curMixer.isDefined) {
+        val decoders                   = decodersByTid(curMixer.get.tid)
+        val curDecoder :: restDecoders = decoders
+
+        /* Decode and check if there is remaining LIR */
+        if (!curDecoder(curMixer.get))
+          if (restDecoders.isEmpty)
+            decodersByTid.remove(curMixer.get.tid)
+          else
+            decodersByTid(curMixer.get.tid) = restDecoders
+
+        curMixer = nextMixer
+      }
+
+      /* Pad mixers with NoOps until maximum cycles */
+      val maxCycles = mixers.map(_.curCycles).max
+
+      while (mixers.map(_.curCycles).min < maxCycles)
+        for (mixer <- mixers)
+          if (mixer.curCycles < maxCycles)
+            mixer.emitNoOp()
+
+      streamsByTid.foreach(_._2.close())
     }
 
     for (curTile <- tiles) {
@@ -280,7 +436,9 @@ class Backend(
     overlayTiles(Tile(), prev0Tile, prev1Tile)
     overlayTiles(Tile(), Tile(), prev0Tile)
 
-    stream.close()
+    tiledProgramStream.close()
+
+    // TILED EXPERIMENT ENDS
 
     for ((key, segment) <- segments) {
       if (printProgramStream.isDefined)

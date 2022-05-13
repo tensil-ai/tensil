@@ -502,7 +502,7 @@ class Scheduler(
                 )
 
                 if (
-                  accumulatorSize > arch.accumulatorDepth || localSize > arch.localDepth
+                  accumulatorSize > arch.accumulatorDepth || localSize > arch.threadLocalDepth
                 ) {
                   if (n == 1)
                     /**

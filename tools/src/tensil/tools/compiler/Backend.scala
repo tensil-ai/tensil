@@ -5,7 +5,12 @@ package tensil.tools.compiler
 
 import java.io._
 import scala.collection.mutable
-import tensil.tools.{TraceContext, TracepointCondition, TracepointsMap}
+import tensil.tools.{
+  CompilerException,
+  TraceContext,
+  TracepointCondition,
+  TracepointsMap
+}
 import tensil.{ArchitectureDataType, InstructionLayout}
 
 class BackendSegment(
@@ -171,22 +176,16 @@ class Backend(
                                                             else Nil)
     )
 
-    def decodeSegment(segment: BackendSegment, lir: LIR): Unit = {
-      val inputStream = new FileInputStream(segment.file)
-      val lirDecoder  = new LIRDecoder(layout.arch)
-
-      lirDecoder.decode(inputStream, lir)
-
-      inputStream.close()
+    val tileWindowSize = layout.arch.numberOfThreads match {
+      case 1 => 1
+      case 2 => 3
+      case _ =>
+        throw new CompilerException(
+          s"${layout.arch.numberOfThreads} threads are not supported"
+        )
     }
 
-    // TILED EXPERIMENT BEGINS
-
-    val tiledProgramStream = new DataOutputStream(
-      new FileOutputStream("tiled.tasm")
-    )
-    val tiledLir = new LIRPrinter(tiledProgramStream)
-    var nextTid  = 0
+    var nextTid = 0
 
     case class Tile(
         init: Option[BackendSegment] = None,
@@ -196,90 +195,74 @@ class Backend(
     ) {
       val tid = nextTid
 
-      nextTid = (nextTid + 1) % 2
+      nextTid = (nextTid + 1) % layout.arch.numberOfThreads
     }
 
-    var prev0Tile = Tile()
-    var prev1Tile = Tile()
-
     var curInit: Option[BackendSegment] = None
+    val tiles = Seq.fill(tileWindowSize - 1)(Tile()) ++
+      (for (
+        layerSegments <-
+          segments.groupBy(_._1.layer).toSeq.sortBy(_._1).map(_._2)
+      )
+        yield (for (
+          tileSegments <-
+            layerSegments
+              .groupBy(p => (p._1.stage, p._1.partition))
+              .toSeq
+              .sortBy(_._1)
+              .map(_._2)
+        ) yield {
+          val kindSegments = tileSegments.map {
+            case (key, segment) => (key.kind, segment)
+          }
 
-    val tiles =
-      for (
-        tileSegments <-
-          segments
-            .groupBy(p => (p._1.layer, p._1.stage, p._1.partition))
-            .toSeq
-            .sortBy(_._1)
-            .map(_._2)
-      ) yield {
-        val kindSegments = tileSegments.map {
-          case (key, segment) => (key.kind, segment)
-        }
+          val init = if (tileSegments.head._1.partition == 0) {
+            curInit = kindSegments.get(BackendSegmentKey.Init)
+            curInit
+          } else if (
+            tileSegments.head._1.partition < layout.arch.numberOfThreads
+          ) {
+            curInit
+          } else None
 
-        val init = if (tileSegments.head._1.partition == 0) {
-          curInit = kindSegments.get(BackendSegmentKey.Init)
-          curInit
-        } else if (tileSegments.head._1.partition == 1) {
-          curInit
-        } else None
-
-        Tile(
-          init = init,
-          load = kindSegments.get(BackendSegmentKey.Load),
-          compute = kindSegments.get(BackendSegmentKey.Compute),
-          save = kindSegments.get(BackendSegmentKey.Save)
-        )
-      }
-
-    def overlayTiles(curTile: Tile, prev0Tile: Tile, prev1Tile: Tile) = {
-      val lirDecoder   = new LIRDecoder(layout.arch)
-      val streamsByTid = mutable.ArrayBuffer.empty[(Int, InputStream)]
-
-      if (prev1Tile.save.isDefined) {
-        tiledProgramStream.writeBytes(
-          s"; TID ${prev1Tile.tid}: ${BackendSegmentKeyHelper(prev1Tile.save.get.key)}\r\n"
-        )
-        streamsByTid += (
-          (
-            prev1Tile.tid,
-            new FileInputStream(prev1Tile.save.get.file)
+          Tile(
+            init = init,
+            load = kindSegments.get(BackendSegmentKey.Load),
+            compute = kindSegments.get(BackendSegmentKey.Compute),
+            save = kindSegments.get(BackendSegmentKey.Save)
           )
-        )
-      }
-      if (curTile.init.isDefined) {
-        tiledProgramStream.writeBytes(
-          s"; TID ${curTile.tid}: ${BackendSegmentKeyHelper(curTile.init.get.key)}\r\n"
-        )
-        streamsByTid += (
-          (
-            curTile.tid,
-            new FileInputStream(curTile.init.get.file)
-          )
-        )
-      }
-      if (curTile.load.isDefined) {
-        tiledProgramStream.writeBytes(
-          s"; TID ${curTile.tid}: ${BackendSegmentKeyHelper(curTile.load.get.key)}\r\n"
-        )
-        streamsByTid += (
-          (
-            curTile.tid,
-            new FileInputStream(curTile.load.get.file)
-          )
-        )
-      }
-      if (prev0Tile.compute.isDefined) {
-        tiledProgramStream.writeBytes(
-          s"; TID ${prev0Tile.tid}: ${BackendSegmentKeyHelper(prev0Tile.compute.get.key)}\r\n"
-        )
-        streamsByTid += (
-          (
-            prev0Tile.tid,
-            new FileInputStream(prev0Tile.compute.get.file)
-          )
-        )
-      }
+        }) ++ Seq.fill(tileWindowSize - 1)(Tile())).reduceLeft(_ ++ _)
+
+    def overlayTiles(tiles: Seq[Tile]) = {
+      require(tiles.size == 1 || tiles.size == 3)
+
+      val lirDecoder = new LIRDecoder(layout.arch)
+      val streamsByTid =
+        (if (tiles.size == 3)
+           Seq(
+             (tiles(0).tid, tiles(0).save),
+             (tiles(2).tid, tiles(2).init),
+             (tiles(2).tid, tiles(2).load),
+             (tiles(1).tid, tiles(1).compute)
+           )
+         else if (tiles.size == 1)
+           Seq(
+             (tiles(0).tid, tiles(0).init),
+             (tiles(0).tid, tiles(0).load),
+             (tiles(0).tid, tiles(0).compute),
+             (tiles(0).tid, tiles(0).save)
+           )
+         else Nil)
+          .filter(_._2.isDefined)
+          .map {
+            case (tid, tile) =>
+              if (printProgramStream.isDefined)
+                printProgramStream.get.writeBytes(
+                  s"; TID $tid: ${BackendSegmentKeyHelper(tile.get.key)}\r\n"
+                )
+
+              (tid, new FileInputStream(tile.get.file))
+          }
 
       val decodersByTid = mutable.Map(
         streamsByTid
@@ -290,23 +273,33 @@ class Backend(
           .toSeq: _*
       )
 
-      val mixers = decodersByTid.keys
+      val threads = decodersByTid.keys
         .map(decodersTid =>
           new LIR {
-            // TODO: Mixer will set desired TID and adjust local address
+            // TODO: Mixer will set desired TID
 
             val tid       = decodersTid
             val estimator = new Estimator(layout)
             var curCycles = 0L
 
+            private def adjustLocalAddress(address: MemoryAddress) =
+              if (address.tag == MemoryTag.Local) {
+
+                MemoryAddress(
+                  MemoryTag.Local,
+                  address.ref,
+                  address.raw + layout.arch.threadLocalDepth * tid
+                )
+              } else address
+
             override def emitNoOp(): Unit = {
               curCycles += estimator.estimateCyclesAndEnergy(Opcode.Wait).cycles
-              tiledLir.emitNoOp()
+              lir.emitNoOp()
             }
 
             override def emitWait(tidToWait: Int): Unit = {
               curCycles += estimator.estimateCyclesAndEnergy(Opcode.Wait).cycles
-              tiledLir.emitWait(tidToWait)
+              lir.emitWait(tidToWait)
             }
 
             override def emitMatMul(
@@ -320,10 +313,10 @@ class Backend(
               curCycles += estimator
                 .estimateCyclesAndEnergy(Opcode.MatMul, Some(size))
                 .cycles
-              tiledLir.emitMatMul(
+              lir.emitMatMul(
                 accumulate,
                 localStride,
-                localAddress,
+                adjustLocalAddress(localAddress),
                 accumulatorStride,
                 accumulatorAddress,
                 size
@@ -340,7 +333,7 @@ class Backend(
                 readAccumulatorAddress: MemoryAddress
             ): Unit = {
               curCycles += estimator.estimateCyclesAndEnergy(Opcode.SIMD).cycles
-              tiledLir.emitSIMD(
+              lir.emitSIMD(
                 accumulate,
                 simdOp,
                 simdSourceLeft,
@@ -367,11 +360,11 @@ class Backend(
                   LIRGen.mkDataMoveFlags(toLocal, accumulate, address.tag)
                 )
                 .cycles
-              tiledLir.emitDataMove(
+              lir.emitDataMove(
                 toLocal,
                 accumulate,
                 localStride,
-                localAddress,
+                adjustLocalAddress(localAddress),
                 stride,
                 address,
                 size
@@ -386,41 +379,48 @@ class Backend(
               curCycles += estimator
                 .estimateCyclesAndEnergy(Opcode.LoadWeights, Some(size))
                 .cycles
-              tiledLir.emitLoadWeights(localStride, localAddress, size)
+              lir.emitLoadWeights(
+                localStride,
+                adjustLocalAddress(localAddress),
+                size
+              )
             }
 
           }
         )
         .toSeq
 
-      /* Find mixer with remaning decoders and least cycles */
-      def nextMixer =
-        mixers
+      /* Find a thread with remaining decoders and least cycles */
+      def nextThread =
+        threads
           .filter(m => decodersByTid.contains(m.tid))
           .sortBy(_.curCycles)
           .headOption
-      var curMixer = nextMixer
+      var curThread = nextThread
 
-      while (curMixer.isDefined) {
-        val decoders                   = decodersByTid(curMixer.get.tid)
+      while (curThread.isDefined) {
+        val decoders                   = decodersByTid(curThread.get.tid)
         val curDecoder :: restDecoders = decoders
 
         /* Decode and check if there is remaining LIR */
-        if (!curDecoder(curMixer.get))
+        if (!curDecoder(curThread.get))
           if (restDecoders.isEmpty)
-            decodersByTid.remove(curMixer.get.tid)
+            decodersByTid.remove(curThread.get.tid)
           else
-            decodersByTid(curMixer.get.tid) = restDecoders
+            decodersByTid(curThread.get.tid) = restDecoders
 
-        curMixer = nextMixer
+        curThread = nextThread
       }
 
-      /* Pad mixers with NoOps until maximum cycles */
-      if (!mixers.isEmpty) {
-        val maxCycles = mixers.map(_.curCycles).max
+      /**
+        * Pad threads with NoOps until maximum cycles.
+        * This in the future will be replaced with mutual WAITs.
+        */
+      if (!threads.isEmpty) {
+        val maxCycles = threads.map(_.curCycles).max
 
-        while (mixers.map(_.curCycles).min < maxCycles)
-          for (mixer <- mixers)
+        while (threads.map(_.curCycles).min < maxCycles)
+          for (mixer <- threads)
             if (mixer.curCycles < maxCycles)
               mixer.emitNoOp()
       }
@@ -428,21 +428,11 @@ class Backend(
       streamsByTid.foreach(_._2.close())
     }
 
-    for (curTile <- tiles) {
-      overlayTiles(curTile, prev0Tile, prev1Tile)
-
-      prev1Tile = prev0Tile
-      prev0Tile = curTile
+    for (i <- 0 until tiles.size - (tileWindowSize - 1)) {
+      overlayTiles(tiles.slice(i, i + tileWindowSize))
     }
 
-    overlayTiles(Tile(), prev0Tile, prev1Tile)
-    overlayTiles(Tile(), Tile(), prev0Tile)
-
-    tiledProgramStream.close()
-
-    // TILED EXPERIMENT ENDS
-
-    for ((key, segment) <- segments) {
+    /*for ((key, segment) <- segments) {
       if (printProgramStream.isDefined)
         printProgramStream.get.writeBytes(
           s";\r\n; ${BackendSegmentKeyHelper(key)}\r\n;\r\n"
@@ -462,7 +452,7 @@ class Backend(
       }
 
       instructionOffset += segment.instructionsCount
-    }
+    }*/
   }
 
   def instructionsCount = segments.values.map(_.instructionsCount).sum

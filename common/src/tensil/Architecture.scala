@@ -31,6 +31,8 @@ case class Architecture(
   def varsDepth   = dram0Depth
   def constsDepth = dram1Depth
 
+  def threadLocalDepth = localDepth / numberOfThreads
+
   def writeDriverArchitectureParams(fileName: String): Unit = {
     val stream = new FileOutputStream(fileName)
     writeDriverArchitecureParams(new DataOutputStream(stream));

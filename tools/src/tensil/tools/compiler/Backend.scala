@@ -416,12 +416,14 @@ class Backend(
       }
 
       /* Pad mixers with NoOps until maximum cycles */
-      val maxCycles = mixers.map(_.curCycles).max
+      if (!mixers.isEmpty) {
+        val maxCycles = mixers.map(_.curCycles).max
 
-      while (mixers.map(_.curCycles).min < maxCycles)
-        for (mixer <- mixers)
-          if (mixer.curCycles < maxCycles)
-            mixer.emitNoOp()
+        while (mixers.map(_.curCycles).min < maxCycles)
+          for (mixer <- mixers)
+            if (mixer.curCycles < maxCycles)
+              mixer.emitNoOp()
+      }
 
       streamsByTid.foreach(_._2.close())
     }

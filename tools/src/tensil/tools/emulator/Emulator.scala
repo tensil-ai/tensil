@@ -11,9 +11,14 @@ import scala.reflect.ClassTag
 
 import tensil.tools.data.Tensor
 import tensil.tools.{TraceContext}
-import tensil.{Architecture, ArchitectureDataTypeWithBase, TablePrinter, emulator}
+import tensil.{
+  Architecture,
+  ArchitectureDataTypeWithBase,
+  TablePrinter,
+  emulator
+}
 import tensil.tools.compiler.{
-  LIRDecoder,
+  LIRStreamParser,
   LoadWeightsFlags,
   SIMDFlags,
   SIMDOp,
@@ -35,7 +40,6 @@ class Emulator[T : NumericWithMAC : ClassTag](
     dataType: ArchitectureDataTypeWithBase[T],
     arch: Architecture
 ) {
-  private val lirDecoder        = new LIRDecoder(arch)
   private val emulatorExecutive = new EmulatorExecutive(arch)
 
   private def arrayToStream(bytes: Array[Byte]): InputStream = {
@@ -68,12 +72,10 @@ class Emulator[T : NumericWithMAC : ClassTag](
 
     try {
       val emulatorTrace = new EmulatorTrace(trace, emulatorExecutive)
+      val lirParser     = new LIRStreamParser(arch, stream)
       val lir           = new LIRBroadcast(Seq(emulatorTrace, emulatorExecutive))
 
-      lirDecoder.decode(
-        stream,
-        lir
-      )
+      lirParser.parseAll(lir)
 
       emulatorTrace.runTrace()
     } finally {

@@ -236,7 +236,6 @@ class Backend(
     def overlayTiles(tiles: Seq[Tile]) = {
       require(tiles.size == 1 || tiles.size == 3)
 
-      val lirDecoder = new LIRDecoder(layout.arch)
       val streamsByTid =
         (if (tiles.size == 3)
            Seq(
@@ -264,21 +263,22 @@ class Backend(
               (tid, new FileInputStream(tile.get.file))
           }
 
-      val decodersByTid = mutable.Map(
+      val parsersByTid =
         streamsByTid
           .groupBy(_._1)
-          .mapValues(
-            _.map(v => lirDecoder.mkStepDecoder(v._2)).toList
-          )
-          .toSeq: _*
-      )
+          .map {
+            case (tid, g) =>
+              (tid -> LIRParser.combine(
+                g.map(p => new LIRStreamParser(layout.arch, p._2)): _*
+              ))
+          }
 
-      val threads = decodersByTid.keys
-        .map(decodersTid =>
+      val threads = parsersByTid.keys
+        .map(parserTid =>
           new LIR {
-            // TODO: Mixer will set desired TID
+            // TODO: Thread will set desired TID
 
-            val tid       = decodersTid
+            val tid       = parserTid
             val estimator = new Estimator(layout)
             var curCycles = 0L
 
@@ -390,25 +390,18 @@ class Backend(
         )
         .toSeq
 
-      /* Find a thread with remaining decoders and least cycles */
+      /* Find a thread with non-empty parsers and least cycles */
       def nextThread =
         threads
-          .filter(m => decodersByTid.contains(m.tid))
+          .filter(m => parsersByTid.filter(_._2.hasNext).contains(m.tid))
           .sortBy(_.curCycles)
           .headOption
       var curThread = nextThread
 
       while (curThread.isDefined) {
-        val decoders                   = decodersByTid(curThread.get.tid)
-        val curDecoder :: restDecoders = decoders
+        val curParser = parsersByTid(curThread.get.tid)
 
-        /* Decode and check if there is remaining LIR */
-        if (!curDecoder(curThread.get))
-          if (restDecoders.isEmpty)
-            decodersByTid.remove(curThread.get.tid)
-          else
-            decodersByTid(curThread.get.tid) = restDecoders
-
+        curParser.parseNext(curThread.get)
         curThread = nextThread
       }
 
@@ -420,9 +413,9 @@ class Backend(
         val maxCycles = threads.map(_.curCycles).max
 
         while (threads.map(_.curCycles).min < maxCycles)
-          for (mixer <- threads)
-            if (mixer.curCycles < maxCycles)
-              mixer.emitNoOp()
+          for (thread <- threads)
+            if (thread.curCycles < maxCycles)
+              thread.emitNoOp()
       }
 
       streamsByTid.foreach(_._2.close())

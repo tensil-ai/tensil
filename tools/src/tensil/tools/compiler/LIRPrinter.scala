@@ -10,16 +10,11 @@ class LIRPrinter(
 ) extends LIR {
   private var instructionOffset: InstructionAddress = InstructionAddress.Zero
 
-  def emitNoOp(): Unit =
-    printOp(
-      "NoOp",
-      ""
-    )
-
-  def emitWait(tidToWait: Int): Unit =
+  def emitWait(tidToWait: Int, tid: Int): Unit =
     printOp(
       "Wait",
-      ""
+      s"$tidToWait",
+      tid
     )
 
   def emitMatMul(
@@ -28,7 +23,8 @@ class LIRPrinter(
       localAddress: MemoryAddress,
       accumulatorStride: Int,
       accumulatorAddress: MemoryAddress,
-      size: MemoryAddressRaw
+      size: MemoryAddressRaw,
+      tid: Int
   ): Unit = {
     val suffix =
       if (accumulate)
@@ -38,7 +34,8 @@ class LIRPrinter(
 
     printOp(
       "MatMul" + suffix,
-      s"${formatAddress(localStride, localAddress)} ${formatAddress(accumulatorStride, accumulatorAddress)}${formatSize(size)}"
+      s"${formatAddress(localStride, localAddress)} ${formatAddress(accumulatorStride, accumulatorAddress)}${formatSize(size)}",
+      tid
     )
   }
 
@@ -49,7 +46,8 @@ class LIRPrinter(
       simdSourceRight: Int,
       simdDestination: Int,
       writeAccumulatorAddress: MemoryAddress,
-      readAccumulatorAddress: MemoryAddress
+      readAccumulatorAddress: MemoryAddress,
+      tid: Int
   ): Unit = {
     val mnemonic = "SIMD"
 
@@ -82,36 +80,42 @@ class LIRPrinter(
     ) {
       printOp(
         mnemonic + "(RWA)",
-        s"${subInstructionName} W${MemoryAddressHelper(writeAccumulatorAddress)} R${MemoryAddressHelper(readAccumulatorAddress)}"
+        s"${subInstructionName} W${MemoryAddressHelper(writeAccumulatorAddress)} R${MemoryAddressHelper(readAccumulatorAddress)}",
+        tid
       )
     } else if (
       writeAccumulatorAddress.tag == MemoryTag.Accumulators && accumulate
     ) {
       printOp(
         mnemonic + "(WA)",
-        s"${subInstructionName} W${MemoryAddressHelper(writeAccumulatorAddress)}"
+        s"${subInstructionName} W${MemoryAddressHelper(writeAccumulatorAddress)}",
+        tid
       )
     } else if (
       readAccumulatorAddress.tag == MemoryTag.Accumulators && writeAccumulatorAddress.tag == MemoryTag.Accumulators
     ) {
       printOp(
         mnemonic + "(RW)",
-        s"${subInstructionName} W${MemoryAddressHelper(writeAccumulatorAddress)} R${MemoryAddressHelper(readAccumulatorAddress)}"
+        s"${subInstructionName} W${MemoryAddressHelper(writeAccumulatorAddress)} R${MemoryAddressHelper(readAccumulatorAddress)}",
+        tid
       )
     } else if (writeAccumulatorAddress.tag == MemoryTag.Accumulators) {
       printOp(
         mnemonic + "(W)",
-        s"${subInstructionName} W${MemoryAddressHelper(writeAccumulatorAddress)}"
+        s"${subInstructionName} W${MemoryAddressHelper(writeAccumulatorAddress)}",
+        tid
       )
     } else if (readAccumulatorAddress.tag == MemoryTag.Accumulators) {
       printOp(
         mnemonic + "(R)",
-        s"${subInstructionName} R${MemoryAddressHelper(readAccumulatorAddress)}"
+        s"${subInstructionName} R${MemoryAddressHelper(readAccumulatorAddress)}",
+        tid
       )
     } else
       printOp(
         mnemonic,
-        subInstructionName
+        subInstructionName,
+        tid
       )
   }
 
@@ -122,7 +126,8 @@ class LIRPrinter(
       localAddress: MemoryAddress,
       stride: Int,
       address: MemoryAddress,
-      size: MemoryAddressRaw
+      size: MemoryAddressRaw,
+      tid: Int
   ): Unit = {
     val suffix =
       if (toLocal)
@@ -133,25 +138,29 @@ class LIRPrinter(
 
     printOp(
       "DataMove" + suffix,
-      s"${formatAddress(localStride, localAddress)} ${formatAddress(stride, address)}${formatSize(size)}"
+      s"${formatAddress(localStride, localAddress)} ${formatAddress(stride, address)}${formatSize(size)}",
+      tid
     )
   }
 
   def emitLoadWeights(
       localStride: Int,
       localAddress: MemoryAddress,
-      size: MemoryAddressRaw
+      size: MemoryAddressRaw,
+      tid: Int
   ): Unit =
     printOp(
       "LoadWeights",
-      s"${formatAddress(localStride, localAddress)}${formatSize(size)}"
+      s"${formatAddress(localStride, localAddress)}${formatSize(size)}",
+      tid
     )
 
   private def printOp(
       mnemonic: String,
-      operands: String
+      operands: String,
+      tid: Int
   ): Unit = {
-    stream.writeBytes(s"[$instructionOffset] $mnemonic $operands\r\n")
+    stream.writeBytes(s"[$instructionOffset] $tid $mnemonic $operands\r\n")
 
     instructionOffset += 1
   }

@@ -44,9 +44,8 @@ class BackendSegment(
 
   def close(): Unit = fileStream.close()
 
-  def emitNoOp(): Unit = lirBroadcast.emitNoOp()
-
-  def emitWait(tidToWait: Int): Unit = lirBroadcast.emitWait(tidToWait)
+  def emitWait(tidToWait: Int, tid: Int): Unit =
+    lirBroadcast.emitWait(tidToWait, tid)
 
   def emitMatMul(
       accumulate: Boolean,
@@ -54,7 +53,8 @@ class BackendSegment(
       localAddress: MemoryAddress,
       accumulatorStride: Int,
       accumulatorAddress: MemoryAddress,
-      size: MemoryAddressRaw
+      size: MemoryAddressRaw,
+      tid: Int
   ): Unit =
     lirBroadcast.emitMatMul(
       accumulate,
@@ -62,7 +62,8 @@ class BackendSegment(
       localAddress,
       accumulatorStride,
       accumulatorAddress,
-      size
+      size,
+      tid
     )
 
   def emitSIMD(
@@ -72,7 +73,8 @@ class BackendSegment(
       simdSourceRight: Int,
       simdDestination: Int,
       writeAccumulatorAddress: MemoryAddress,
-      readAccumulatorAddress: MemoryAddress
+      readAccumulatorAddress: MemoryAddress,
+      tid: Int
   ): Unit =
     lirBroadcast.emitSIMD(
       accumulate,
@@ -81,7 +83,8 @@ class BackendSegment(
       simdSourceRight,
       simdDestination,
       writeAccumulatorAddress,
-      readAccumulatorAddress
+      readAccumulatorAddress,
+      tid
     )
 
   def emitDataMove(
@@ -91,7 +94,8 @@ class BackendSegment(
       localAddress: MemoryAddress,
       stride: Int,
       address: MemoryAddress,
-      size: MemoryAddressRaw
+      size: MemoryAddressRaw,
+      tid: Int
   ): Unit =
     lirBroadcast.emitDataMove(
       toLocal,
@@ -100,14 +104,16 @@ class BackendSegment(
       localAddress,
       stride,
       address,
-      size
+      size,
+      tid
     )
 
   def emitLoadWeights(
       localStride: Int,
       localAddress: MemoryAddress,
-      size: MemoryAddressRaw
-  ): Unit = lirBroadcast.emitLoadWeights(localStride, localAddress, size)
+      size: MemoryAddressRaw,
+      tid: Int
+  ): Unit = lirBroadcast.emitLoadWeights(localStride, localAddress, size, tid)
 }
 
 object BackendSegmentKey {
@@ -276,8 +282,6 @@ class Backend(
       val threads = parsersByTid.keys
         .map(parserTid =>
           new LIR {
-            // TODO: Thread will set desired TID
-
             val tid       = parserTid
             val estimator = new Estimator(layout)
             var curCycles = 0L
@@ -292,14 +296,11 @@ class Backend(
                 )
               } else address
 
-            override def emitNoOp(): Unit = {
-              curCycles += estimator.estimateCyclesAndEnergy(Opcode.Wait).cycles
-              lir.emitNoOp()
-            }
+            def emitPaddingNoOp() = emitWait(tid)
 
-            override def emitWait(tidToWait: Int): Unit = {
+            override def emitWait(tidToWait: Int, ignoredTid: Int): Unit = {
               curCycles += estimator.estimateCyclesAndEnergy(Opcode.Wait).cycles
-              lir.emitWait(tidToWait)
+              lir.emitWait(tidToWait, tid)
             }
 
             override def emitMatMul(
@@ -308,7 +309,8 @@ class Backend(
                 localAddress: MemoryAddress,
                 accumulatorStride: Int,
                 accumulatorAddress: MemoryAddress,
-                size: MemoryAddressRaw
+                size: MemoryAddressRaw,
+                ignoredTid: Int
             ): Unit = {
               curCycles += estimator
                 .estimateCyclesAndEnergy(Opcode.MatMul, Some(size))
@@ -319,7 +321,8 @@ class Backend(
                 adjustLocalAddress(localAddress),
                 accumulatorStride,
                 accumulatorAddress,
-                size
+                size,
+                tid
               )
             }
 
@@ -330,7 +333,8 @@ class Backend(
                 simdSourceRight: Int,
                 simdDestination: Int,
                 writeAccumulatorAddress: MemoryAddress,
-                readAccumulatorAddress: MemoryAddress
+                readAccumulatorAddress: MemoryAddress,
+                ignoredTid: Int
             ): Unit = {
               curCycles += estimator.estimateCyclesAndEnergy(Opcode.SIMD).cycles
               lir.emitSIMD(
@@ -340,7 +344,8 @@ class Backend(
                 simdSourceRight,
                 simdDestination,
                 writeAccumulatorAddress,
-                readAccumulatorAddress
+                readAccumulatorAddress,
+                tid
               )
             }
 
@@ -351,7 +356,8 @@ class Backend(
                 localAddress: MemoryAddress,
                 stride: Int,
                 address: MemoryAddress,
-                size: MemoryAddressRaw
+                size: MemoryAddressRaw,
+                ignoredTid: Int
             ): Unit = {
               curCycles += estimator
                 .estimateCyclesAndEnergy(
@@ -367,14 +373,16 @@ class Backend(
                 adjustLocalAddress(localAddress),
                 stride,
                 address,
-                size
+                size,
+                tid
               )
             }
 
             override def emitLoadWeights(
                 localStride: Int,
                 localAddress: MemoryAddress,
-                size: MemoryAddressRaw
+                size: MemoryAddressRaw,
+                ignoredTid: Int
             ): Unit = {
               curCycles += estimator
                 .estimateCyclesAndEnergy(Opcode.LoadWeights, Some(size))
@@ -382,7 +390,8 @@ class Backend(
               lir.emitLoadWeights(
                 localStride,
                 adjustLocalAddress(localAddress),
-                size
+                size,
+                tid
               )
             }
 
@@ -415,7 +424,7 @@ class Backend(
         while (threads.map(_.curCycles).min < maxCycles)
           for (thread <- threads)
             if (thread.curCycles < maxCycles)
-              thread.emitNoOp()
+              thread.emitPaddingNoOp()
       }
 
       streamsByTid.foreach(_._2.close())

@@ -32,19 +32,16 @@ object LIRGen {
 
 class LIRGen(
     layout: InstructionLayout,
-    stream: OutputStream,
-    currentTid: Int = 0
+    stream: OutputStream
 ) extends LIR {
   private var currentInstructionSizeBits: Int = 0
   private var currentInstruction: BigInt      = 0
 
   private val binaryDataStream = new DataOutputStream(stream)
 
-  def emitNoOp(): Unit = emitWait(currentTid)
-
-  def emitWait(tidToWait: Int): Unit = {
+  def emitWait(tidToWait: Int, tid: Int): Unit = {
     emitTidOperand0(tidToWait)
-    emitHeader(currentTid, Opcode.Wait)
+    emitHeader(tid, Opcode.Wait)
     emitInstruction()
   }
 
@@ -54,7 +51,8 @@ class LIRGen(
       localAddress: MemoryAddress,
       accumulatorStride: Int,
       accumulatorAddress: MemoryAddress,
-      size: MemoryAddressRaw
+      size: MemoryAddressRaw,
+      tid: Int
   ): Unit = {
     require(
       localAddress.tag == MemoryTag.Local || localAddress.tag == MemoryTag.Zeroes
@@ -71,7 +69,7 @@ class LIRGen(
       accumulatorAddress.raw
     )
     emitLocalAndAccumulatorSizeOperand2(size)
-    emitHeader(currentTid, Opcode.MatMul, flags)
+    emitHeader(tid, Opcode.MatMul, flags)
     emitInstruction()
   }
 
@@ -98,7 +96,8 @@ class LIRGen(
       simdSourceRight: Int,
       simdDestination: Int,
       writeAccumulatorAddress: MemoryAddress,
-      readAccumulatorAddress: MemoryAddress
+      readAccumulatorAddress: MemoryAddress,
+      tid: Int
   ): Unit = {
     require(
       writeAccumulatorAddress.tag == MemoryTag.Accumulators || writeAccumulatorAddress.tag == MemoryTag.Invalid
@@ -130,7 +129,7 @@ class LIRGen(
       simdSourceRight,
       simdDestination
     )
-    emitHeader(currentTid, Opcode.SIMD, flags)
+    emitHeader(tid, Opcode.SIMD, flags)
     emitInstruction()
   }
 
@@ -141,7 +140,8 @@ class LIRGen(
       localAddress: MemoryAddress,
       stride: Int,
       address: MemoryAddress,
-      size: MemoryAddressRaw
+      size: MemoryAddressRaw,
+      tid: Int
   ): Unit = {
     require(
       localAddress.tag == MemoryTag.Local
@@ -166,14 +166,15 @@ class LIRGen(
         emitLocalAndDRAM1SizeOperand2(size)
     }
 
-    emitHeader(currentTid, Opcode.DataMove, flags)
+    emitHeader(tid, Opcode.DataMove, flags)
     emitInstruction()
   }
 
   def emitLoadWeights(
       localStride: Int,
       localAddress: MemoryAddress,
-      size: MemoryAddressRaw
+      size: MemoryAddressRaw,
+      tid: Int
   ): Unit = {
     require(
       localAddress.tag == MemoryTag.Local || localAddress.tag == MemoryTag.Zeroes
@@ -186,7 +187,7 @@ class LIRGen(
 
     emitLocalStrideAddressOperand0(localStride, localAddress.raw)
     emitLocalSizeOperand1(size)
-    emitHeader(currentTid, Opcode.LoadWeights, flags)
+    emitHeader(tid, Opcode.LoadWeights, flags)
     emitInstruction()
   }
 

@@ -8,7 +8,8 @@ import java.io._
 import tensil.tools.{TraceContext}
 import tensil.{Architecture, InstructionLayout}
 
-class LIRStreamParser(arch: Architecture, stream: InputStream) extends LIRParser {
+class LIRStreamParser(arch: Architecture, stream: InputStream)
+    extends LIRParser {
   val layout = new InstructionLayout(arch)
   val bytes =
     Array.fill[Byte](layout.instructionSizeBytes + 1)(0)
@@ -76,6 +77,13 @@ class LIRStreamParser(arch: Architecture, stream: InputStream) extends LIRParser
       skipBits(layout.operand2SizeBits - layout.simdInstructionSizeBits)
       r
     }
+    def decodeTidOperand() = {
+      val r = decodeInstructionBits(layout.tidSizeBits).toInt
+      skipBits(
+        layout.operand0SizeBits - (layout.tidSizeBits)
+      )
+      r
+    }
 
     val header = instruction >> layout.operandsSizeBits
 
@@ -86,9 +94,10 @@ class LIRStreamParser(arch: Architecture, stream: InputStream) extends LIRParser
     val flags: Int = (header & ((1 << layout.flagsSizeBits) - 1)).toByte
 
     val r = if (opcode == Opcode.Wait) {
-      skipBits(layout.operandsSizeBits)
+      val tidToWait = decodeTidOperand()
+      skipBits(layout.operand1SizeBits + layout.operand2SizeBits)
 
-      lir.emitNoOp()
+      lir.emitWait(tidToWait, tid)
     } else if (opcode == Opcode.MatMul) {
       val (localAddress, localStride) = decodeAddressOperand0()
       val (accumulatorAddress, accumulatorStride) =
@@ -113,7 +122,8 @@ class LIRStreamParser(arch: Architecture, stream: InputStream) extends LIRParser
           MemoryRef.Invalid,
           accumulatorAddress
         ),
-        size
+        size,
+        tid
       )
     } else if (opcode == Opcode.DataMove) {
       val (localAddress, localStride) = decodeAddressOperand0()
@@ -154,7 +164,8 @@ class LIRStreamParser(arch: Architecture, stream: InputStream) extends LIRParser
           MemoryRef.Invalid,
           accumulatorOrDRAMAddress
         ),
-        size
+        size,
+        tid
       )
     } else if (opcode == Opcode.LoadWeights) {
       val (localAddress, localStride) = decodeAddressOperand0()
@@ -167,7 +178,8 @@ class LIRStreamParser(arch: Architecture, stream: InputStream) extends LIRParser
       lir.emitLoadWeights(
         localStride,
         MemoryAddress(localTag, MemoryRef.Invalid, localAddress),
-        size
+        size,
+        tid
       )
 
     } else if (opcode == Opcode.SIMD) {
@@ -198,7 +210,8 @@ class LIRStreamParser(arch: Architecture, stream: InputStream) extends LIRParser
           readAccumulatorTag,
           MemoryRef.Invalid,
           readAccumulatorAddress
-        )
+        ),
+        tid
       )
     }
 

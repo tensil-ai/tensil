@@ -4,9 +4,8 @@
 package tensil.tools.compiler
 
 class LIRBroadcast(to: Seq[LIR]) extends LIR {
-  def emitNoOp(): Unit = to.foreach(_.emitNoOp())
-
-  def emitWait(tidToWait: Int): Unit = to.foreach(_.emitWait(tidToWait))
+  def emitWait(tid: Int, tidToWait: Int): Unit =
+    to.foreach(_.emitWait(tid, tidToWait))
 
   def emitMatMul(
       accumulate: Boolean,
@@ -14,7 +13,8 @@ class LIRBroadcast(to: Seq[LIR]) extends LIR {
       localAddress: MemoryAddress,
       accumulatorStride: Int,
       accumulatorAddress: MemoryAddress,
-      size: MemoryAddressRaw
+      size: MemoryAddressRaw,
+      tid: Int
   ): Unit =
     to.foreach(
       _.emitMatMul(
@@ -23,7 +23,8 @@ class LIRBroadcast(to: Seq[LIR]) extends LIR {
         localAddress,
         accumulatorStride,
         accumulatorAddress,
-        size
+        size,
+        tid
       )
     )
 
@@ -34,7 +35,8 @@ class LIRBroadcast(to: Seq[LIR]) extends LIR {
       simdSourceRight: Int,
       simdDestination: Int,
       writeAccumulatorAddress: MemoryAddress,
-      readAccumulatorAddress: MemoryAddress
+      readAccumulatorAddress: MemoryAddress,
+      tid: Int
   ): Unit =
     to.foreach(
       _.emitSIMD(
@@ -44,7 +46,8 @@ class LIRBroadcast(to: Seq[LIR]) extends LIR {
         simdSourceRight,
         simdDestination,
         writeAccumulatorAddress,
-        readAccumulatorAddress
+        readAccumulatorAddress,
+        tid
       )
     )
 
@@ -55,7 +58,8 @@ class LIRBroadcast(to: Seq[LIR]) extends LIR {
       localAddress: MemoryAddress,
       stride: Int,
       address: MemoryAddress,
-      size: MemoryAddressRaw
+      size: MemoryAddressRaw,
+      tid: Int
   ): Unit =
     to.foreach(
       _.emitDataMove(
@@ -65,13 +69,15 @@ class LIRBroadcast(to: Seq[LIR]) extends LIR {
         localAddress,
         stride,
         address,
-        size
+        size,
+        tid
       )
     )
 
   def emitLoadWeights(
       localStride: Int,
       localAddress: MemoryAddress,
-      size: MemoryAddressRaw
-  ): Unit = to.foreach(_.emitLoadWeights(localStride, localAddress, size))
+      size: MemoryAddressRaw,
+      tid: Int
+  ): Unit = to.foreach(_.emitLoadWeights(localStride, localAddress, size, tid))
 }

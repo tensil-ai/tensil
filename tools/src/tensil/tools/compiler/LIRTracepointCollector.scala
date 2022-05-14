@@ -18,9 +18,7 @@ class LIRTracepointCollector(
   def instructionsCount          = instructionOffset
   def instructionTracepointsMaps = instructionTracepointsMapsBuffer.toMap
 
-  def emitNoOp(): Unit = incInstructionsCount()
-
-  def emitWait(tidToWait: Int): Unit = incInstructionsCount()
+  def emitWait(tidToWait: Int, tid: Int): Unit = incInstructionsCount()
 
   def emitMatMul(
       accumulate: Boolean,
@@ -28,7 +26,8 @@ class LIRTracepointCollector(
       localAddress: MemoryAddress,
       accumulatorStride: Int,
       accumulatorAddress: MemoryAddress,
-      size: MemoryAddressRaw
+      size: MemoryAddressRaw,
+      tid: Int
   ): Unit =
     emitTracepoints(accumulatorAddress, size, accumulatorStride)
 
@@ -39,7 +38,8 @@ class LIRTracepointCollector(
       simdSourceRight: Int,
       simdDestination: Int,
       writeAccumulatorAddress: MemoryAddress,
-      readAccumulatorAddress: MemoryAddress
+      readAccumulatorAddress: MemoryAddress,
+      tid: Int
   ): Unit =
     emitTracepoints(writeAccumulatorAddress, 0L, 1)
 
@@ -50,7 +50,8 @@ class LIRTracepointCollector(
       localAddress: MemoryAddress,
       stride: Int,
       address: MemoryAddress,
-      size: MemoryAddressRaw
+      size: MemoryAddressRaw,
+      tid: Int
   ): Unit =
     if (toLocal)
       emitTracepoints(localAddress, size, localStride)
@@ -60,7 +61,8 @@ class LIRTracepointCollector(
   def emitLoadWeights(
       localStride: Int,
       localAddress: MemoryAddress,
-      size: MemoryAddressRaw
+      size: MemoryAddressRaw,
+      tid: Int
   ): Unit = incInstructionsCount()
 
   private def incInstructionsCount(): Unit = instructionOffset += 1

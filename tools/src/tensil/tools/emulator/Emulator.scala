@@ -101,9 +101,7 @@ class Emulator[T : NumericWithMAC : ClassTag](
       instructionOffset += 1
     }
 
-    def emitNoOp(): Unit = runTrace()
-
-    def emitWait(tidToWait: Int): Unit = runTrace()
+    def emitWait(tidToWait: Int, tid: Int): Unit = runTrace()
 
     def emitMatMul(
         accumulate: Boolean,
@@ -111,7 +109,8 @@ class Emulator[T : NumericWithMAC : ClassTag](
         localAddress: MemoryAddress,
         accumulatorStride: Int,
         accumulatorAddress: MemoryAddress,
-        size: MemoryAddressRaw
+        size: MemoryAddressRaw,
+        tid: Int
     ): Unit = runTrace()
 
     def emitSIMD(
@@ -121,7 +120,8 @@ class Emulator[T : NumericWithMAC : ClassTag](
         simdSourceRight: Int,
         simdDestination: Int,
         writeAccumulatorAddress: MemoryAddress,
-        readAccumulatorAddress: MemoryAddress
+        readAccumulatorAddress: MemoryAddress,
+        tid: Int
     ): Unit = runTrace()
 
     def emitDataMove(
@@ -131,13 +131,15 @@ class Emulator[T : NumericWithMAC : ClassTag](
         localAddress: MemoryAddress,
         stride: Int,
         address: MemoryAddress,
-        size: MemoryAddressRaw
+        size: MemoryAddressRaw,
+        tid: Int
     ): Unit = runTrace()
 
     def emitLoadWeights(
         localStride: Int,
         localAddress: MemoryAddress,
-        size: MemoryAddressRaw
+        size: MemoryAddressRaw,
+        tid: Int
     ): Unit = runTrace()
   }
 
@@ -223,9 +225,7 @@ class Emulator[T : NumericWithMAC : ClassTag](
           dram1Array(i.toInt * arch.arraySize + j) = dataType.readConst(stream)
     }
 
-    def emitNoOp(): Unit = {}
-
-    def emitWait(tidToWait: Int): Unit = {}
+    def emitWait(tidToWait: Int, tid: Int): Unit = {}
 
     def emitMatMul(
         accumulate: Boolean,
@@ -233,7 +233,8 @@ class Emulator[T : NumericWithMAC : ClassTag](
         localAddress: MemoryAddress,
         accumulatorStride: Int,
         accumulatorAddress: MemoryAddress,
-        size: MemoryAddressRaw
+        size: MemoryAddressRaw,
+        tid: Int
     ): Unit = {
       val localBase       = localAddress.raw.toInt * arch.arraySize.toInt
       val accumulatorBase = accumulatorAddress.raw.toInt * arch.arraySize.toInt
@@ -274,7 +275,8 @@ class Emulator[T : NumericWithMAC : ClassTag](
         localAddress: MemoryAddress,
         accumulatorOrDRAMStride: Int,
         accumulatorOrDRAMAddress: MemoryAddress,
-        size: MemoryAddressRaw
+        size: MemoryAddressRaw,
+        tid: Int
     ): Unit = {
       val localBase = localAddress.raw.toInt * arch.arraySize.toInt
       val accumulatorOrDRAMBase =
@@ -333,7 +335,8 @@ class Emulator[T : NumericWithMAC : ClassTag](
     def emitLoadWeights(
         localStride: Int,
         localAddress: MemoryAddress,
-        size: MemoryAddressRaw
+        size: MemoryAddressRaw,
+        tid: Int
     ): Unit = {
       val localStep = 1 << localStride
 
@@ -361,7 +364,8 @@ class Emulator[T : NumericWithMAC : ClassTag](
         simdSourceRight: Int,
         simdDestination: Int,
         writeAccumulatorAddress: MemoryAddress,
-        readAccumulatorAddress: MemoryAddress
+        readAccumulatorAddress: MemoryAddress,
+        tid: Int
     ): Unit = {
       val readAccumulatorBase =
         readAccumulatorAddress.raw.toInt * arch.arraySize.toInt

@@ -4,9 +4,9 @@
 package tensil.tools.compiler
 
 abstract trait LIR {
-  def emitNoOp(): Unit
+  final def emitNoOp(tid: Int = 0) = emitWait(tid, tid)
 
-  def emitWait(tidToWait: Int): Unit
+  def emitWait(tidToWait: Int, tid: Int = 0): Unit
 
   def emitMatMul(
       accumulate: Boolean,
@@ -14,7 +14,8 @@ abstract trait LIR {
       localAddress: MemoryAddress,
       accumulatorStride: Int,
       accumulatorAddress: MemoryAddress,
-      size: MemoryAddressRaw
+      size: MemoryAddressRaw,
+      tid: Int = 0
   ): Unit
 
   def emitSIMD(
@@ -24,7 +25,8 @@ abstract trait LIR {
       simdSourceRight: Int,
       simdDestination: Int,
       writeAccumulatorAddress: MemoryAddress,
-      readAccumulatorAddress: MemoryAddress
+      readAccumulatorAddress: MemoryAddress,
+      tid: Int = 0
   ): Unit
 
   def emitDataMove(
@@ -34,12 +36,14 @@ abstract trait LIR {
       localAddress: MemoryAddress,
       stride: Int,
       address: MemoryAddress,
-      size: MemoryAddressRaw
+      size: MemoryAddressRaw,
+      tid: Int = 0
   ): Unit
 
   def emitLoadWeights(
       localStride: Int,
       localAddress: MemoryAddress,
-      size: MemoryAddressRaw
+      size: MemoryAddressRaw,
+      tid: Int = 0
   ): Unit
 }

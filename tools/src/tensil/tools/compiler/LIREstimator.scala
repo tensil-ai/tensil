@@ -8,14 +8,7 @@ import tensil.InstructionLayout
 class LIREstimator(layout: InstructionLayout, stats: Stats) extends LIR {
   val estimator = new Estimator(layout)
 
-  def emitNoOp(): Unit = {
-    stats.countInstruction(
-      "Wait",
-      estimator.estimateCyclesAndEnergy(Opcode.Wait)
-    )
-  }
-
-  def emitWait(tidToWait: Int): Unit = {
+  def emitWait(tidToWait: Int, tid: Int): Unit = {
     stats.countInstruction(
       "Wait",
       estimator.estimateCyclesAndEnergy(Opcode.Wait)
@@ -28,7 +21,8 @@ class LIREstimator(layout: InstructionLayout, stats: Stats) extends LIR {
       localAddress: MemoryAddress,
       accumulatorStride: Int,
       accumulatorAddress: MemoryAddress,
-      size: MemoryAddressRaw
+      size: MemoryAddressRaw,
+      tid: Int
   ): Unit = {
     val mnemonic = "MatMul"
 
@@ -49,7 +43,8 @@ class LIREstimator(layout: InstructionLayout, stats: Stats) extends LIR {
       simdSourceRight: Int,
       simdDestination: Int,
       writeAccumulatorAddress: MemoryAddress,
-      readAccumulatorAddress: MemoryAddress
+      readAccumulatorAddress: MemoryAddress,
+      tid: Int
   ): Unit = {
     stats.countInstruction(
       "SIMD",
@@ -64,7 +59,8 @@ class LIREstimator(layout: InstructionLayout, stats: Stats) extends LIR {
       localAddress: MemoryAddress,
       stride: Int,
       address: MemoryAddress,
-      size: MemoryAddressRaw
+      size: MemoryAddressRaw,
+      tid: Int
   ): Unit = {
     val flags = LIRGen.mkDataMoveFlags(toLocal, accumulate, address.tag)
     val suffix = flags match {
@@ -92,7 +88,8 @@ class LIREstimator(layout: InstructionLayout, stats: Stats) extends LIR {
   def emitLoadWeights(
       localStride: Int,
       localAddress: MemoryAddress,
-      size: MemoryAddressRaw
+      size: MemoryAddressRaw,
+      tid: Int
   ): Unit = {
     val mnemonic = "LoadWeights"
 

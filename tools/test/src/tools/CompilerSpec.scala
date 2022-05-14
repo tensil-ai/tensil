@@ -1139,10 +1139,9 @@ class CompilerSpec extends FlatSpec {
     dram0Depth = Kibi * 64,
     dram1Depth = Kibi * 64,
     accumulatorDepth = 256,
-    localDepth = 4096 * 2,
+    localDepth = 4096,
     stride0Depth = 8,
     stride1Depth = 8,
-    numberOfThreads = 2
   )
 
   it should "Compile TF MLP MNIST for 784x784 array with 64K memories" in {
@@ -1858,8 +1857,7 @@ class CompilerSpec extends FlatSpec {
     val name = "cnn_mnist_16x16_acc256_loc4k"
     val options = CompilerOptions(
       arch = MNIST16x16With256Acc4KLocArchitecture,
-      printSummary = true,
-      printProgramFileName = Some(s"${name}.tasm")
+      printSummary = true
     )
 
     Compiler.compile(

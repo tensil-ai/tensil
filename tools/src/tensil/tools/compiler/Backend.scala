@@ -260,13 +260,13 @@ class Backend(
          else Nil)
           .filter(_._2.isDefined)
           .map {
-            case (tid, tile) =>
+            case (tid, segment) =>
               if (printProgramStream.isDefined)
                 printProgramStream.get.writeBytes(
-                  s"; TID $tid: ${BackendSegmentKeyHelper(tile.get.key)}\r\n"
+                  s"; TID $tid: ${BackendSegmentKeyHelper(segment.get.key)}\r\n"
                 )
 
-              (tid, new FileInputStream(tile.get.file))
+              (tid, new FileInputStream(segment.get.file))
           }
 
       val parsersByTid =

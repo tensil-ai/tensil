@@ -354,6 +354,9 @@ class TfFrontend(
   private var nextLayerIndex = 0
 
   private def startLayer(nodeDefs: Seq[NodeDef]): Scheduler = {
+    if (graphPrinter.isDefined)
+      graphPrinter.get.startLayer(s"layer_$nextLayerIndex")
+
     val layerIndex = nextLayerIndex
     nextLayerIndex += 1
 
@@ -369,8 +372,12 @@ class TfFrontend(
     None
   }*/
 
-  private def finishLayer(scheduler: Scheduler, context: EmitContext) =
+  private def finishLayer(scheduler: Scheduler, context: EmitContext) = {
+    if (graphPrinter.isDefined)
+      graphPrinter.get.endLayer()
+
     Some(scheduler.emit(context.backend))
+  }
 
   private def doRewriteLayer(
       nodeDef: NodeDef,
@@ -381,9 +388,6 @@ class TfFrontend(
       poolDef: Option[NodeDef]
   ): Emitter =
     (context: EmitContext) => {
-      if (graphPrinter.isDefined)
-        graphPrinter.get.startLayer(s"layer_$nextLayerIndex")
-
       val scheduler = startLayer(
         Seq(Some(nodeDef), biasDef, addDef, normDef, activateDef, poolDef)
           .filter(_.isDefined)
@@ -514,9 +518,6 @@ class TfFrontend(
         )
 
       }
-
-      if (graphPrinter.isDefined)
-        graphPrinter.get.endLayer()
 
       finishLayer(scheduler, context)
     }

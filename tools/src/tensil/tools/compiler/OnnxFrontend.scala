@@ -388,6 +388,9 @@ class OnnxFrontend(
   private var nextLayerIndex = 0
 
   private def startLayer(nodeProtos: Seq[NodeProto]): Scheduler = {
+    if (graphPrinter.isDefined)
+      graphPrinter.get.startLayer(s"layer_$nextLayerIndex")
+
     val layerIndex = nextLayerIndex
     nextLayerIndex += 1
 
@@ -403,8 +406,12 @@ class OnnxFrontend(
     None
   }*/
 
-  private def finishLayer(scheduler: Scheduler, context: EmitContext) =
+  private def finishLayer(scheduler: Scheduler, context: EmitContext) = {
+    if (graphPrinter.isDefined)
+      graphPrinter.get.endLayer()
+
     Some(scheduler.emit(context.backend))
+  }
 
   private def doRewriteLayer(
       nodeProto: NodeProto,
@@ -414,9 +421,6 @@ class OnnxFrontend(
       poolProto: Option[NodeProto]
   ): Emitter =
     (context: EmitContext) => {
-      if (graphPrinter.isDefined)
-        graphPrinter.get.startLayer(s"layer_$nextLayerIndex")
-
       val scheduler = startLayer(
         Seq(
           Some(nodeProto),
@@ -549,9 +553,6 @@ class OnnxFrontend(
         )
 
       }
-
-      if (graphPrinter.isDefined)
-        graphPrinter.get.endLayer()
 
       finishLayer(scheduler, context)
     }

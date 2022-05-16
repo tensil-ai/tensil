@@ -417,7 +417,7 @@ class Scheduler(
 
     def rootStageSignature(root: VarOutputNode) = {
       val constValues =
-        inputsToLoad(traverseRoots(Seq(root)), _.inputStageConsts)
+        inputsToLoad(traverseRoots(Seq(root)), _.inputVars) //!!!
           .map(_.raw)
       StageSignature(
         firstConstAddressValue = constValues.headOption,
@@ -472,7 +472,7 @@ class Scheduler(
           .map(combinationCandidateStagedRoots => {
             val consts = inputsToLoad(
               traverseRoots(combinationCandidateStagedRoots.map(_.head)),
-              _.inputStageConsts
+              _.inputVars //!!!
             )
 
             def partitionRoots(
@@ -899,7 +899,7 @@ class Scheduler(
           .filter(_.isInstanceOf[TempOutputNode])
           .map(_.asInstanceOf[TempOutputNode])
     ) {
-      unique ++= node.inputVars
+      unique ++= node.inputStageConsts ///!!!
       unique ++= node.inputPartitionConsts
     }
 
@@ -932,7 +932,7 @@ class Scheduler(
     )
 
     for (constAddress <- constsToLoad) {
-      require(constAddress.tag == MemoryTag.Consts)
+      require(constAddress.tag == MemoryTag.Vars) //!!!
       require(!constsToLocalRenameMap.contains(constAddress.raw))
 
       val localAddressValue = toLocalRenameNext
@@ -991,12 +991,15 @@ class Scheduler(
       if (stage.constsToLocalRenameMap.isEmpty) 0
       else stage.constsToLocalRenameMap.values.max + 1;
     val varsToLocalRenameMap =
-      mutable.Map.empty[MemoryAddressRaw, MemoryAddressRaw]
+      mutable.Map.empty[
+        MemoryAddressRaw,
+        MemoryAddressRaw
+      ] ++ stage.constsToLocalRenameMap //!!!
     val constsToLocalRenameMap =
       mutable.Map.empty[
         MemoryAddressRaw,
         MemoryAddressRaw
-      ] ++ stage.constsToLocalRenameMap
+      ] //!!!
 
     def allocateLocal(varsOrConstsAddress: MemoryAddress): MemoryAddress = {
       require(
@@ -1050,7 +1053,7 @@ class Scheduler(
         constAddress
       )
 
-    for (varsAddress <- inputsToLoad(nodes, _.inputVars))
+    for (varsAddress <- inputsToLoad(nodes, _.inputStageConsts)) //!!!
       loadLocalRollup.emit(
         allocateLocal(varsAddress),
         varsAddress

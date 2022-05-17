@@ -27,13 +27,38 @@ class Scratch(depth: Int) extends Module {
   val a = Queue(io.a.in, 2)
   val b = Queue(io.b.in, 2)
 
-  // when a barrier comes in, the port has to wait until the other port also
-  // receives a barrier
-  // barriers are transmitted onwards, can contain a request too
+  val holdAReg = RegInit(false.B)
+  val holdBReg = RegInit(false.B)
 
-  when(a.valid && a.bits.barrier) {
-    when(b.valid && b.bits.barrier) {
-      proceed()
+  def hold(reg: Bool, bus: DecoupledIO[Request]): Bool =
+    (reg && !(bus.valid && bus.bits.signal === Signal.Release.U)) || (bus.valid && bus.bits.signal === Signal.Hold.U)
+
+  val holdA = hold(holdAReg, b)
+  val holdB = hold(holdBReg, a)
+
+  when(a.valid) {
+    when(a.bits.signal === Signal.Hold.U) {
+      holdBReg := true.B
+    }.elsewhen(a.bits.signal === Signal.Release.U) {
+      holdBReg := false.B
+    }
+  }
+
+  when(b.valid) {
+    when(b.bits.signal === Signal.Hold.U) {
+      holdAReg := true.B
+    }.elsewhen(b.bits.signal === Signal.Release.U) {
+      holdAReg := false.B
+    }
+  }
+
+  when(holdA) {
+    when(holdB) {
+      // both holds requested, break race condition by preferring to hold B
+      io.a.out <> a
+      b.ready := false.B
+      io.b.out.valid := false.B
+      io.b.out.bits := DontCare
     }.otherwise {
       // hold A
       a.ready := false.B
@@ -42,20 +67,16 @@ class Scratch(depth: Int) extends Module {
       io.b.out <> b
     }
   }.otherwise {
-    when(b.valid && b.bits.barrier) {
+    when(holdB) {
       // hold B
+      io.a.out <> a
       b.ready := false.B
       io.b.out.valid := false.B
       io.b.out.bits := DontCare
-      io.a.out <> a
     }.otherwise {
-      proceed()
+      io.a.out <> a
+      io.b.out <> b
     }
-  }
-
-  def proceed(): Unit = {
-    io.a.out <> a
-    io.b.out <> b
   }
 }
 
@@ -71,24 +92,24 @@ class ScratchSpec extends FunUnitSpec {
           m.io.b.out.setSinkClock(m.clock)
 
           thread("a.in") {
-            m.io.a.in.enqueue(Request(depth, 0, false, false))
+            m.io.a.in.enqueue(Request(depth, 0, false, Signal.None))
           }
 
           thread("b.in") {
-            m.io.b.in.enqueue(Request(depth, 0, false, false))
+            m.io.b.in.enqueue(Request(depth, 0, false, Signal.None))
           }
 
           thread("a.out") {
-            m.io.a.out.expectDequeue(Request(depth, 0, false, false))
+            m.io.a.out.expectDequeue(Request(depth, 0, false, Signal.None))
           }
 
           thread("b.out") {
-            m.io.b.out.expectDequeue(Request(depth, 0, false, false))
+            m.io.b.out.expectDequeue(Request(depth, 0, false, Signal.None))
           }
         }
       }
 
-      it("should block requests until barrier arrives on both ports") {
+      it("should hold requests until release arrives") {
         decoupledTest(new Scratch(depth)) { m =>
           m.io.a.in.setSourceClock(m.clock)
           m.io.a.out.setSinkClock(m.clock)
@@ -98,30 +119,34 @@ class ScratchSpec extends FunUnitSpec {
           val delay = 10
 
           thread("a.in") {
-            m.io.a.in.enqueue(Request(depth, 0, false, true))
+            m.io.a.in.enqueue(Request(depth, 0, false, Signal.Hold))
+            for (_ <- 0 until delay) {
+              m.clock.step()
+            }
+            m.io.a.in.enqueue(Request(depth, 0, false, Signal.Release))
           }
 
           thread("b.in") {
-            m.clock.step(delay)
-            m.io.b.in.enqueue(Request(depth, 0, false, true))
+            m.io.b.in.enqueue(Request(depth, 0, false, Signal.None))
           }
 
           thread("a.out") {
-            for (i <- 0 until delay) {
-              m.io.a.out.valid.expect(false.B)
-              m.clock.step()
-            }
-            m.io.a.out.expectDequeue(Request(depth, 0, false, true))
+            m.io.a.out.expectDequeue(Request(depth, 0, false, Signal.Hold))
+            m.io.a.out.expectDequeue(Request(depth, 0, false, Signal.Release))
           }
 
           thread("b.out") {
-            m.io.b.out.expectDequeue(Request(depth, 0, false, true))
+            for (_ <- 0 until delay) {
+              m.io.b.out.valid.expect(false.B)
+              m.clock.step()
+            }
+            m.io.b.out.expectDequeue(Request(depth, 0, false, Signal.None))
           }
         }
       }
 
       it(
-        "should allow requests on b while a is blocked until barrier arrives on b"
+        "should prefer to block B when holds are requested on both ports"
       ) {
         decoupledTest(new Scratch(depth)) { m =>
           m.io.a.in.setSourceClock(m.clock)
@@ -130,21 +155,23 @@ class ScratchSpec extends FunUnitSpec {
           m.io.b.out.setSinkClock(m.clock)
 
           thread("a.in") {
-            m.io.a.in.enqueue(Request(depth, 0, false, true))
+            m.io.a.in.enqueue(Request(depth, 0, false, Signal.Hold))
+            m.io.a.in.enqueue(Request(depth, 0, false, Signal.None))
           }
 
           thread("b.in") {
-            m.io.b.in.enqueue(Request(depth, 0, false, false))
-            m.io.b.in.enqueue(Request(depth, 0, false, true))
+            m.io.b.in.enqueue(Request(depth, 0, false, Signal.Hold))
           }
 
           thread("a.out") {
-            m.io.a.out.expectDequeue(Request(depth, 0, false, true))
+            m.io.a.out.expectDequeue(Request(depth, 0, false, Signal.Hold))
+            m.io.a.out.expectDequeue(Request(depth, 0, false, Signal.None))
           }
 
           thread("b.out") {
-            m.io.b.out.expectDequeue(Request(depth, 0, false, false))
-            m.io.b.out.expectDequeue(Request(depth, 0, false, true))
+            for (_ <- 0 until 5) {
+              m.io.b.out.valid.expect(false.B)
+            }
           }
         }
       }
@@ -155,7 +182,7 @@ class ScratchSpec extends FunUnitSpec {
 class Request(val depth: Long) extends Bundle {
   val address = UInt(log2Ceil(depth).W)
   val write   = Bool()
-  val barrier = Bool()
+  val signal  = UInt(2.W)
 }
 
 object Request {
@@ -163,12 +190,19 @@ object Request {
       depth: Long,
       address: Int,
       write: Boolean,
-      barrier: Boolean
+      signal: Int,
   ): Request = {
     (new Request(depth)).Lit(
       _.address -> address.U,
       _.write   -> write.B,
-      _.barrier -> barrier.B
+      _.signal  -> signal.U
     )
   }
+}
+
+object Signal {
+  val None    = 0x0
+  val Hold    = 0x1
+  val Release = 0x2
+  val _unused = 0x3
 }

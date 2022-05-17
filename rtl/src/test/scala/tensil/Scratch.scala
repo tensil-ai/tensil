@@ -109,7 +109,7 @@ class ScratchSpec extends FunUnitSpec {
         }
       }
 
-      it("should hold requests until release arrives") {
+      it("should hold requests on B until release arrives on A") {
         decoupledTest(new Scratch(depth)) { m =>
           m.io.a.in.setSourceClock(m.clock)
           m.io.a.out.setSinkClock(m.clock)
@@ -141,6 +141,42 @@ class ScratchSpec extends FunUnitSpec {
               m.clock.step()
             }
             m.io.b.out.expectDequeue(Request(depth, 0, false, Signal.None))
+          }
+        }
+      }
+
+      it("should hold requests on A until release arrives on B") {
+        decoupledTest(new Scratch(depth)) { m =>
+          m.io.a.in.setSourceClock(m.clock)
+          m.io.a.out.setSinkClock(m.clock)
+          m.io.b.in.setSourceClock(m.clock)
+          m.io.b.out.setSinkClock(m.clock)
+
+          val delay = 10
+
+          thread("a.in") {
+            m.io.a.in.enqueue(Request(depth, 0, false, Signal.None))
+          }
+
+          thread("b.in") {
+            m.io.b.in.enqueue(Request(depth, 0, false, Signal.Hold))
+            for (_ <- 0 until delay) {
+              m.clock.step()
+            }
+            m.io.b.in.enqueue(Request(depth, 0, false, Signal.Release))
+          }
+
+          thread("a.out") {
+            for (_ <- 0 until delay) {
+              m.io.a.out.valid.expect(false.B)
+              m.clock.step()
+            }
+            m.io.a.out.expectDequeue(Request(depth, 0, false, Signal.None))
+          }
+
+          thread("b.out") {
+            m.io.b.out.expectDequeue(Request(depth, 0, false, Signal.Hold))
+            m.io.b.out.expectDequeue(Request(depth, 0, false, Signal.Release))
           }
         }
       }

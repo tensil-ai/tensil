@@ -155,6 +155,8 @@ class LIRPrinter(
       tid
     )
 
+  def endEmit(): Unit = {}
+
   private def printOp(
       mnemonic: String,
       operands: String,

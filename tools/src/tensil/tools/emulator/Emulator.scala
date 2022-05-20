@@ -76,8 +76,6 @@ class Emulator[T : NumericWithMAC : ClassTag](
       val lir           = new LIRBroadcast(Seq(emulatorTrace, emulatorExecutive))
 
       lirParser.parseAll(lir)
-
-      emulatorTrace.runTrace()
     } finally {
       val endTime = System.nanoTime()
 
@@ -96,7 +94,7 @@ class Emulator[T : NumericWithMAC : ClassTag](
       extends LIR {
     var instructionOffset = 0L
 
-    def runTrace(): Unit = {
+    private def runTrace(): Unit = {
       trace.runTrace(instructionOffset, executive)
       instructionOffset += 1
     }
@@ -141,6 +139,8 @@ class Emulator[T : NumericWithMAC : ClassTag](
         size: MemoryAddressRaw,
         tid: Int
     ): Unit = runTrace()
+
+    def endEmit(): Unit = runTrace()
   }
 
   private class EmulatorExecutive(arch: Architecture)
@@ -427,6 +427,8 @@ class Emulator[T : NumericWithMAC : ClassTag](
           y(base + i) = r
       }
     }
+
+    def endEmit(): Unit = {}
 
     private def mkArray(size: Int): Array[T] = {
       Array.fill(size)(zero)

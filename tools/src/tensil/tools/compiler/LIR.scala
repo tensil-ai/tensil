@@ -46,4 +46,6 @@ abstract trait LIR {
       size: MemoryAddressRaw,
       tid: Int = 0
   ): Unit
+
+  def endEmit(): Unit
 }

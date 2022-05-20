@@ -5,7 +5,25 @@ package tensil.tools.compiler
 
 import tensil.InstructionLayout
 
-case class Estimate(cycles: Long, energy: Long)
+class Estimate(initCycles: Long, initEnergy: Long) {
+  private var curCycles = initCycles
+  private var curEnergy = initEnergy
+
+  def cycles = curCycles
+  def energy = curEnergy
+
+  def splitCycles(cyclesToSplit: Long): Estimate = {
+    require(cyclesToSplit < cycles)
+
+    val energyToSplit =
+      ((cyclesToSplit.toFloat / cycles.toFloat) * energy.toFloat).toLong
+
+    curCycles -= cyclesToSplit
+    curEnergy -= energyToSplit
+
+    new Estimate(cyclesToSplit, energyToSplit)
+  }
+}
 
 class Estimator(layout: InstructionLayout) {
   private var previousOpcode = Opcode.Wait
@@ -32,7 +50,7 @@ class Estimator(layout: InstructionLayout) {
         val cycles = 1L
         val energy = 0L
 
-        Estimate(cycles, energy)
+        new Estimate(cycles, energy)
       case Opcode.MatMul => {
         val cycles =
           (if (previousOpcode == Opcode.MatMul)
@@ -45,21 +63,21 @@ class Estimator(layout: InstructionLayout) {
         val energy =
           (size.get + 1) * layout.arch.arraySize * layout.arch.arraySize
 
-        Estimate(cycles, energy)
+        new Estimate(cycles, energy)
       }
 
       case Opcode.SIMD => {
         val cycles = 1L
         val energy = layout.arch.arraySize.toLong
 
-        Estimate(cycles, energy)
+        new Estimate(cycles, energy)
       }
 
       case Opcode.LoadWeights => {
         val cycles = (size.get + 1) * InternalTransferCycles
         val energy = (size.get + 1) * InternalTransferEnergy
 
-        Estimate(cycles, energy)
+        new Estimate(cycles, energy)
       }
 
       case Opcode.DataMove =>
@@ -90,16 +108,16 @@ class Estimator(layout: InstructionLayout) {
           val cycles = (size.get + 1) * 1
           val energy = (size.get + 1) * 1
 
-          Estimate(cycles, energy)
+          new Estimate(cycles, energy)
         } else {
           val cycles = (size.get + 1) * InternalTransferCycles
           val energy = (size.get + 1) * InternalTransferEnergy
 
-          Estimate(cycles, energy)
+          new Estimate(cycles, energy)
         }
 
       case _ =>
-        Estimate(0L, 0L)
+        new Estimate(0L, 0L)
     }
 
     previousOpcode = currentOp

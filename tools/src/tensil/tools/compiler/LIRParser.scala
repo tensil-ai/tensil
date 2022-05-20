@@ -18,9 +18,12 @@ object LIRParser {
 }
 
 abstract trait LIRParser {
-  def parseAll(lir: LIR): Unit =
+  def parseAll(lir: LIR): Unit = {
     while (hasNext)
       parseNext(lir)
+
+    lir.endEmit()
+  }
 
   def hasNext: Boolean
   def parseNext(lir: LIR): Unit

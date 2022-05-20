@@ -42,8 +42,6 @@ class BackendSegment(
   def instructionTracepointsMaps =
     lirTracepointCollector.instructionTracepointsMaps
 
-  def close(): Unit = fileStream.close()
-
   def emitWait(tidToWait: Int, tid: Int): Unit =
     lirBroadcast.emitWait(tidToWait, tid)
 
@@ -114,6 +112,11 @@ class BackendSegment(
       size: MemoryAddressRaw,
       tid: Int
   ): Unit = lirBroadcast.emitLoadWeights(localStride, localAddress, size, tid)
+
+  def endEmit(): Unit = {
+    lirBroadcast.endEmit()
+    fileStream.close()
+  }
 }
 
 object BackendSegmentKey {
@@ -151,10 +154,8 @@ class Backend(
       resolveRefToObject = resolveRefToObject
     )
 
-  def finalizeSegment(segment: BackendSegment): Unit = {
-    segment.close()
+  def emitSegment(segment: BackendSegment): Unit =
     segments(segment.key) = segment
-  }
 
   def writeSegments(
       programStream: OutputStream,
@@ -395,6 +396,7 @@ class Backend(
               )
             }
 
+            def endEmit(): Unit = {}
           }
         )
         .toSeq
@@ -433,6 +435,8 @@ class Backend(
     for (i <- 0 until tiles.size - (tileWindowSize - 1)) {
       overlayTiles(tiles.slice(i, i + tileWindowSize))
     }
+
+    lir.endEmit()
 
     /*for ((key, segment) <- segments) {
       if (printProgramStream.isDefined)

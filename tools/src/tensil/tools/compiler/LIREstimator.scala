@@ -3,13 +3,77 @@
 
 package tensil.tools.compiler
 
+import scala.collection.mutable
 import tensil.InstructionLayout
 
-class LIREstimator(layout: InstructionLayout, stats: Stats) extends LIR {
-  val estimator = new Estimator(layout)
+class LIREstimator(
+    layout: InstructionLayout,
+    stats: Stats,
+    queueSize: Int = 10000000
+) extends LIR {
+  private val estimator = new Estimator(layout)
+  private val estimateQueues =
+    Array.fill(layout.arch.numberOfThreads)(mutable.Queue.empty[Estimate])
+
+  private def countExecution(maxQueueSize: Int): Unit = {
+    val nonEmptyTids =
+      estimateQueues.map(_.size).zipWithIndex.filter(_._1 != 0).map(_._2)
+
+    val estimate = if (nonEmptyTids.size > 1) {
+      val minCycles =
+        nonEmptyTids.map(estimateQueues(_).front.cycles).min
+      val estimates =
+        for (tid <- nonEmptyTids)
+          yield
+            if (estimateQueues(tid).front.cycles == minCycles)
+              estimateQueues(tid).dequeue()
+            else
+              estimateQueues(tid).front.splitCycles(minCycles)
+
+      Some(
+        estimates.reduce((a, b) => new Estimate(a.cycles, a.energy + b.energy))
+      )
+
+    } else if (nonEmptyTids.size == 1) {
+      val queue = estimateQueues(nonEmptyTids(0))
+
+      if (queue.size > maxQueueSize) {
+        val dequeueSize = queue.size - maxQueueSize
+        val estimates   = for (_ <- 0 until dequeueSize) yield queue.dequeue()
+
+        Some(
+          estimates.reduce((a, b) =>
+            new Estimate(a.cycles + b.cycles, a.energy + b.energy)
+          )
+        )
+      } else
+        None
+    } else None
+
+    if (estimate.isDefined)
+      stats.countExecution(estimate.get)
+  }
+
+  private def count(
+      tid: Int,
+      mnemonic: String,
+      estimate: Estimate,
+      size: Long = 0
+  ): Unit = {
+    stats.countInstruction(
+      mnemonic,
+      estimate,
+      size
+    )
+
+    estimateQueues(tid).enqueue(estimate)
+
+    countExecution(queueSize)
+  }
 
   def emitWait(tidToWait: Int, tid: Int): Unit = {
-    stats.countInstruction(
+    count(
+      tid,
       "Wait",
       estimator.estimateCyclesAndEnergy(Opcode.Wait)
     )
@@ -26,10 +90,11 @@ class LIREstimator(layout: InstructionLayout, stats: Stats) extends LIR {
   ): Unit = {
     val mnemonic = "MatMul"
 
-    stats.countInstruction(
+    count(
+      tid,
       mnemonic,
       estimator.estimateCyclesAndEnergy(Opcode.MatMul, Some(size)),
-      Some(size)
+      size
     )
     if (localAddress.tag != MemoryTag.Zeroes)
       stats.countStride(mnemonic, 0, localStride, size)
@@ -46,7 +111,8 @@ class LIREstimator(layout: InstructionLayout, stats: Stats) extends LIR {
       readAccumulatorAddress: MemoryAddress,
       tid: Int
   ): Unit = {
-    stats.countInstruction(
+    count(
+      tid,
       "SIMD",
       estimator.estimateCyclesAndEnergy(Opcode.SIMD)
     )
@@ -76,10 +142,11 @@ class LIREstimator(layout: InstructionLayout, stats: Stats) extends LIR {
 
     val mnemonicWithSuffix = "DataMove" + suffix
 
-    stats.countInstruction(
+    count(
+      tid,
       mnemonicWithSuffix,
       estimator.estimateCyclesAndEnergy(Opcode.DataMove, Some(size), flags),
-      Some(size)
+      size
     )
     stats.countStride(mnemonicWithSuffix, 0, localStride, size)
     stats.countStride(mnemonicWithSuffix, 1, stride, size)
@@ -93,13 +160,18 @@ class LIREstimator(layout: InstructionLayout, stats: Stats) extends LIR {
   ): Unit = {
     val mnemonic = "LoadWeights"
 
-    stats.countInstruction(
+    count(
+      tid,
       mnemonic,
       estimator.estimateCyclesAndEnergy(Opcode.LoadWeights, Some(size)),
-      Some(size)
+      size
     )
 
     if (localAddress.tag != MemoryTag.Zeroes)
       stats.countStride(mnemonic, 0, localStride, size)
   }
+
+  def endEmit(): Unit =
+    while (estimateQueues.exists(!_.isEmpty))
+      countExecution(0)
 }

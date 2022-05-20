@@ -46,7 +46,7 @@ object Stats {
       arch: Architecture,
       macs: Long
   ): Float =
-    (macs.toFloat / (arch.arraySize * arch.arraySize).toFloat / stats.totalCycles.toFloat)
+    (macs.toFloat / (arch.arraySize * arch.arraySize).toFloat / stats.executionCycles.toFloat)
 
   def printSummary(
       stats: Stats,
@@ -55,19 +55,27 @@ object Stats {
       macs: Option[Long] = None
   ) = {
     val (cyclesLetter, cyclesDivisor) = getUnitsLetterAndDivisor(
-      stats.totalCycles
+      stats.aggregateCycles
     )
     val (energyLetter, energyDivisor) = getUnitsLetterAndDivisor(
-      stats.totalEnergy
+      stats.aggregateEnergy
     )
 
     tb.addNamedLine(
-      s"Latency (${cyclesLetter}Cycles)",
-      stats.totalCycles.toFloat / cyclesDivisor
+      s"Execution latency (${cyclesLetter}Cycles)",
+      stats.executionCycles.toFloat / cyclesDivisor
     )
     tb.addNamedLine(
-      s"Energy (${energyLetter}Units)",
-      stats.totalEnergy.toFloat / energyDivisor
+      s"Aggregate latency (${cyclesLetter}Cycles)",
+      stats.aggregateCycles.toFloat / cyclesDivisor
+    )
+    tb.addNamedLine(
+      s"Execution energy (${energyLetter}Units)",
+      stats.executionEnergy.toFloat / energyDivisor
+    )
+    tb.addNamedLine(
+      s"Aggregate energy (${energyLetter}Units)",
+      stats.aggregateEnergy.toFloat / energyDivisor
     )
 
     if (macs.isDefined)
@@ -201,25 +209,35 @@ class Stats {
     mutable.Map.empty[String, InstructionStats]
   private val currentStrideStats =
     mutable.Map.empty[String, mutable.Map[Int, mutable.Map[Int, StrideStats]]]
+  private var executionCyclesBuffer = 0L
+  private var executionEnergyBuffer = 0L
 
   def instructionCounts = currentInstructionStats.toMap
   def strideStats =
     currentStrideStats.mapValues(_.mapValues(_.toMap).toMap).toMap
 
-  def totalCycles = currentInstructionStats.values.map(_.cycles).sum
-  def totalEnergy = currentInstructionStats.values.map(_.energy).sum
+  def executionCycles = executionCyclesBuffer
+  def executionEnergy = executionEnergyBuffer
+
+  def aggregateCycles = currentInstructionStats.values.map(_.cycles).sum
+  def aggregateEnergy = currentInstructionStats.values.map(_.energy).sum
+
+  def countExecution(estimate: Estimate): Unit = {
+    executionCyclesBuffer += estimate.cycles
+    executionEnergyBuffer += estimate.energy
+  }
 
   def countInstruction(
       mnemonic: String,
       estimate: Estimate,
-      size: Option[Long] = None
+      size: Long = 0
   ) =
     doCountInstruction(
       mnemonic,
       1,
       estimate.cycles,
       estimate.energy,
-      if (size.isDefined) size.get + 1 else 1
+      size + 1
     )
 
   private def doCountInstruction(
@@ -274,6 +292,9 @@ class Stats {
   }
 
   def add(stats: Stats): Unit = {
+    executionCyclesBuffer += stats.executionCycles
+    executionEnergyBuffer += stats.executionEnergy
+
     stats.instructionCounts.foreach({
       case (mnemonic, stats) =>
         doCountInstruction(

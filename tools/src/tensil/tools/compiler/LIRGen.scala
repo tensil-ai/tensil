@@ -191,6 +191,8 @@ class LIRGen(
     emitInstruction()
   }
 
+  def endEmit(): Unit = {}
+
   private def emitAccumulatorStrideAddressOperand0(
       stride: Int,
       address: MemoryAddressRaw

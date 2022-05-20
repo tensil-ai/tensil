@@ -94,7 +94,7 @@ class CompilerBackendSpec extends FlatSpec {
     segment.emitNoOp()
     segment.emitNoOp()
     segment.emitNoOp()
-    backend.finalizeSegment(segment)
+    backend.emitSegment(segment)
     backend.writeSegments(out)
 
     assert(
@@ -123,7 +123,7 @@ class CompilerBackendSpec extends FlatSpec {
     segment.emitNoOp()
     segment.emitNoOp()
     segment.emitNoOp()
-    backend.finalizeSegment(segment)
+    backend.emitSegment(segment)
     backend.writeSegments(out)
 
     assert(
@@ -152,7 +152,7 @@ class CompilerBackendSpec extends FlatSpec {
     segment.emitNoOp()
     segment.emitNoOp()
     segment.emitNoOp()
-    backend.finalizeSegment(segment)
+    backend.emitSegment(segment)
     backend.writeSegments(out)
 
     assert(
@@ -210,7 +210,7 @@ class CompilerBackendSpec extends FlatSpec {
       MemoryAddress(MemoryTag.Accumulators, MemoryRef.Invalid, 0x0089abcdL),
       0x543210L
     )
-    backend.finalizeSegment(segment)
+    backend.emitSegment(segment)
     backend.writeSegments(out)
 
     assert(
@@ -274,7 +274,7 @@ class CompilerBackendSpec extends FlatSpec {
       MemoryAddress(MemoryTag.Accumulators, MemoryRef.Invalid, 0x00012345L),
       MemoryAddress(MemoryTag.Accumulators, MemoryRef.Invalid, 0x0089abcdL),
     )
-    backend.finalizeSegment(segment)
+    backend.emitSegment(segment)
     backend.writeSegments(out)
 
     assert(
@@ -372,7 +372,7 @@ class CompilerBackendSpec extends FlatSpec {
       MemoryAddress(MemoryTag.Accumulators, MemoryRef.Invalid, 0x0089abcdL),
       0x00543210L
     )
-    backend.finalizeSegment(segment)
+    backend.emitSegment(segment)
     backend.writeSegments(out)
 
     assert(
@@ -467,7 +467,7 @@ class CompilerBackendSpec extends FlatSpec {
       MemoryAddress.Zeroes,
       0x0089abcdL
     )
-    backend.finalizeSegment(segment)
+    backend.emitSegment(segment)
     backend.writeSegments(out)
 
     assert(

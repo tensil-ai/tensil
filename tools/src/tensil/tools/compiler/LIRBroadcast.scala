@@ -80,4 +80,6 @@ class LIRBroadcast(to: Seq[LIR]) extends LIR {
       size: MemoryAddressRaw,
       tid: Int
   ): Unit = to.foreach(_.emitLoadWeights(localStride, localAddress, size, tid))
+
+  def endEmit(): Unit = to.foreach(_.endEmit())
 }

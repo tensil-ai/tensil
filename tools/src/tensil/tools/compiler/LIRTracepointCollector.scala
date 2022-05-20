@@ -65,6 +65,8 @@ class LIRTracepointCollector(
       tid: Int
   ): Unit = incInstructionsCount()
 
+  def endEmit(): Unit = {}
+
   private def incInstructionsCount(): Unit = instructionOffset += 1
 
   private def emitTracepoints(

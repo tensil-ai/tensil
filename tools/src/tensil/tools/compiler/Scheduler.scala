@@ -732,7 +732,7 @@ class Scheduler(
       .seq
       .map({
         case ((initSegment, initStats, partitionSegmentAndStats)) => {
-          backend.finalizeSegment(initSegment)
+          backend.emitSegment(initSegment)
 
           stats.add(initStats)
 
@@ -742,7 +742,7 @@ class Scheduler(
 
               for ((partitionSegment, partitionStats) <- segmentAndStats)
                 yield {
-                  backend.finalizeSegment(partitionSegment)
+                  backend.emitSegment(partitionSegment)
 
                   partitionSegment.instructionsCount
                 }
@@ -843,8 +843,8 @@ class Scheduler(
       numberOfStages = numberOfStages,
       numberOfCombinedStages = numberOfCombinedStages,
       numberOfPartitions = numberOfPartitions,
-      cycles = stats.totalCycles,
-      energy = stats.totalEnergy,
+      cycles = stats.aggregateCycles,
+      energy = stats.aggregateEnergy,
       accumulatorUtilization = accumulatorUtilization,
       localUtilization = localUtilization,
       macs = macs,
@@ -946,6 +946,7 @@ class Scheduler(
     }
 
     loadLocalRollup.finalEmit()
+    lir.endEmit()
 
     StageInitInfo(constsToLocalRenameMap = constsToLocalRenameMap.toMap)
   }
@@ -1583,5 +1584,8 @@ class Scheduler(
     }
 
     saveLocalRollup.finalEmit()
+    loadLir.endEmit()
+    computeLir.endEmit()
+    saveLir.endEmit()
   }
 }

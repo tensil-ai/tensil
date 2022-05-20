@@ -289,8 +289,8 @@ object Compiler {
           programSizeBytes = programSizeBytes,
           constsScalarSize = mm.constsScalarSize,
           constsUtilization = mm.constsUtilization,
-          cycles = backendStats.totalCycles,
-          energy = backendStats.totalEnergy,
+          cycles = backendStats.executionCycles,
+          energy = backendStats.executionEnergy,
           macs = macs,
           macEfficiency = macEfficiency
         )

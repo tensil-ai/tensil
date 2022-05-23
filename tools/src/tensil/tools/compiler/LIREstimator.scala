@@ -8,8 +8,7 @@ import tensil.InstructionLayout
 
 class LIREstimator(
     layout: InstructionLayout,
-    stats: Stats,
-    queueSize: Int = 10000000
+    stats: Stats
 ) extends LIR {
   private val estimator = new Estimator(layout)
   private val estimateQueues =
@@ -68,7 +67,7 @@ class LIREstimator(
 
     estimateQueues(tid).enqueue(estimate)
 
-    countExecution(queueSize)
+    countExecution(layout.arch.threadQueueDepth)
   }
 
   def emitWait(tidToWait: Int, tid: Int): Unit = {

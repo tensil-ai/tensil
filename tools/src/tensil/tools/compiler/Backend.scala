@@ -283,9 +283,18 @@ class Backend(
       val threads = parsersByTid.keys
         .map(parserTid =>
           new LIR {
-            val tid       = parserTid
-            val estimator = new Estimator(layout)
-            var curCycles = 0L
+            val tid         = parserTid
+            val estimator   = new Estimator(layout)
+            var curCycles   = 0L
+            val queueCycles = mutable.Queue.empty[Long]
+
+            private def countCycles(cycles: Long): Unit = {
+              curCycles += cycles
+              queueCycles.enqueue(cycles)
+
+              while (queueCycles.size > layout.arch.threadQueueDepth)
+                queueCycles.dequeue()
+            }
 
             private def adjustLocalAddress(address: MemoryAddress) =
               if (address.tag == MemoryTag.Local) {
@@ -297,10 +306,11 @@ class Backend(
                 )
               } else address
 
-            def emitPaddingNoOp() = emitWait(tid)
+            def emitPaddingNoOps(cycles: Long) =
+              for (_ <- 0L until cycles) emitWait(tid)
 
             override def emitWait(tidToWait: Int, ignoredTid: Int): Unit = {
-              curCycles += estimator.estimateCyclesAndEnergy(Opcode.Wait).cycles
+              countCycles(estimator.estimateCyclesAndEnergy(Opcode.Wait).cycles)
               lir.emitWait(tidToWait, tid)
             }
 
@@ -313,9 +323,11 @@ class Backend(
                 size: MemoryAddressRaw,
                 ignoredTid: Int
             ): Unit = {
-              curCycles += estimator
-                .estimateCyclesAndEnergy(Opcode.MatMul, Some(size))
-                .cycles
+              countCycles(
+                estimator
+                  .estimateCyclesAndEnergy(Opcode.MatMul, Some(size))
+                  .cycles
+              )
               lir.emitMatMul(
                 accumulate,
                 localStride,
@@ -337,7 +349,7 @@ class Backend(
                 readAccumulatorAddress: MemoryAddress,
                 ignoredTid: Int
             ): Unit = {
-              curCycles += estimator.estimateCyclesAndEnergy(Opcode.SIMD).cycles
+              countCycles(estimator.estimateCyclesAndEnergy(Opcode.SIMD).cycles)
               lir.emitSIMD(
                 accumulate,
                 simdOp,
@@ -360,13 +372,15 @@ class Backend(
                 size: MemoryAddressRaw,
                 ignoredTid: Int
             ): Unit = {
-              curCycles += estimator
-                .estimateCyclesAndEnergy(
-                  Opcode.DataMove,
-                  Some(size),
-                  LIRGen.mkDataMoveFlags(toLocal, accumulate, address.tag)
-                )
-                .cycles
+              countCycles(
+                estimator
+                  .estimateCyclesAndEnergy(
+                    Opcode.DataMove,
+                    Some(size),
+                    LIRGen.mkDataMoveFlags(toLocal, accumulate, address.tag)
+                  )
+                  .cycles
+              )
               lir.emitDataMove(
                 toLocal,
                 accumulate,
@@ -385,9 +399,11 @@ class Backend(
                 size: MemoryAddressRaw,
                 ignoredTid: Int
             ): Unit = {
-              curCycles += estimator
-                .estimateCyclesAndEnergy(Opcode.LoadWeights, Some(size))
-                .cycles
+              countCycles(
+                estimator
+                  .estimateCyclesAndEnergy(Opcode.LoadWeights, Some(size))
+                  .cycles
+              )
               lir.emitLoadWeights(
                 localStride,
                 adjustLocalAddress(localAddress),
@@ -401,7 +417,6 @@ class Backend(
         )
         .toSeq
 
-      /* Find a thread with non-empty parsers and least cycles */
       def nextThread =
         threads
           .filter(m => parsersByTid.filter(_._2.hasNext).contains(m.tid))
@@ -417,16 +432,28 @@ class Backend(
       }
 
       /**
-        * Pad threads with NoOps until maximum cycles.
-        * This in the future will be replaced with mutual WAITs.
+        * Pad threads with NoOps for the number of cycles it takes
+        * to clear the longest queue among longer threads (both in
+        * terms of cycles) or until reaching cycles of the longest
+        * thread, whichever comes first.
+        *
+        * This in the future will be replaced with the barrier consisting
+        * of mutual WAITs.
         */
-      if (!threads.isEmpty) {
-        val maxCycles = threads.map(_.curCycles).max
+      for (thread <- threads) {
+        val longerThreads = threads.filter(t =>
+          t.tid != thread.tid && t.curCycles > thread.curCycles
+        )
 
-        while (threads.map(_.curCycles).min < maxCycles)
-          for (thread <- threads)
-            if (thread.curCycles < maxCycles)
-              thread.emitPaddingNoOp()
+        if (!longerThreads.isEmpty) {
+          val cyclesToPadLongestQueue = longerThreads.map(_.queueCycles.sum).max
+          val cyclesToPadLongestThread =
+            longerThreads.map(_.curCycles).max - thread.curCycles
+
+          thread.emitPaddingNoOps(
+            Math.min(cyclesToPadLongestQueue, cyclesToPadLongestThread)
+          )
+        }
       }
 
       streamsByTid.foreach(_._2.close())

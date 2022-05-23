@@ -5,15 +5,22 @@ package tensil
 
 import org.scalatest._
 import chiseltest.ChiselScalatestTester
+import org.scalatest.funspec.AnyFunSpec
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.Matcher
+// import org.scalatest.matchers.{BeMatcher, EqualMatcher}
 
 class UnitSpec
-    extends FlatSpec
-    with Matchers
+    extends AnyFlatSpec
+    // with BeMatcher
+    // with EqualMatcher
+    with Matcher
     with ChiselScalatestTester
     with DecoupledTester
 
 class FunUnitSpec
-    extends FunSpec
-    with Matchers
+    extends AnyFunSpec
+    // with BeMatcher
+    // with EqualMatcher
     with ChiselScalatestTester
     with DecoupledTester

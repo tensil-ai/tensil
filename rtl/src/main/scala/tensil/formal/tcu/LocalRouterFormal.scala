@@ -4,7 +4,6 @@
 package tensil.formal.tcu
 
 import chisel3._
-import chisel3.experimental.{verification => v}
 import tensil.tcu._
 import tensil.formal._
 import chisel3.util.Queue
@@ -15,7 +14,7 @@ class LocalRouterFormal extends Formal {
   val io   = IO(m.io.cloneType)
   io <> m.io
 
-  v.assume(m.io.control.bits.size === 0.U)
+  assume(m.io.control.bits.size === 0.U)
 
   val controlQueue = Queue(io.control, 1, flow = true)
   m.io.control <> controlQueue

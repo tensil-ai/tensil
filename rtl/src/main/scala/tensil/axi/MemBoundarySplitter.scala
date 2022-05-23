@@ -44,11 +44,11 @@ class BurstSplitter[T <: Bundle](gen: T, maxLen: Int) extends Module {
 
   when(counter.io.value.bits === io.control.bits) {
     last := true.B
-    counter.io.resetValue := io.out.fire()
-    io.control.ready := io.out.fire()
+    counter.io.resetValue := io.out.fire
+    io.control.ready := io.out.fire
   }.otherwise {
     last := false.B
-    counter.io.value.ready := io.out.fire()
+    counter.io.value.ready := io.out.fire
     io.control.ready := false.B
   }
 }
@@ -190,7 +190,7 @@ class MemBoundarySplitter(config: Config, boundary: Int, maxLen: Int)
       readEnqueuer.io.in.noenq()
       readEnqueuer.io.out(0).nodeq()
       readEnqueuer.io.out(1).nodeq()
-      when(io.out.readAddress.fire()) {
+      when(io.out.readAddress.fire) {
         readAddressCounter := 0.U
         readLenCounter := 0.U
       }
@@ -203,7 +203,7 @@ class MemBoundarySplitter(config: Config, boundary: Int, maxLen: Int)
       readEnqueuer.io.out(0).nodeq()
       readEnqueuer.io.out(1).nodeq()
       io.in.readAddress.nodeq()
-      when(io.out.readAddress.fire()) {
+      when(io.out.readAddress.fire) {
         // increment the read address counter by the number of addresses transferred
         readAddressCounter := readAddressCounter + availableAddresses
         // decrement the read len counter by the number of beats transferred

@@ -4,7 +4,6 @@
 package tensil.formal
 
 import chisel3._
-import chisel3.experimental.{verification => v}
 import chisel3.experimental.DataMirror
 import tensil.tcu._
 import chisel3.stage.ChiselGeneratorAnnotation
@@ -23,7 +22,7 @@ abstract class Formal extends Module {
   ) {
     val isOutput = do_isOutput(port)
     val name     = port.instanceName + "_" + suffix
-    val count    = do_count(port.fire() && filter)
+    val count    = do_count(port.fire && filter)
     count.suggestName(name + "_count")
   }
 
@@ -47,14 +46,14 @@ abstract class Formal extends Module {
 
   def assertNoDeadlock(): Unit = {
     for (dep <- dependencies) {
-      v.assume(eventually(dep.input.port.valid))
-      v.assume(eventually(dep.output.port.ready))
+      assume(eventually(dep.input.port.valid))
+      assume(eventually(dep.output.port.ready))
     }
 
-    v.cover(numResets > 0.U)
+    cover(numResets > 0.U)
     when(numResets > 0.U && !reset.asBool()) {
-      v.assert(noExtraneousDependencies(), "failed ned")
-      v.assert(selfCleaning(), "failed sc")
+      assert(noExtraneousDependencies(), "failed ned")
+      assert(selfCleaning(), "failed sc")
     }
   }
 

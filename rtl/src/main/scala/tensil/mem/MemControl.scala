@@ -25,8 +25,7 @@ object MemControlWithStride {
       write: Bool,
   ): MemControlWithStride = {
     if (
-      address.isLit() && size.isLit() && stride.isLit() && write
-        .isLit() && reverse.isLit()
+      address.isLit && size.isLit && stride.isLit && write.isLit && reverse.isLit
     ) {
       new MemControlWithStride(depth, strideDepth).Lit(
         _.address -> address,
@@ -66,7 +65,7 @@ object MemControl {
       size: UInt,
       write: Bool
   ): MemControl = {
-    if (address.isLit() && size.isLit() && write.isLit()) {
+    if (address.isLit && size.isLit && write.isLit) {
       new MemControl(depth).Lit(
         _.address -> address,
         _.write   -> write,

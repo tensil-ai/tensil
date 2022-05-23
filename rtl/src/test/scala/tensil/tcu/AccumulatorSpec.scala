@@ -25,7 +25,7 @@ class AccumulatorSpec extends UnitSpec {
       io <> m.io
       val count = IO(Output(UInt(32.W)))
       val (countValue, wrap) =
-        chisel3.util.Counter(Range(0, 1 << 30), m.io.input.fire())
+        chisel3.util.Counter(Range(0, 1 << 30), m.io.input.fire)
       count := countValue
     }
 

@@ -14,8 +14,8 @@ class Port[T <: Data](gen: T, val depth: Long) extends Bundle {
   val status      = Decoupled(new MemControl(depth))
   val inputStatus = Decoupled(gen)
 
-  override def cloneType =
-    (new Port(gen, depth)).asInstanceOf[this.type]
+  // override def cloneType =
+  //   (new Port(gen, depth)).asInstanceOf[this.type]
 }
 
 class PortWithStride[T <: Data](gen: T, val depth: Long, strideDepth: Int)
@@ -27,6 +27,6 @@ class PortWithStride[T <: Data](gen: T, val depth: Long, strideDepth: Int)
   val status      = Decoupled(new MemControl(depth))
   val inputStatus = Decoupled(gen)
 
-  override def cloneType =
-    (new PortWithStride(gen, depth, strideDepth)).asInstanceOf[this.type]
+  // override def cloneType =
+  //   (new PortWithStride(gen, depth, strideDepth)).asInstanceOf[this.type]
 }

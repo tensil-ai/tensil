@@ -3,9 +3,9 @@
 
 package tensil.data
 
-import org.scalatest.FlatSpec
+import org.scalatest.flatspec.AnyFlatSpec
 
-class ConvSpec extends FlatSpec {
+class ConvSpec extends AnyFlatSpec {
   behavior of "Conv"
 
   it should "conv2d" in {

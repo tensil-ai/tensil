@@ -4,9 +4,10 @@
 package tensil.tools.util
 
 import org.scalatest._
+import org.scalatest.flatspec.AnyFlatSpec
 import org.tensorflow.framework.attr_value.AttrValue
 
-class UtilPackageTests extends FlatSpec with Matchers {
+class UtilPackageTests extends AnyFlatSpec with Matchers {
   "getSeqFromAttrValue" should "support Longs" in {
     val attr = AttrValue.fromAscii(
       List("list {", "i: 1", "i: 1", "i: 1", "i: 1", "}").mkString("\n")

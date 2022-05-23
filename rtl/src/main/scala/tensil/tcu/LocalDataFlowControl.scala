@@ -21,7 +21,7 @@ object LocalDataFlowControlWithSize {
   def apply(
       depth: Long
   )(kind: UInt, size: UInt): LocalDataFlowControlWithSize = {
-    if (kind.isLit() && size.isLit()) {
+    if (kind.isLit && size.isLit) {
       new LocalDataFlowControlWithSize(depth)
         .Lit(_.kind -> kind, _.size -> size)
     } else {
@@ -42,7 +42,7 @@ object LocalDataFlowControl {
   val _unused             = 0x6.U
 
   def apply(kind: UInt): LocalDataFlowControl = {
-    if (kind.isLit()) {
+    if (kind.isLit) {
       new LocalDataFlowControl().Lit(
         _.kind -> kind,
       )

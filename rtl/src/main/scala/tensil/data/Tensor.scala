@@ -329,7 +329,7 @@ object Tensor {
   ): T = {
     (literal match {
       case fp: FixedPoint => fp.litToBigDecimal
-      case other          => other.litValue()
+      case other          => other.litValue
     }).asInstanceOf[T]
   }
 

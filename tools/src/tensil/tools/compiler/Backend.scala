@@ -465,6 +465,11 @@ class Backend(
 
     lir.endEmit()
 
+    val filesToDelete = segments.map(s => Seq(s._2.file)).flatten
+
+    for (file <- filesToDelete)
+      file.delete()
+
     /*for ((key, segment) <- segments) {
       if (printProgramStream.isDefined)
         printProgramStream.get.writeBytes(

@@ -1,14 +1,26 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /* Copyright © 2019-2022 Tensil AI Company */
 
-package tensil.tools.compiler
+package tensil.tools.compiler.lir
 
 import java.io.{OutputStream, DataOutputStream}
 
 import tensil.InstructionLayout
 import tensil.tools.CompilerException
+import tensil.tools.compiler.{
+  LIR,
+  MemoryAddress,
+  MemoryAddressHelper,
+  MemoryAddressRaw,
+  MemoryTag,
+  Opcode,
+  DataMoveFlags,
+  MatMulFlags,
+  SIMDFlags,
+  LoadWeightsFlags
+}
 
-object LIRGen {
+object StreamGen {
   def mkDataMoveFlags(
       toLocal: Boolean,
       accumulate: Boolean,
@@ -30,7 +42,7 @@ object LIRGen {
       }
 }
 
-class LIRGen(
+class StreamGen(
     layout: InstructionLayout,
     stream: OutputStream
 ) extends LIR {
@@ -150,7 +162,7 @@ class LIRGen(
       address.tag == MemoryTag.Accumulators || address.tag == MemoryTag.Vars || address.tag == MemoryTag.Consts
     )
 
-    val flags = LIRGen.mkDataMoveFlags(toLocal, accumulate, address.tag)
+    val flags = StreamGen.mkDataMoveFlags(toLocal, accumulate, address.tag)
 
     emitLocalStrideAddressOperand0(localStride, localAddress.raw)
 

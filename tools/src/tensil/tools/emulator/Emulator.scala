@@ -18,7 +18,6 @@ import tensil.{
   emulator
 }
 import tensil.tools.compiler.{
-  LIRStreamParser,
   LoadWeightsFlags,
   SIMDFlags,
   SIMDOp,
@@ -31,10 +30,9 @@ import tensil.tools.compiler.{
   MemoryAddress,
   MemoryAddressHelper,
   LIR,
-  LIRBroadcast
+  lir
 }
 import tensil.NumericWithMAC
-import tensil.tools.compiler.LIRBroadcast
 
 class Emulator[T : NumericWithMAC : ClassTag](
     dataType: ArchitectureDataTypeWithBase[T],
@@ -72,10 +70,11 @@ class Emulator[T : NumericWithMAC : ClassTag](
 
     try {
       val emulatorTrace = new EmulatorTrace(trace, emulatorExecutive)
-      val lirParser     = new LIRStreamParser(arch, stream)
-      val lir           = new LIRBroadcast(Seq(emulatorTrace, emulatorExecutive))
+      val lirParser     = new lir.StreamParser(arch, stream)
+      val lirBroadcast =
+        new lir.Broadcast(emulatorTrace, emulatorExecutive)
 
-      lirParser.parseAll(lir)
+      lirParser.parseAll(lirBroadcast)
     } finally {
       val endTime = System.nanoTime()
 

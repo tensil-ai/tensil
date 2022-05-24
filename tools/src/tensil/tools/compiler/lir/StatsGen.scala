@@ -1,12 +1,25 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /* Copyright © 2019-2022 Tensil AI Company */
 
-package tensil.tools.compiler
+package tensil.tools.compiler.lir
 
 import scala.collection.mutable
-import tensil.InstructionLayout
 
-class LIREstimator(
+import tensil.InstructionLayout
+import tensil.tools.compiler.{
+  LIR,
+  MemoryAddress,
+  MemoryAddressHelper,
+  MemoryAddressRaw,
+  MemoryTag,
+  Stats,
+  Estimator,
+  Estimate,
+  Opcode,
+  DataMoveFlags
+}
+
+class StatsGen(
     layout: InstructionLayout,
     stats: Stats
 ) extends LIR {
@@ -127,7 +140,7 @@ class LIREstimator(
       size: MemoryAddressRaw,
       tid: Int
   ): Unit = {
-    val flags = LIRGen.mkDataMoveFlags(toLocal, accumulate, address.tag)
+    val flags = StreamGen.mkDataMoveFlags(toLocal, accumulate, address.tag)
     val suffix = flags match {
       case DataMoveFlags.LocalToDRAM0       => "(LocalToDRAM0)"
       case DataMoveFlags.LocalToDRAM1       => "(LocalToDRAM1)"

@@ -1,11 +1,13 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /* Copyright © 2019-2022 Tensil AI Company */
 
-package tensil.tools.compiler
+package tensil.tools.compiler.lir
 
-class LIRBroadcast(to: Seq[LIR]) extends LIR {
+import tensil.tools.compiler.{LIR, MemoryAddress, MemoryAddressRaw}
+
+class Broadcast(lirs: LIR*) extends LIR {
   def emitWait(tid: Int, tidToWait: Int): Unit =
-    to.foreach(_.emitWait(tid, tidToWait))
+    lirs.foreach(_.emitWait(tid, tidToWait))
 
   def emitMatMul(
       accumulate: Boolean,
@@ -16,7 +18,7 @@ class LIRBroadcast(to: Seq[LIR]) extends LIR {
       size: MemoryAddressRaw,
       tid: Int
   ): Unit =
-    to.foreach(
+    lirs.foreach(
       _.emitMatMul(
         accumulate,
         localStride,
@@ -38,7 +40,7 @@ class LIRBroadcast(to: Seq[LIR]) extends LIR {
       readAccumulatorAddress: MemoryAddress,
       tid: Int
   ): Unit =
-    to.foreach(
+    lirs.foreach(
       _.emitSIMD(
         accumulate,
         simdOp,
@@ -61,7 +63,7 @@ class LIRBroadcast(to: Seq[LIR]) extends LIR {
       size: MemoryAddressRaw,
       tid: Int
   ): Unit =
-    to.foreach(
+    lirs.foreach(
       _.emitDataMove(
         toLocal,
         accumulate,
@@ -79,7 +81,8 @@ class LIRBroadcast(to: Seq[LIR]) extends LIR {
       localAddress: MemoryAddress,
       size: MemoryAddressRaw,
       tid: Int
-  ): Unit = to.foreach(_.emitLoadWeights(localStride, localAddress, size, tid))
+  ): Unit =
+    lirs.foreach(_.emitLoadWeights(localStride, localAddress, size, tid))
 
-  def endEmit(): Unit = to.foreach(_.endEmit())
+  def endEmit(): Unit = lirs.foreach(_.endEmit())
 }

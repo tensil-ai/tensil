@@ -1,11 +1,21 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /* Copyright © 2019-2022 Tensil AI Company */
 
-package tensil.tools.compiler
+package tensil.tools.compiler.lir
 
 import java.io.{DataOutputStream}
 
-class LIRPrinter(
+import tensil.tools.compiler.{
+  LIR,
+  MemoryAddress,
+  MemoryAddressHelper,
+  MemoryAddressRaw,
+  MemoryTag,
+  InstructionAddress,
+  SIMDOp
+}
+
+class Printer(
     stream: DataOutputStream
 ) extends LIR {
   private var instructionOffset: InstructionAddress = InstructionAddress.Zero

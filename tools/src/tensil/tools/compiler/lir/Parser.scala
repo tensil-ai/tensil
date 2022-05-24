@@ -1,13 +1,15 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /* Copyright © 2019-2022 Tensil AI Company */
 
-package tensil.tools.compiler
+package tensil.tools.compiler.lir
 
 import scala.collection.mutable
 
-object LIRParser {
-  def combine(parsers: LIRParser*): LIRParser =
-    new LIRParser {
+import tensil.tools.compiler.{LIR}
+
+object Parser {
+  def concat(parsers: Parser*): Parser =
+    new Parser {
 
       override def hasNext: Boolean =
         !parsers.filter(_.hasNext).isEmpty
@@ -17,7 +19,7 @@ object LIRParser {
     }
 }
 
-abstract trait LIRParser {
+abstract trait Parser {
   def parseAll(lir: LIR): Unit = {
     while (hasNext)
       parseNext(lir)

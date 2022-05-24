@@ -1,13 +1,23 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /* Copyright © 2019-2022 Tensil AI Company */
 
-package tensil.tools.compiler
+package tensil.tools.compiler.lir
 
 import scala.collection.mutable
 
 import tensil.tools.{TracepointCondition, TracepointsMap}
+import tensil.tools.compiler.{
+  LIR,
+  MemoryAddress,
+  MemoryAddressHelper,
+  MemoryAddressRaw,
+  MemoryRef,
+  MemoryObject,
+  InstructionAddress,
+  TracepointsWriter
+}
 
-class LIRTracepointCollector(
+class TracepointCollector(
     conditions: Seq[TracepointCondition],
     resolveRefToObject: (MemoryRef) => Option[MemoryObject] = (ref) => None
 ) extends LIR {

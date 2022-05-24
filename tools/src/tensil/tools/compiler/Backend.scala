@@ -24,18 +24,18 @@ class BackendSegment(
 
   private val fileStream = new FileOutputStream(file)
 
-  private val lirTracepointCollector = new LIRTracepointCollector(
+  private val lirTracepointCollector = new lir.TracepointCollector(
     tracepointConditions,
     resolveRefToObject
   )
 
-  private val lirBroadcast = new LIRBroadcast(
+  private val lirBroadcast = new lir.Broadcast(
     Seq(
-      new LIRGen(layout, fileStream),
+      new lir.StreamGen(layout, fileStream),
       lirTracepointCollector
-    ) ++ (if (stats.isDefined) Seq(new LIREstimator(layout, stats.get))
+    ) ++ (if (stats.isDefined) Seq(new lir.StatsGen(layout, stats.get))
           else
-            Nil)
+            Nil): _*
   )
 
   def instructionsCount = lirTracepointCollector.instructionsCount
@@ -163,27 +163,29 @@ class Backend(
       stats: Option[Stats] = None
   ): Unit = {
     var instructionOffset: Long = 0
-    val lir = new LIRBroadcast(
-      Seq(new LIRGen(layout, programStream)) ++ (if (
-                                                   printProgramStream.isDefined
-                                                 )
-                                                   Seq(
-                                                     new LIRPrinter(
-                                                       printProgramStream.get
-                                                     )
-                                                   )
-                                                 else
-                                                   Nil) ++ (if (stats.isDefined)
-                                                              Seq(
-                                                                new LIREstimator(
-                                                                  layout,
-                                                                  stats.get
-                                                                )
-                                                              )
-                                                            else Nil)
+    val lirBroadcast = new lir.Broadcast(
+      Seq(new lir.StreamGen(layout, programStream)) ++ (if (
+                                                          printProgramStream.isDefined
+                                                        )
+                                                          Seq(
+                                                            new lir.Printer(
+                                                              printProgramStream.get
+                                                            )
+                                                          )
+                                                        else
+                                                          Nil) ++ (if (
+                                                                     stats.isDefined
+                                                                   )
+                                                                     Seq(
+                                                                       new lir.StatsGen(
+                                                                         layout,
+                                                                         stats.get
+                                                                       )
+                                                                     )
+                                                                   else Nil): _*
     )
 
-    val tileWindowSize = layout.arch.numberOfThreads match {
+    val windowSize = layout.arch.numberOfThreads match {
       case 1 => 1
       case 2 => 3
       case _ =>
@@ -194,7 +196,7 @@ class Backend(
 
     var nextTid = 0
 
-    case class Tile(
+    case class ThreadedPartition(
         init: Option[BackendSegment] = None,
         load: Option[BackendSegment] = None,
         compute: Option[BackendSegment] = None,
@@ -206,57 +208,57 @@ class Backend(
     }
 
     var curInit: Option[BackendSegment] = None
-    val tiles = Seq.fill(tileWindowSize - 1)(Tile()) ++
+    val partitions = Seq.fill(windowSize - 1)(ThreadedPartition()) ++
       (for (
         layerSegments <-
           segments.groupBy(_._1.layer).toSeq.sortBy(_._1).map(_._2)
       )
         yield (for (
-          tileSegments <-
+          partitionSegments <-
             layerSegments
               .groupBy(p => (p._1.stage, p._1.partition))
               .toSeq
               .sortBy(_._1)
               .map(_._2)
         ) yield {
-          val kindSegments = tileSegments.map {
+          val kindSegments = partitionSegments.map {
             case (key, segment) => (key.kind, segment)
           }
 
-          val init = if (tileSegments.head._1.partition == 0) {
+          val init = if (partitionSegments.head._1.partition == 0) {
             curInit = kindSegments.get(BackendSegmentKey.Init)
             curInit
           } else if (
-            tileSegments.head._1.partition < layout.arch.numberOfThreads
+            partitionSegments.head._1.partition < layout.arch.numberOfThreads
           ) {
             curInit
           } else None
 
-          Tile(
+          ThreadedPartition(
             init = init,
             load = kindSegments.get(BackendSegmentKey.Load),
             compute = kindSegments.get(BackendSegmentKey.Compute),
             save = kindSegments.get(BackendSegmentKey.Save)
           )
-        }) ++ Seq.fill(tileWindowSize - 1)(Tile())).reduceLeft(_ ++ _)
+        }) ++ Seq.fill(windowSize - 1)(ThreadedPartition())).reduceLeft(_ ++ _)
 
-    def overlayTiles(tiles: Seq[Tile]) = {
-      require(tiles.size == 1 || tiles.size == 3)
+    def overlayPartitions(partitions: Seq[ThreadedPartition]) = {
+      require(partitions.size == 1 || partitions.size == 3)
 
       val streamsByTid =
-        (if (tiles.size == 3)
+        (if (partitions.size == 3)
            Seq(
-             (tiles(0).tid, tiles(0).save),
-             (tiles(2).tid, tiles(2).init),
-             (tiles(2).tid, tiles(2).load),
-             (tiles(1).tid, tiles(1).compute)
+             (partitions(0).tid, partitions(0).save),
+             (partitions(2).tid, partitions(2).init),
+             (partitions(2).tid, partitions(2).load),
+             (partitions(1).tid, partitions(1).compute)
            )
-         else if (tiles.size == 1)
+         else if (partitions.size == 1)
            Seq(
-             (tiles(0).tid, tiles(0).init),
-             (tiles(0).tid, tiles(0).load),
-             (tiles(0).tid, tiles(0).compute),
-             (tiles(0).tid, tiles(0).save)
+             (partitions(0).tid, partitions(0).init),
+             (partitions(0).tid, partitions(0).load),
+             (partitions(0).tid, partitions(0).compute),
+             (partitions(0).tid, partitions(0).save)
            )
          else Nil)
           .filter(_._2.isDefined)
@@ -275,195 +277,21 @@ class Backend(
           .groupBy(_._1)
           .map {
             case (tid, g) =>
-              (tid -> LIRParser.combine(
-                g.map(p => new LIRStreamParser(layout.arch, p._2)): _*
+              (tid -> lir.Parser.concat(
+                g.map(p => new lir.StreamParser(layout.arch, p._2)): _*
               ))
           }
 
-      val threads = parsersByTid.keys
-        .map(parserTid =>
-          new LIR {
-            val tid         = parserTid
-            val estimator   = new Estimator(layout)
-            var curCycles   = 0L
-            val queueCycles = mutable.Queue.empty[Long]
-
-            private def countCycles(cycles: Long): Unit = {
-              curCycles += cycles
-              queueCycles.enqueue(cycles)
-
-              while (queueCycles.size > layout.arch.threadQueueDepth)
-                queueCycles.dequeue()
-            }
-
-            private def adjustLocalAddress(address: MemoryAddress) =
-              if (address.tag == MemoryTag.Local) {
-
-                MemoryAddress(
-                  MemoryTag.Local,
-                  address.ref,
-                  address.raw + layout.arch.threadLocalDepth * tid
-                )
-              } else address
-
-            def emitPaddingNoOps(cycles: Long) =
-              for (_ <- 0L until cycles) emitWait(tid)
-
-            override def emitWait(tidToWait: Int, ignoredTid: Int): Unit = {
-              countCycles(estimator.estimateCyclesAndEnergy(Opcode.Wait).cycles)
-              lir.emitWait(tidToWait, tid)
-            }
-
-            override def emitMatMul(
-                accumulate: Boolean,
-                localStride: Int,
-                localAddress: MemoryAddress,
-                accumulatorStride: Int,
-                accumulatorAddress: MemoryAddress,
-                size: MemoryAddressRaw,
-                ignoredTid: Int
-            ): Unit = {
-              countCycles(
-                estimator
-                  .estimateCyclesAndEnergy(Opcode.MatMul, Some(size))
-                  .cycles
-              )
-              lir.emitMatMul(
-                accumulate,
-                localStride,
-                adjustLocalAddress(localAddress),
-                accumulatorStride,
-                accumulatorAddress,
-                size,
-                tid
-              )
-            }
-
-            override def emitSIMD(
-                accumulate: Boolean,
-                simdOp: Int,
-                simdSourceLeft: Int,
-                simdSourceRight: Int,
-                simdDestination: Int,
-                writeAccumulatorAddress: MemoryAddress,
-                readAccumulatorAddress: MemoryAddress,
-                ignoredTid: Int
-            ): Unit = {
-              countCycles(estimator.estimateCyclesAndEnergy(Opcode.SIMD).cycles)
-              lir.emitSIMD(
-                accumulate,
-                simdOp,
-                simdSourceLeft,
-                simdSourceRight,
-                simdDestination,
-                writeAccumulatorAddress,
-                readAccumulatorAddress,
-                tid
-              )
-            }
-
-            override def emitDataMove(
-                toLocal: Boolean,
-                accumulate: Boolean,
-                localStride: Int,
-                localAddress: MemoryAddress,
-                stride: Int,
-                address: MemoryAddress,
-                size: MemoryAddressRaw,
-                ignoredTid: Int
-            ): Unit = {
-              countCycles(
-                estimator
-                  .estimateCyclesAndEnergy(
-                    Opcode.DataMove,
-                    Some(size),
-                    LIRGen.mkDataMoveFlags(toLocal, accumulate, address.tag)
-                  )
-                  .cycles
-              )
-              lir.emitDataMove(
-                toLocal,
-                accumulate,
-                localStride,
-                adjustLocalAddress(localAddress),
-                stride,
-                address,
-                size,
-                tid
-              )
-            }
-
-            override def emitLoadWeights(
-                localStride: Int,
-                localAddress: MemoryAddress,
-                size: MemoryAddressRaw,
-                ignoredTid: Int
-            ): Unit = {
-              countCycles(
-                estimator
-                  .estimateCyclesAndEnergy(Opcode.LoadWeights, Some(size))
-                  .cycles
-              )
-              lir.emitLoadWeights(
-                localStride,
-                adjustLocalAddress(localAddress),
-                size,
-                tid
-              )
-            }
-
-            def endEmit(): Unit = {}
-          }
-        )
-        .toSeq
-
-      def nextThread =
-        threads
-          .filter(m => parsersByTid.filter(_._2.hasNext).contains(m.tid))
-          .sortBy(_.curCycles)
-          .headOption
-      var curThread = nextThread
-
-      while (curThread.isDefined) {
-        val curParser = parsersByTid(curThread.get.tid)
-
-        curParser.parseNext(curThread.get)
-        curThread = nextThread
-      }
-
-      /**
-        * Pad threads with NoOps for the number of cycles it takes
-        * to clear the longest queue among longer threads (both in
-        * terms of cycles) or until reaching cycles of the longest
-        * thread, whichever comes first.
-        *
-        * This in the future will be replaced with the barrier consisting
-        * of mutual WAITs.
-        */
-      for (thread <- threads) {
-        val longerThreads = threads.filter(t =>
-          t.tid != thread.tid && t.curCycles > thread.curCycles
-        )
-
-        if (!longerThreads.isEmpty) {
-          val cyclesToPadLongestQueue = longerThreads.map(_.queueCycles.sum).max
-          val cyclesToPadLongestThread =
-            longerThreads.map(_.curCycles).max - thread.curCycles
-
-          thread.emitPaddingNoOps(
-            Math.min(cyclesToPadLongestQueue, cyclesToPadLongestThread)
-          )
-        }
-      }
+      lir.Threading.interlace(layout, parsersByTid, lirBroadcast)
 
       streamsByTid.foreach(_._2.close())
     }
 
-    for (i <- 0 until tiles.size - (tileWindowSize - 1)) {
-      overlayTiles(tiles.slice(i, i + tileWindowSize))
+    for (i <- 0 until partitions.size - (windowSize - 1)) {
+      overlayPartitions(partitions.slice(i, i + windowSize))
     }
 
-    lir.endEmit()
+    lirBroadcast.endEmit()
 
     val filesToDelete = segments.map(s => Seq(s._2.file)).flatten
 

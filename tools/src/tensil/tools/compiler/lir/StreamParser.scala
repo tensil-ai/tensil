@@ -1,15 +1,26 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /* Copyright © 2019-2022 Tensil AI Company */
 
-package tensil.tools.compiler
+package tensil.tools.compiler.lir
 
 import java.io._
 
 import tensil.tools.{TraceContext}
 import tensil.{Architecture, InstructionLayout}
+import tensil.tools.compiler.{
+  LIR,
+  MemoryAddress,
+  MemoryTag,
+  MemoryRef,
+  Opcode,
+  MatMulFlags,
+  DataMoveFlags,
+  LoadWeightsFlags,
+  SIMDFlags
+}
 
-class LIRStreamParser(arch: Architecture, stream: InputStream)
-    extends LIRParser {
+class StreamParser(arch: Architecture, stream: InputStream)
+    extends Parser {
   val layout = new InstructionLayout(arch)
   val bytes =
     Array.fill[Byte](layout.instructionSizeBytes + 1)(0)

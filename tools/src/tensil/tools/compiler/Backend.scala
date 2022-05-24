@@ -242,23 +242,24 @@ class Backend(
           )
         }) ++ Seq.fill(windowSize - 1)(ThreadedPartition())).reduceLeft(_ ++ _)
 
-    def overlayPartitions(partitions: Seq[ThreadedPartition]) = {
-      require(partitions.size == 1 || partitions.size == 3)
+    val mixer = new lir.Mixer(layout)
+    def mixPartitions(window: Seq[ThreadedPartition]) = {
+      require(window.size == 1 || window.size == 3)
 
       val streamsByTid =
-        (if (partitions.size == 3)
+        (if (window.size == 3)
            Seq(
-             (partitions(0).tid, partitions(0).save),
-             (partitions(2).tid, partitions(2).init),
-             (partitions(2).tid, partitions(2).load),
-             (partitions(1).tid, partitions(1).compute)
+             (window(0).tid, window(0).save),
+             (window(2).tid, window(2).init),
+             (window(2).tid, window(2).load),
+             (window(1).tid, window(1).compute)
            )
-         else if (partitions.size == 1)
+         else if (window.size == 1)
            Seq(
-             (partitions(0).tid, partitions(0).init),
-             (partitions(0).tid, partitions(0).load),
-             (partitions(0).tid, partitions(0).compute),
-             (partitions(0).tid, partitions(0).save)
+             (window(0).tid, window(0).init),
+             (window(0).tid, window(0).load),
+             (window(0).tid, window(0).compute),
+             (window(0).tid, window(0).save)
            )
          else Nil)
           .filter(_._2.isDefined)
@@ -282,13 +283,13 @@ class Backend(
               ))
           }
 
-      lir.Threading.interlace(layout, parsersByTid, lirBroadcast)
+      mixer.mix(parsersByTid, lirBroadcast)
 
       streamsByTid.foreach(_._2.close())
     }
 
     for (i <- 0 until partitions.size - (windowSize - 1)) {
-      overlayPartitions(partitions.slice(i, i + windowSize))
+      mixPartitions(partitions.slice(i, i + windowSize))
     }
 
     lirBroadcast.endEmit()

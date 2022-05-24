@@ -16,9 +16,8 @@ import tensil.tools.compiler.{
   Opcode
 }
 
-object Threading {
-  def interlace(
-      layout: InstructionLayout,
+class Mixer(layout: InstructionLayout) {
+  def mix(
       parsersByTid: Map[Int, Parser],
       targetLir: LIR
   ): Unit = {

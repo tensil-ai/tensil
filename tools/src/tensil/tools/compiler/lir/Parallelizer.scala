@@ -5,7 +5,6 @@ package tensil.tools.compiler.lir
 
 import scala.collection.mutable
 
-import tensil.InstructionLayout
 import tensil.tools.compiler.{
   LIR,
   MemoryAddress,
@@ -15,9 +14,10 @@ import tensil.tools.compiler.{
   Estimator,
   Opcode
 }
+import tensil.Architecture
 
-class Mixer(layout: InstructionLayout) {
-  def mix(
+class Parallelizer(arch: Architecture) {
+  def emit(
       parsersByTid: Map[Int, Parser],
       targetLir: LIR
   ): Unit = {
@@ -25,7 +25,7 @@ class Mixer(layout: InstructionLayout) {
       .map(parserTid =>
         new LIR {
           val tid         = parserTid
-          val estimator   = new Estimator(layout)
+          val estimator   = new Estimator(arch)
           var curCycles   = 0L
           val queueCycles = mutable.Queue.empty[Long]
 
@@ -33,7 +33,7 @@ class Mixer(layout: InstructionLayout) {
             curCycles += cycles
             queueCycles.enqueue(cycles)
 
-            while (queueCycles.size > layout.arch.threadQueueDepth)
+            while (queueCycles.size > arch.threadQueueDepth)
               queueCycles.dequeue()
           }
 
@@ -43,7 +43,7 @@ class Mixer(layout: InstructionLayout) {
               MemoryAddress(
                 MemoryTag.Local,
                 address.ref,
-                address.raw + layout.arch.threadLocalDepth * tid
+                address.raw + arch.threadLocalDepth * tid
               )
             } else address
 
@@ -181,15 +181,22 @@ class Mixer(layout: InstructionLayout) {
       * This in the future will be replaced with the barrier consisting
       * of mutual WAITs.
       */
+    val threadTotalCycles = threads.map(_.curCycles)
+    val threadQueueCycles = threads.map(_.queueCycles.sum)
+
     for (thread <- threads) {
       val longerThreads = threads.filter(t =>
-        t.tid != thread.tid && t.curCycles > thread.curCycles
+        t.tid != thread.tid &&
+          threadTotalCycles(t.tid) > threadTotalCycles(thread.tid)
       )
 
       if (!longerThreads.isEmpty) {
-        val cyclesToPadLongestQueue = longerThreads.map(_.queueCycles.sum).max
+        val cyclesToPadLongestQueue =
+          longerThreads.map(t => threadQueueCycles(t.tid)).max
         val cyclesToPadLongestThread =
-          longerThreads.map(_.curCycles).max - thread.curCycles
+          longerThreads
+            .map(t => threadTotalCycles(t.tid))
+            .max - threadTotalCycles(thread.tid)
 
         thread.emitPaddingNoOps(
           Math.min(cyclesToPadLongestQueue, cyclesToPadLongestThread)

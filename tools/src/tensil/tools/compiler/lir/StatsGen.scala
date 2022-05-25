@@ -5,7 +5,6 @@ package tensil.tools.compiler.lir
 
 import scala.collection.mutable
 
-import tensil.InstructionLayout
 import tensil.tools.compiler.{
   LIR,
   MemoryAddress,
@@ -18,14 +17,15 @@ import tensil.tools.compiler.{
   Opcode,
   DataMoveFlags
 }
+import tensil.Architecture
 
 class StatsGen(
-    layout: InstructionLayout,
+    arch: Architecture,
     stats: Stats
 ) extends LIR {
-  private val estimator = new Estimator(layout)
+  private val estimator = new Estimator(arch)
   private val estimateQueues =
-    Array.fill(layout.arch.numberOfThreads)(mutable.Queue.empty[Estimate])
+    Array.fill(arch.numberOfThreads)(mutable.Queue.empty[Estimate])
 
   private def countExecution(maxQueueSize: Int): Unit = {
     val nonEmptyTids =
@@ -80,7 +80,7 @@ class StatsGen(
 
     estimateQueues(tid).enqueue(estimate)
 
-    countExecution(layout.arch.threadQueueDepth)
+    countExecution(arch.threadQueueDepth)
   }
 
   def emitWait(tidToWait: Int, tid: Int): Unit = {

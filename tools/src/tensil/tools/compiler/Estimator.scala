@@ -3,7 +3,7 @@
 
 package tensil.tools.compiler
 
-import tensil.InstructionLayout
+import tensil.Architecture
 
 class Estimate(initCycles: Long, initEnergy: Long) {
   private var curCycles = initCycles
@@ -25,7 +25,7 @@ class Estimate(initCycles: Long, initEnergy: Long) {
   }
 }
 
-class Estimator(layout: InstructionLayout) {
+class Estimator(arch: Architecture) {
   private var previousOpcode = Opcode.Wait
   private var previousFlags  = 0
 
@@ -56,19 +56,19 @@ class Estimator(layout: InstructionLayout) {
           (if (previousOpcode == Opcode.MatMul)
              (size.get + 1)
            else if (previousOpcode == Opcode.LoadWeights)
-             (size.get + 1 + layout.arch.arraySize)
+             (size.get + 1 + arch.arraySize)
            else
-             (size.get + 1 + 2 * layout.arch.arraySize))
+             (size.get + 1 + 2 * arch.arraySize))
 
         val energy =
-          (size.get + 1) * layout.arch.arraySize * layout.arch.arraySize
+          (size.get + 1) * arch.arraySize * arch.arraySize
 
         new Estimate(cycles, energy)
       }
 
       case Opcode.SIMD => {
         val cycles = 1L
-        val energy = layout.arch.arraySize.toLong
+        val energy = arch.arraySize.toLong
 
         new Estimate(cycles, energy)
       }
@@ -88,7 +88,7 @@ class Estimator(layout: InstructionLayout) {
           flags == DataMoveFlags.DRAM1ToLocal
         ) {
           /*val transfersPerVector = divCeil(
-            dataType.sizeBytes * layout.arch.arraySize * 8,
+            dataType.sizeBytes * arch.arraySize * 8,
             DRAMTransferWidthBits
           )
           val isRead =

@@ -33,7 +33,7 @@ class BackendSegment(
     Seq(
       new lir.StreamGen(layout, fileStream),
       lirTracepointCollector
-    ) ++ (if (stats.isDefined) Seq(new lir.StatsGen(layout, stats.get))
+    ) ++ (if (stats.isDefined) Seq(new lir.StatsGen(layout.arch, stats.get))
           else
             Nil): _*
   )
@@ -159,17 +159,17 @@ class Backend(
 
   def writeSegments(
       programStream: OutputStream,
-      printProgramStream: Option[DataOutputStream] = None,
+      printProgramFileName: Option[String] = None,
       stats: Option[Stats] = None
   ): Unit = {
     var instructionOffset: Long = 0
     val lirBroadcast = new lir.Broadcast(
       Seq(new lir.StreamGen(layout, programStream)) ++ (if (
-                                                          printProgramStream.isDefined
+                                                          printProgramFileName.isDefined
                                                         )
                                                           Seq(
                                                             new lir.Printer(
-                                                              printProgramStream.get
+                                                              printProgramFileName.get
                                                             )
                                                           )
                                                         else
@@ -178,7 +178,7 @@ class Backend(
                                                                    )
                                                                      Seq(
                                                                        new lir.StatsGen(
-                                                                         layout,
+                                                                         layout.arch,
                                                                          stats.get
                                                                        )
                                                                      )
@@ -242,8 +242,8 @@ class Backend(
           )
         }) ++ Seq.fill(windowSize - 1)(ThreadedPartition())).reduceLeft(_ ++ _)
 
-    val mixer = new lir.Mixer(layout)
-    def mixPartitions(window: Seq[ThreadedPartition]) = {
+    val parallelizer = new lir.Parallelizer(layout.arch)
+    def parallelizePartitions(window: Seq[ThreadedPartition]) = {
       require(window.size == 1 || window.size == 3)
 
       val streamsByTid =
@@ -265,10 +265,10 @@ class Backend(
           .filter(_._2.isDefined)
           .map {
             case (tid, segment) =>
-              if (printProgramStream.isDefined)
+              /*if (printProgramStream.isDefined)
                 printProgramStream.get.writeBytes(
                   s"; TID $tid: ${BackendSegmentKeyHelper(segment.get.key)}\r\n"
-                )
+                )*/
 
               (tid, new FileInputStream(segment.get.file))
           }
@@ -283,13 +283,13 @@ class Backend(
               ))
           }
 
-      mixer.mix(parsersByTid, lirBroadcast)
+      parallelizer.emit(parsersByTid, lirBroadcast)
 
       streamsByTid.foreach(_._2.close())
     }
 
     for (i <- 0 until partitions.size - (windowSize - 1)) {
-      mixPartitions(partitions.slice(i, i + windowSize))
+      parallelizePartitions(partitions.slice(i, i + windowSize))
     }
 
     lirBroadcast.endEmit()

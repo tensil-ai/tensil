@@ -191,9 +191,6 @@ object Compiler {
     val startTime = System.nanoTime()
 
     val graphStream = options.printGraphFileName.map(new FileOutputStream(_))
-    val printProgramStream = if (options.printProgramFileName.isDefined) {
-      Some(new FileOutputStream(options.printProgramFileName.get))
-    } else None
 
     val frontend: Frontend =
       if (modelSourceType == CompilerSourceType.Tensorflow) {
@@ -267,7 +264,7 @@ object Compiler {
 
       backend.writeSegments(
         programStream,
-        printProgramStream.map(new DataOutputStream(_)),
+        options.printProgramFileName,
         Some(backendStats)
       )
 
@@ -305,8 +302,6 @@ object Compiler {
       val endTime = System.nanoTime()
 
       if (graphStream.isDefined) graphStream.get.close()
-
-      if (printProgramStream.isDefined) printProgramStream.get.close()
 
       if (options.printSummary) {
         val tb = new TablePrinter(Some("COMPILER SUMMARY"))

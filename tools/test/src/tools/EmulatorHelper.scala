@@ -200,12 +200,12 @@ object EmulatorHelper {
       inputBatchSize: Int,
       traceContext: ExecutiveTraceContext
   ): Unit = {
-    val processor = new Emulator(
+    val emulator = new Emulator(
       dataType = dataType,
       arch = model.arch
     )
 
-    processor.writeDRAM1(
+    emulator.writeDRAM1(
       model.consts(0).size,
       new FileInputStream(model.consts(0).fileName)
     )
@@ -218,21 +218,21 @@ object EmulatorHelper {
       prepareInputStream(model.name, dataType, model.arch.arraySize, count)
 
     for (_ <- 0 until count / inputBatchSize) {
-      processor.writeDRAM0(
+      emulator.writeDRAM0(
         input.base until input.base + input.size,
         new DataInputStream(inputStream)
       )
 
       var trace = new ExecutiveTrace(traceContext)
 
-      processor.run(new FileInputStream(model.program.fileName), trace)
+      emulator.run(new FileInputStream(model.program.fileName), trace)
 
       trace.printTrace()
 
       for (output <- model.outputs) {
         val outputStream =
           outputs.getOrElseUpdate(output.name, new ByteArrayOutputStream())
-        processor.readDRAM0(
+        emulator.readDRAM0(
           output.base until output.base + output.size,
           new DataOutputStream(outputStream)
         )

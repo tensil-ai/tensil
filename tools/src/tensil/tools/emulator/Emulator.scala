@@ -71,14 +71,19 @@ class Emulator[T : NumericWithMAC : ClassTag](
     try {
       val emulatorTrace = new EmulatorTrace(trace, emulatorExecutive)
       val lirParser     = new lir.StreamParser(arch, stream)
-      val lirBroadcast =
-        new lir.Broadcast(emulatorTrace, emulatorExecutive)
+      /*val lirPrinter =
+        new lir.Printer("resnet20v2_cifar_8x8_fixed16bp8_exec.tasm")*/
 
-      lirParser.parseAll(lirBroadcast)
+      val lirSequencer = new lir.Sequencer(
+        arch,
+        new lir.Broadcast(emulatorTrace, emulatorExecutive /*, lirPrinter*/ )
+      )
+
+      lirParser.parseAll(lirSequencer)
     } finally {
       val endTime = System.nanoTime()
 
-      val tb = new TablePrinter(Some("GOLDEN PROCESSOR SUMMARY"))
+      val tb = new TablePrinter(Some("EMULATOR SUMMARY"))
       tb.addNamedLine(
         "Execution time (sec)",
         (endTime - startTime).toFloat / 1e9f

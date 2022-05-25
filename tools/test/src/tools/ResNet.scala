@@ -45,11 +45,13 @@ object ResNet {
       new DataInputStream(new ByteArrayInputStream(bytes))
 
     for (i <- 0 until count) {
-      assert(
-        Util.argMax(
-          Util.readResult(dataType, output, arraySize, ClassSize)
-        ) == GoldenClasses(i)
+      val expected = GoldenClasses(i)
+      val actual = Util.argMax(
+        Util.readResult(dataType, output, arraySize, ClassSize)
       )
+
+      println(s"expected=$expected, actual=$actual")
+      assert(expected == actual)
     }
   }
 }

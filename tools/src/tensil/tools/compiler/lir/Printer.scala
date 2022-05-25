@@ -3,7 +3,7 @@
 
 package tensil.tools.compiler.lir
 
-import java.io.{DataOutputStream}
+import java.io.{FileOutputStream, DataOutputStream}
 
 import tensil.tools.compiler.{
   LIR,
@@ -16,9 +16,12 @@ import tensil.tools.compiler.{
 }
 
 class Printer(
-    stream: DataOutputStream
+    printProgramFileName: String
 ) extends LIR {
   private var instructionOffset: InstructionAddress = InstructionAddress.Zero
+  private val stream = new DataOutputStream(
+    new FileOutputStream(printProgramFileName)
+  )
 
   def emitWait(tidToWait: Int, tid: Int): Unit =
     printOp(
@@ -165,7 +168,7 @@ class Printer(
       tid
     )
 
-  def endEmit(): Unit = {}
+  def endEmit(): Unit = stream.close()
 
   private def printOp(
       mnemonic: String,

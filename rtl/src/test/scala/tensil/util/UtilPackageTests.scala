@@ -8,7 +8,7 @@ import chisel3._
 import chisel3.experimental.FixedPoint
 import chisel3.util.{Decoupled, Queue}
 import chiseltest._
-import tensil.{FixedDriver, FixedPeekPokeTester, Scratch, Treadle, UnitSpec}
+import tensil.UnitSpec
 import tensil.Fixed16bp8
 
 import Numeric.Implicits._
@@ -221,39 +221,39 @@ class UtilPackageTests extends UnitSpec {
     streamTransmission(input, 32, 16) should equal(expected)
   }
 
-  "signedMod" should "be correct" in {
-    FixedDriver(
-      () => new SignedModTest(4, 16),
-      generateVCD = true,
-      backend = Treadle
-    ) { dut =>
-      new FixedPeekPokeTester(dut) {
-        val tests = Array((5, 6, 15))
+  // "signedMod" should "be correct" in {
+  //   FixedDriver(
+  //     () => new SignedModTest(4, 16),
+  //     generateVCD = true,
+  //     backend = Treadle
+  //   ) { dut =>
+  //     new FixedPeekPokeTester(dut) {
+  //       val tests = Array((5, 6, 15))
 
-        for ((a, b, c) <- tests) {
-          poke(dut.io.a, a)
-          poke(dut.io.b, b)
-          expect(dut.io.c, c)
-        }
-      }
-    } should be(true)
+  //       for ((a, b, c) <- tests) {
+  //         poke(dut.io.a, a)
+  //         poke(dut.io.b, b)
+  //         expect(dut.io.c, c)
+  //       }
+  //     }
+  //   } should be(true)
 
-    FixedDriver(
-      () => new SignedModTest(2, 3),
-      generateVCD = true,
-      backend = Treadle
-    ) { dut =>
-      new FixedPeekPokeTester(dut) {
-        val tests = Array((0, 1, 2), (1, 2, 2), (0, 2, 1))
+  //   FixedDriver(
+  //     () => new SignedModTest(2, 3),
+  //     generateVCD = true,
+  //     backend = Treadle
+  //   ) { dut =>
+  //     new FixedPeekPokeTester(dut) {
+  //       val tests = Array((0, 1, 2), (1, 2, 2), (0, 2, 1))
 
-        for ((a, b, c) <- tests) {
-          poke(dut.io.a, a)
-          poke(dut.io.b, b)
-          expect(dut.io.c, c)
-        }
-      }
-    } should be(true)
-  }
+  //       for ((a, b, c) <- tests) {
+  //         poke(dut.io.a, a)
+  //         poke(dut.io.b, b)
+  //         expect(dut.io.c, c)
+  //       }
+  //     }
+  //   } should be(true)
+  // }
 
   "extractBitField" should "include low endpoint, exclude high endpoint" in {
     val input: BigInt    = 0xff0102ff

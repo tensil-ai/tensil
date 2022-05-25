@@ -7,20 +7,16 @@ import org.scalatest._
 import chiseltest.ChiselScalatestTester
 import org.scalatest.funspec.AnyFunSpec
 import org.scalatest.flatspec.AnyFlatSpec
-import org.scalatest.matchers.Matcher
-// import org.scalatest.matchers.{BeMatcher, EqualMatcher}
+import matchers.should._
 
 class UnitSpec
     extends AnyFlatSpec
-    // with BeMatcher
-    // with EqualMatcher
-    with Matcher
+    with Matchers
     with ChiselScalatestTester
     with DecoupledTester
 
 class FunUnitSpec
     extends AnyFunSpec
-    // with BeMatcher
-    // with EqualMatcher
+    with Matchers
     with ChiselScalatestTester
     with DecoupledTester

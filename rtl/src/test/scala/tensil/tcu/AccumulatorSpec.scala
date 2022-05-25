@@ -19,7 +19,7 @@ class AccumulatorSpec extends UnitSpec {
     val height = 4
     val depth  = 16
 
-    class PacketCounter extends MultiIOModule {
+    class PacketCounter extends Module {
       val m  = Module(new Accumulator(gen, height, depth))
       val io = IO(m.io.cloneType)
       io <> m.io

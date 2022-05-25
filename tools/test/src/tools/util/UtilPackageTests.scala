@@ -5,6 +5,7 @@ package tensil.tools.util
 
 import org.scalatest._
 import org.scalatest.flatspec.AnyFlatSpec
+import matchers.should._
 import org.tensorflow.framework.attr_value.AttrValue
 
 class UtilPackageTests extends AnyFlatSpec with Matchers {

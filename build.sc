@@ -21,7 +21,7 @@ object common extends ScalaModule { m =>
     )
 
   object test extends Tests with TestModule.ScalaTest {
-    def ivyDeps = m.ivyDeps() ++ Agg(ivy"org.scalatest::scalatest:3.0.4")
+    def ivyDeps = m.ivyDeps() ++ Agg(ivy"org.scalatest::scalatest:3.2.12")
   }
 }
 
@@ -68,8 +68,7 @@ object rtl extends SbtModule { m =>
   override def ivyDeps =
     common.ivyDeps() ++ super.ivyDeps() ++ Agg(
       ivy"edu.berkeley.cs::chisel3:3.5.3",
-      ivy"edu.berkeley.cs::chiseltest:0.5.1",
-      ivy"edu.berkeley.cs::chisel-iotesters:1.5.3",
+      ivy"edu.berkeley.cs::chiseltest:0.5.3",
       ivy"edu.berkeley.cs::treadle:1.5.3",
     )
   override def scalacPluginIvyDeps =

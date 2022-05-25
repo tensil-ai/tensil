@@ -37,6 +37,15 @@ class Scratch(depth: Int) extends Module {
         )
       )
     )
+    val locked = Decoupled(
+      new ConditionalReleaseLockControl(
+        lockCond,
+        numPorts,
+        numBlocks,
+        maxDelay
+      )
+    )
+    val deadlocked = Decoupled(Bool())
   })
 
   val a           = Queue(io.a.in, 2)
@@ -46,17 +55,22 @@ class Scratch(depth: Int) extends Module {
   val lock = RegInit(
     VecInit(
       Array.fill(numBlocks)(
-        ConditionalReleaseLock(lockCond, numPorts, maxDelay)
+        ConditionalReleaseLock(
+          lockCond,
+          numPorts,
+          maxDelay,
+          false.B,
+          0.U,
+          0.U,
+          lockCond.Lit(_.address -> 0.U, _.write -> false.B)
+        )
       )
     )
   )
-  val actor = VecInit(Array(a, b))
-  val idA   = 0.U
-  val idB   = 1.U
-
-  // when do we lock and unlock
-  // how do we break ties
-  // when are requests allowed to proceed / blocked?
+  val actorValid = VecInit(Array(a, b).map(_.valid))
+  val actorBits  = VecInit(Array(a, b).map(_.bits))
+  val idA        = 0.U
+  val idB        = 1.U
 
   // we need a way to map an address to the block to which it belong
   def block(address: UInt): UInt = {
@@ -71,34 +85,42 @@ class Scratch(depth: Int) extends Module {
   val lockB  = lock(block(b.bits.address))
   val blockB = lockB.held && lockB.by =/= idB
 
+  // locked output for testing
+  io.locked.bits <> lockControl.bits
+  io.locked.valid := lockControl.fire
+
+  // signal when deadlocked
+  io.deadlocked.bits := DontCare
+  io.deadlocked.valid := false.B
+
   // acquire lock when lock control comes in
   val l = lock(lockControl.bits.lock)
   when(l.held) {
     when(l.by === lockControl.bits.by) {
-      // lock continues to be held by same port
-      // have to update condition
+      // lock continues to be held by same port unless request specifies acquire = false (i.e. manual release)
       lockControl.ready := true.B
-      l.cond <> lockControl.bits.cond
-      // alternatively we could just treat this as have to wait to acquire lock again
+      when(lockControl.valid) {
+        l.held := lockControl.bits.acquire
+        // update release condition
+        l.cond <> lockControl.bits.cond
+      }
     }.otherwise {
       // other port holds lock, have to wait for it to release to acquire it
       lockControl.ready := false.B
     }
   }.otherwise {
     // can acquire it
-    // TODO check acquire flag
+    lockControl.ready := true.B
     when(lockControl.valid) {
-      l.held := true.B
+      l.held := lockControl.bits.acquire
       l.by := lockControl.bits.by
       l.cond <> lockControl.bits.cond
     }
-    lockControl.ready := true.B
   }
 
   // release lock when condition is observed
   for (l <- lock) {
-    val ac = actor(l.by)
-    when(ac.valid && ac.bits === l.cond) {
+    when(l.held && actorValid(l.by) && actorBits(l.by) === l.cond) {
       // release
       // TODO use release delay
       l.held := false.B
@@ -113,7 +135,9 @@ class Scratch(depth: Int) extends Module {
       b.ready := false.B
       io.b.out.valid := false.B
       io.b.out.bits := DontCare
-      // TODO signal out when deadlock happens so we know that something is wrong
+      // signal out when deadlock happens so we know that something is wrong
+      io.deadlocked.bits := true.B
+      io.deadlocked.valid := true.B
     }.otherwise {
       // block A
       a.ready := false.B
@@ -129,6 +153,7 @@ class Scratch(depth: Int) extends Module {
       io.b.out.valid := false.B
       io.b.out.bits := DontCare
     }.otherwise {
+      // everything can proceed
       io.a.out <> a
       io.b.out <> b
     }
@@ -137,9 +162,10 @@ class Scratch(depth: Int) extends Module {
 
 class ScratchSpec extends FunUnitSpec {
   describe("Scratch") {
-    describe("when depth = 1 << 8") {
+    describe("when depth = 8") {
       val depth = 8
-      it("should allow requests to proceed when there are no locks") {
+
+      it("should allow requests to proceed when there are no locks acquired") {
         decoupledTest(new Scratch(depth)) { m =>
           m.io.a.in.setSourceClock(m.clock)
           m.io.a.out.setSinkClock(m.clock)
@@ -147,19 +173,19 @@ class ScratchSpec extends FunUnitSpec {
           m.io.b.out.setSinkClock(m.clock)
 
           thread("a.in") {
-            m.io.a.in.enqueue(Request(depth, 0, false))
+            m.io.a.in.enqueue(Request(depth, 0.U, false.B))
           }
 
           thread("b.in") {
-            m.io.b.in.enqueue(Request(depth, 0, false))
+            m.io.b.in.enqueue(Request(depth, 0.U, false.B))
           }
 
           thread("a.out") {
-            m.io.a.out.expectDequeue(Request(depth, 0, false))
+            m.io.a.out.expectDequeue(Request(depth, 0.U, false.B))
           }
 
           thread("b.out") {
-            m.io.b.out.expectDequeue(Request(depth, 0, false))
+            m.io.b.out.expectDequeue(Request(depth, 0.U, false.B))
           }
         }
       }
@@ -172,6 +198,7 @@ class ScratchSpec extends FunUnitSpec {
           m.io.a.out.setSinkClock(m.clock)
           m.io.b.in.setSourceClock(m.clock)
           m.io.b.out.setSinkClock(m.clock)
+          m.io.lock.setSourceClock(m.clock)
 
           val delay = 10
 
@@ -186,26 +213,27 @@ class ScratchSpec extends FunUnitSpec {
                 true.B,
                 m.idA,
                 0.U,
-                Request(depth, 1, true)
+                Request(depth, 1.U, true.B)
               )
             )
           }
 
           thread("a.in") {
-            m.io.a.in.enqueue(Request(depth, 0, false))
+            m.io.a.in.enqueue(Request(depth, 0.U, false.B))
             for (_ <- 0 until delay) {
               m.clock.step()
             }
-            m.io.a.in.enqueue(Request(depth, 1, true))
+            m.io.a.in.enqueue(Request(depth, 1.U, true.B))
           }
 
           thread("b.in") {
-            m.io.b.in.enqueue(Request(depth, 0, false))
+            m.clock.step()
+            m.io.b.in.enqueue(Request(depth, 0.U, false.B))
           }
 
           thread("a.out") {
-            m.io.a.out.expectDequeue(Request(depth, 0, false))
-            m.io.a.out.expectDequeue(Request(depth, 1, true))
+            m.io.a.out.expectDequeue(Request(depth, 0.U, false.B))
+            m.io.a.out.expectDequeue(Request(depth, 1.U, true.B))
           }
 
           thread("b.out") {
@@ -213,77 +241,197 @@ class ScratchSpec extends FunUnitSpec {
               m.io.b.out.valid.expect(false.B)
               m.clock.step()
             }
-            m.io.b.out.expectDequeue(Request(depth, 0, false))
+            m.io.b.out.expectDequeue(Request(depth, 0.U, false.B))
           }
         }
       }
 
-      //   it("should hold requests on A until release arrives on B") {
-      //     decoupledTest(new Scratch(depth)) { m =>
-      //       m.io.a.in.setSourceClock(m.clock)
-      //       m.io.a.out.setSinkClock(m.clock)
-      //       m.io.b.in.setSourceClock(m.clock)
-      //       m.io.b.out.setSinkClock(m.clock)
+      it(
+        "should allow B to acquire lock then hold requests on A until release condition is met on B"
+      ) {
+        decoupledTest(new Scratch(depth)) { m =>
+          m.io.a.in.setSourceClock(m.clock)
+          m.io.a.out.setSinkClock(m.clock)
+          m.io.b.in.setSourceClock(m.clock)
+          m.io.b.out.setSinkClock(m.clock)
+          m.io.lock.setSourceClock(m.clock)
 
-      //       val delay = 10
+          val delay = 10
 
-      //       thread("a.in") {
-      //         m.io.a.in.enqueue(Request(depth, 0, false, Signal.None))
-      //       }
+          thread("lock") {
+            m.io.lock.enqueue(
+              ConditionalReleaseLockControl(
+                m.lockCond,
+                m.numPorts,
+                m.numBlocks,
+                m.maxDelay,
+                0.U,
+                true.B,
+                m.idB,
+                0.U,
+                Request(depth, 1.U, true.B)
+              )
+            )
+          }
 
-      //       thread("b.in") {
-      //         m.io.b.in.enqueue(Request(depth, 0, false, Signal.Hold))
-      //         for (_ <- 0 until delay) {
-      //           m.clock.step()
-      //         }
-      //         m.io.b.in.enqueue(Request(depth, 0, false, Signal.Release))
-      //       }
+          thread("b.in") {
+            m.io.b.in.enqueue(Request(depth, 0.U, false.B))
+            for (_ <- 0 until delay) {
+              m.clock.step()
+            }
+            m.io.b.in.enqueue(Request(depth, 1.U, true.B))
+          }
 
-      //       thread("a.out") {
-      //         for (_ <- 0 until delay) {
-      //           m.io.a.out.valid.expect(false.B)
-      //           m.clock.step()
-      //         }
-      //         m.io.a.out.expectDequeue(Request(depth, 0, false, Signal.None))
-      //       }
+          thread("a.in") {
+            m.clock.step()
+            m.io.a.in.enqueue(Request(depth, 0.U, false.B))
+          }
 
-      //       thread("b.out") {
-      //         m.io.b.out.expectDequeue(Request(depth, 0, false, Signal.Hold))
-      //         m.io.b.out.expectDequeue(Request(depth, 0, false, Signal.Release))
-      //       }
-      //     }
-      //   }
+          thread("b.out") {
+            m.io.b.out.expectDequeue(Request(depth, 0.U, false.B))
+            m.io.b.out.expectDequeue(Request(depth, 1.U, true.B))
+          }
 
-      //   it(
-      //     "should prefer to block B when holds are requested on both ports"
-      //   ) {
-      //     decoupledTest(new Scratch(depth)) { m =>
-      //       m.io.a.in.setSourceClock(m.clock)
-      //       m.io.a.out.setSinkClock(m.clock)
-      //       m.io.b.in.setSourceClock(m.clock)
-      //       m.io.b.out.setSinkClock(m.clock)
+          thread("a.out") {
+            for (_ <- 0 until delay) {
+              m.io.a.out.valid.expect(false.B)
+              m.clock.step()
+            }
+            m.io.a.out.expectDequeue(Request(depth, 0.U, false.B))
+          }
+        }
+      }
 
-      //       thread("a.in") {
-      //         m.io.a.in.enqueue(Request(depth, 0, false, Signal.Hold))
-      //         m.io.a.in.enqueue(Request(depth, 0, false, Signal.None))
-      //       }
+      it("should not allow B to acquire a lock when it is held by A") {
+        decoupledTest(new Scratch(depth)) { m =>
+          m.io.a.in.setSourceClock(m.clock)
+          m.io.a.out.setSinkClock(m.clock)
+          m.io.b.in.setSourceClock(m.clock)
+          m.io.b.out.setSinkClock(m.clock)
+          m.io.lock.setSourceClock(m.clock)
+          m.io.locked.setSinkClock(m.clock)
 
-      //       thread("b.in") {
-      //         m.io.b.in.enqueue(Request(depth, 0, false, Signal.Hold))
-      //       }
+          thread("lock") {
+            m.io.lock.enqueue(
+              ConditionalReleaseLockControl(
+                m.lockCond,
+                m.numPorts,
+                m.numBlocks,
+                m.maxDelay,
+                0.U,
+                true.B,
+                m.idA,
+                0.U,
+                Request(depth, 1.U, true.B)
+              )
+            )
 
-      //       thread("a.out") {
-      //         m.io.a.out.expectDequeue(Request(depth, 0, false, Signal.Hold))
-      //         m.io.a.out.expectDequeue(Request(depth, 0, false, Signal.None))
-      //       }
+            m.io.lock.enqueue(
+              ConditionalReleaseLockControl(
+                m.lockCond,
+                m.numPorts,
+                m.numBlocks,
+                m.maxDelay,
+                0.U,
+                true.B,
+                m.idB,
+                0.U,
+                Request(depth, 1.U, true.B)
+              )
+            )
+          }
 
-      //       thread("b.out") {
-      //         for (_ <- 0 until 5) {
-      //           m.io.b.out.valid.expect(false.B)
-      //         }
-      //       }
-      //     }
-      //   }
+          thread("locked") {
+            m.io.locked.expectDequeue(
+              ConditionalReleaseLockControl(
+                m.lockCond,
+                m.numPorts,
+                m.numBlocks,
+                m.maxDelay,
+                0.U,
+                true.B,
+                m.idA,
+                0.U,
+                Request(depth, 1.U, true.B)
+              )
+            )
+
+            for (_ <- 0 until 10)
+              m.io.locked.valid.expect(false.B)
+          }
+        }
+      }
+
+      // deadlock: A holds 0, B holds 1, A is waiting for 0, B is waiting for 1. In this case we should allow A to proceed.
+      it(
+        "should allow A to proceed when deadlocked, and also signal deadlock"
+      ) {
+
+        decoupledTest(new Scratch(depth)) { m =>
+          m.io.a.in.setSourceClock(m.clock)
+          m.io.a.out.setSinkClock(m.clock)
+          m.io.b.in.setSourceClock(m.clock)
+          m.io.b.out.setSinkClock(m.clock)
+          m.io.lock.setSourceClock(m.clock)
+          m.io.locked.setSinkClock(m.clock)
+          m.io.deadlocked.setSinkClock(m.clock)
+
+          thread("lock") {
+            m.io.lock.enqueue(
+              ConditionalReleaseLockControl(
+                m.lockCond,
+                m.numPorts,
+                m.numBlocks,
+                m.maxDelay,
+                0.U,
+                true.B,
+                m.idA,
+                0.U,
+                Request(depth, 1.U, true.B)
+              )
+            )
+
+            m.io.lock.enqueue(
+              ConditionalReleaseLockControl(
+                m.lockCond,
+                m.numPorts,
+                m.numBlocks,
+                m.maxDelay,
+                1.U,
+                true.B,
+                m.idB,
+                0.U,
+                Request(depth, 1.U, true.B)
+              )
+            )
+          }
+
+          thread("a.in") {
+            m.clock.step(2)
+            m.io.a.in.enqueue(Request(depth, (depth / 2).U, false.B))
+            m.io.a.in.enqueue(Request(depth, 1.U, true.B))
+          }
+
+          thread("b.in") {
+            m.clock.step(2)
+            m.io.b.in.enqueue(Request(depth, 0.U, false.B))
+          }
+
+          thread("a.out") {
+            m.io.a.out.expectDequeue(Request(depth, (depth / 2).U, false.B))
+            m.io.a.out.expectDequeue(Request(depth, 1.U, true.B))
+          }
+
+          thread("b.out") {
+            m.io.b.out.expectDequeue(Request(depth, 0.U, false.B))
+          }
+
+          thread("deadlocked") {
+            m.io.deadlocked.expectDequeue(true.B)
+          }
+        }
+      }
+
     }
   }
 }
@@ -300,12 +448,12 @@ class Request(val depth: Long) extends Bundle {
 object Request {
   def apply(
       depth: Long,
-      address: Int,
-      write: Boolean,
+      address: UInt,
+      write: Bool,
   ): Request = {
     (new Request(depth)).Lit(
-      _.address -> address.U,
-      _.write   -> write.B,
+      _.address -> address,
+      _.write   -> write,
     )
   }
 }
@@ -316,14 +464,14 @@ class Lock(val numActors: Int) extends Bundle {
 }
 
 object Lock {
-  def apply(numActors: Int, held: Boolean, by: Int): Lock = {
+  def apply(numActors: Int, held: Bool, by: UInt): Lock = {
     (new Lock(numActors)).Lit(
-      _.held -> held.B,
-      _.by   -> by.U,
+      _.held -> held,
+      _.by   -> by,
     )
   }
 
-  def apply(numActors: Int): Lock = apply(numActors, false, 0)
+  def apply(numActors: Int): Lock = apply(numActors, false.B, 0.U)
 }
 
 trait ConditionalRelease[T <: Data] {
@@ -339,10 +487,6 @@ class ConditionalReleaseLock[T <: Data](
     with ConditionalRelease[T] {
   val delayRelease = UInt(log2Ceil(maxDelay).W)
   val cond         = gen
-
-  // override def cloneType: ConditionalReleaseLock[T] =
-  //   new ConditionalReleaseLock[T](gen, numActors, maxDelay)
-  // // .asInstanceOf[ConditionalReleaseLock[T]]
 }
 
 object ConditionalReleaseLock {
@@ -350,15 +494,15 @@ object ConditionalReleaseLock {
       gen: T,
       numActors: Int,
       maxDelay: Int,
-      held: Boolean,
-      by: Int,
-      delayRelease: Int,
+      held: Bool,
+      by: UInt,
+      delayRelease: UInt,
       cond: T,
   ): ConditionalReleaseLock[T] = {
     (new ConditionalReleaseLock(gen, numActors, maxDelay)).Lit(
-      _.held         -> held.B,
-      _.by           -> by.U,
-      _.delayRelease -> delayRelease.U,
+      _.held         -> held,
+      _.by           -> by,
+      _.delayRelease -> delayRelease,
       _.cond         -> cond,
     )
   }
@@ -368,7 +512,7 @@ object ConditionalReleaseLock {
       numActors: Int,
       maxDelay: Int
   ): ConditionalReleaseLock[T] =
-    apply(gen, numActors, maxDelay: Int, false, 0, 0, zero(gen))
+    apply(gen, numActors, maxDelay, false.B, 0.U, 0.U, zero(gen))
 }
 
 class LockControl(
@@ -389,10 +533,6 @@ class ConditionalReleaseLockControl[T <: Data](
     with ConditionalRelease[T] {
   val delayRelease = UInt(log2Ceil(maxDelay).W)
   val cond         = gen
-
-  // override def cloneType: ConditionalReleaseLockControl[T] =
-  //   new ConditionalReleaseLockControl(gen, numActors, numLocks, maxDelay)
-  //     .asInstanceOf[this.type]
 }
 
 object ConditionalReleaseLockControl {

@@ -5,10 +5,12 @@ package tensil
 
 import org.scalatest._
 import scala.reflect.ClassTag
+import org.scalatest.flatspec.AnyFlatSpec
+import matchers.should._
 
 import Numeric.Implicits._
 
-class FixedSpec extends FlatSpec {
+class FixedSpec extends AnyFlatSpec {
   behavior of "Fixed"
 
   implicit val numeric = FloatAsIfIntegralWithMAC

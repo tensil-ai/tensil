@@ -59,13 +59,13 @@ class LockPool[T <: Data with Comparable[T]](
 
   val block = VecInit(for ((a, id) <- actor.zipWithIndex) yield {
     // block by default
-    io.actor(id.U).out.noenq()
+    io.actor(id).out.noenq()
     a.ready := false.B
     val requiredLock = lock(select(a.bits))
     val blocked      = requiredLock.held && requiredLock.by =/= id.U
     when(!blocked) {
       // allow actor to proceed when not blocked
-      io.actor(id.U).out <> a
+      io.actor(id).out <> a
     }
     blocked
   })

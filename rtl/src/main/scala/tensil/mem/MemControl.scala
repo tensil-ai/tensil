@@ -18,7 +18,7 @@ class MemControlWithStride(depth: Long, val strideDepth: Int)
   val reverse = Bool()
 
   def ===(other: MemControlWithStride): Bool = {
-    address === other.address && write && other.write && size === other.size && stride === other.stride && reverse === other.reverse
+    address === other.address && write === other.write && size === other.size && stride === other.stride && reverse === other.reverse
   }
 }
 

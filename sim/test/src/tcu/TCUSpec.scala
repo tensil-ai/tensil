@@ -72,7 +72,6 @@ class TCUSpec extends UnitSpec {
         m.io.dram0.control.expectDequeue(
           MemControl(arch.dram0Depth, 0.U, 0.U, true.B)
         )
-        println(count)
         assert(count < 110)
       }
 

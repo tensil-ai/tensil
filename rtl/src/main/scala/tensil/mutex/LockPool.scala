@@ -81,43 +81,112 @@ class LockPool[T <: Data with Comparable[T]](
   io.deadlocked.bits := DontCare
   io.deadlocked.valid := false.B
 
-  // acquire lock when lock control comes in
-  val l = lock(lockControl.bits.lock)
-  when(l.held) {
-    when(l.by === lockControl.bits.by) {
-      // lock continues to be held by same port unless request specifies acquire = false (i.e. manual release)
-      lockControl.ready := true.B
-      when(lockControl.valid) {
-        l.held := lockControl.bits.acquire
-        // update release condition
-        l.cond <> lockControl.bits.cond
-      }
-    }.otherwise {
-      // other port holds lock, have to wait for it to release to acquire it
-      lockControl.ready := false.B
-    }
-  }.otherwise {
-    // can acquire it
-    lockControl.ready := true.B
+  def acquire(l: ConditionalReleaseLock[T]): Unit = {
     when(lockControl.valid) {
       l.held := lockControl.bits.acquire
       l.by := lockControl.bits.by
       l.cond <> lockControl.bits.cond
     }
   }
-
-  // release lock when condition is observed
-  for (l <- lock) {
-    when(l.held && actor(l.by).fire && actor(l.by).bits === l.cond) {
-      // release
-      // TODO use release delay
-      l.held := false.B
+  def release(l: ConditionalReleaseLock[T]): Unit = {
+    l.held := false.B
+  }
+  // this covers the case where the condition happens to be observed on the same
+  // cycle the lock would have been acquired
+  val incomingObserved =
+    lockControl.valid && actor(lockControl.bits.by).fire && actor(
+      lockControl.bits.by
+    ).bits === lockControl.bits.cond
+  // ready for new lock requests by default
+  val requestedLock = lock(lockControl.bits.lock)
+  // when requested lock held by a different actor than the one requesting, block until lock is released
+  lockControl.ready := !(requestedLock.held && lockControl.bits.by =/= requestedLock.by)
+  for ((l, id) <- lock.zipWithIndex) {
+    val incoming = lockControl.bits.lock === id.U
+    val observed = actor(l.by).fire && actor(l.by).bits === l.cond
+    when(l.held) {
+      when(observed) {
+        when(incoming) {
+          when(incomingObserved) {
+            release(l)
+          }.otherwise {
+            // release then immediately try to acquire
+            release(l)
+            acquire(l)
+          }
+        }.otherwise {
+          release(l)
+        }
+      }.otherwise {
+        when(incoming) {
+          when(l.by === lockControl.bits.by) {
+            // same actor acquiring lock, so allowed
+            acquire(l)
+          }.otherwise {
+            // do nothing
+          }
+        }.otherwise {
+          // do nothing
+        }
+      }
+    }.otherwise {
+      when(incoming) {
+        when(incomingObserved) {
+          // do nothing
+        }.otherwise {
+          acquire(l)
+        }
+      }.otherwise {
+        // do nothing
+      }
     }
   }
 
-  // when all actors are blocked, allow the lowest index one to proceed.
+  // val l = lock(lockControl.bits.lock)
+  // when(l.held) {
+  //   when(l.by === lockControl.bits.by) {
+  //     // lock continues to be held by same port unless request specifies acquire = false (i.e. manual release)
+  //     lockControl.ready := true.B
+  //     when(lockControl.valid) {
+  //       l.held := lockControl.bits.acquire
+  //       // update release condition
+  //       l.cond <> lockControl.bits.cond
+  //     }
+  //   }.otherwise {
+  //     // other port holds lock, have to wait for it to release to acquire it
+  //     lockControl.ready := false.B
+  //   }
+  // }.otherwise {
+  //   // can acquire it
+  //   lockControl.ready := true.B
+  //   when(lockControl.valid) {
+  //     l.held := lockControl.bits.acquire
+  //     l.by := lockControl.bits.by
+  //     l.cond <> lockControl.bits.cond
+  //   }
+  // }
+
+  // // release lock when condition is observed
+  // for ((l, id) <- lock.zipWithIndex) {
+  //   when(l.held && actor(l.by).fire && actor(l.by).bits === l.cond) {
+  //     // condition met: release
+  //     l.held := false.B
+  //   }.elsewhen(
+  //     lockControl.valid && lockControl.bits.lock === id.U && actor(
+  //       lockControl.bits.by
+  //     ).fire && actor(
+  //       lockControl.bits.by
+  //     ).bits === lockControl.bits.cond
+  //   ) {
+  //     // condition on incoming lock control met on same cycle as lock was to be acquired
+  //     // therefore don't acquire
+  //     l.held := false.B
+  //   }
+  // }
+
+  // when all actors are blocked, allow the actor holding lock 0 to proceed
   when(block.reduce((a, b) => a && b)) {
-    io.actor(0.U).out <> actor(0.U)
+    io.actor(lock(0.U).by).out <> actor(lock(0.U).by)
     // signal out when deadlock happens so we know that something is wrong
     io.deadlocked.bits := true.B
     io.deadlocked.valid := true.B

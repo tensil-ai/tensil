@@ -43,7 +43,7 @@ class LoadWeightFlags extends Bundle {
   val zeroes  = Bool()
 }
 
-object LoadWeightFlags extends Bundle {
+object LoadWeightFlags {
   def apply(zeroes: Boolean): LoadWeightFlags = {
     (new LoadWeightFlags).Lit(_._unused -> 0.U, _.zeroes -> zeroes.B)
   }

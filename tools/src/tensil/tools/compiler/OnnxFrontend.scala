@@ -9,7 +9,12 @@ import scala.collection.mutable
 
 import onnx.onnx.{NodeProto, ModelProto, TensorProto, ValueInfoProto}
 
-import _root_.tensil.tools.{CompilerException, TracepointCondition, CompilerOptions}
+import _root_.tensil.tools.{
+  CompilerException,
+  TracepointCondition,
+  CompilerOptions,
+  CompilerInputShapesHelper
+}
 import _root_.tensil.tools.data.{Shape, TensorData}
 import _root_.tensil.tools.util
 import _root_.tensil.{TablePrinter, Architecture}
@@ -231,7 +236,7 @@ class OnnxFrontend(
       case Nil => emitters
       case nodeProto :: remainingProtos =>
         nodeProto.opType.get match {
-          case "Gemm" | "Conv" =>
+          case "MatMul" | "Gemm" | "Conv" =>
             rewriteLayer(remainingProtos, nodeProto, emitters)
           case "Reshape" =>
             rewriteSimple(remainingProtos, emitReshape(_, nodeProto), emitters)
@@ -312,7 +317,7 @@ class OnnxFrontend(
    * This function takes `layerStepOps`, which describes
    * the pattern to which we expect nodes to adhere in order
    * to form a layer. The initial and the only required node is
-   * matched in `recursiveRewrite` to be either `Gemm` or
+   * matched in `recursiveRewrite` to be either `MatMul`, `Gemm` or
    * `Conv`. This node is followed by "layer step operations"
    * where each step can optionally be one of the operations
    * included in the set.
@@ -383,7 +388,8 @@ class OnnxFrontend(
   private var layerIndex = 0
 
   private def startLayer(nodeProtos: Seq[NodeProto]): Scheduler = {
-    val name = s"LAYER $layerIndex (${nodeProtos.map(_.name.get).mkString(",")})"
+    val name =
+      s"LAYER $layerIndex (${nodeProtos.map(_.name.get).mkString(",")})"
 
     layerIndex += 1
 
@@ -441,7 +447,13 @@ class OnnxFrontend(
         )
 
       val matMulTemp =
-        if (nodeProto.opType.get == "Gemm")
+        if (nodeProto.opType.get == "MatMul")
+          emitLayerMatMul(
+            context,
+            scheduler,
+            nodeProto
+          )
+        else if (nodeProto.opType.get == "Gemm")
           emitLayerGemm(
             context,
             scheduler,
@@ -568,11 +580,10 @@ class OnnxFrontend(
 
   private def emitInput(context: EmitContext): EmitResult = {
     for ((name, valueInfoProto) <- inputValueInfoProtos) {
-      val shape = Shape(
+      val modelInputShape =
         valueInfoProto.`type`.get.value.tensorType.get.shape.get.dim
-          .map(_.value.dimValue.get.toInt)
-          .toArray
-      )
+          .map(_.value.dimValue.map(_.toInt))
+      val shape = options.inputShapes.deduceInputShape(name, modelInputShape)
 
       val consumers = inputNodeNames(name)
 
@@ -1833,6 +1844,9 @@ class OnnxFrontend(
       scheduler: Scheduler,
       conv2DProto: NodeProto
   ): MemoryObject = {
+    val autoPadAttr = getAttr(conv2DProto, "auto_pad")
+    val autoPad     = autoPadAttr.map(_.s.get.toStringUtf8())
+
     val padsAttr = getAttr(conv2DProto, "pads")
 
     val pads = if (padsAttr.isDefined) {
@@ -1869,15 +1883,6 @@ class OnnxFrontend(
         )
     }
 
-    val (paddingTop, paddingLeft, paddingBottom, paddingRight) =
-      pads.map(_.toInt) match {
-        case Seq(t, l, b, r) => (t, l, b, r)
-        case _ =>
-          throw new CompilerException(
-            s"Unsupported pads [${pads.mkString(", ")}]"
-          )
-      }
-
     context.mm.addPendingConst(
       conv2DProto.input(1),
       getTensorData(tensorProtos(conv2DProto.input(1)))
@@ -1895,6 +1900,45 @@ class OnnxFrontend(
         if (conv2DProto.input.isDefinedAt(2)) Some(conv2DProto.input(2))
         else None,
       )
+
+    val (paddingTop, paddingLeft, paddingBottom, paddingRight) =
+      pads.map(_.toInt) match {
+        case Seq(t, l, b, r) =>
+          val paddingWidth =
+            (weights.dims.width.toDouble - 1) / 2
+          val paddingHeight =
+            (weights.dims.height.toDouble - 1) / 2
+
+          autoPad match {
+            case Some("SAME_UPPER") =>
+              (
+                Math.floor(paddingHeight).toInt,
+                Math.floor(paddingWidth).toInt,
+                Math.ceil(paddingHeight).toInt,
+                Math.ceil(paddingWidth).toInt
+              )
+
+            case Some("SAME_LOWER") =>
+              (
+                Math.ceil(paddingHeight).toInt,
+                Math.ceil(paddingWidth).toInt,
+                Math.floor(paddingHeight).toInt,
+                Math.floor(paddingWidth).toInt
+              )
+
+            case None | Some("NOTSET") => (t, l, b, r)
+            case Some(v) =>
+              throw new CompilerException(
+                s"Unsupported auto_pad attribute $v"
+              )
+
+          }
+
+        case _ =>
+          throw new CompilerException(
+            s"Unsupported pads [${pads.mkString(", ")}]"
+          )
+      }
 
     val inputVars =
       context.mm.consumeObject(conv2DProto.input(0), Seq(conv2DProto.name.get))
@@ -2037,6 +2081,55 @@ class OnnxFrontend(
         Seq(("Weights", weights)) ++ (if (bias.isDefined)
                                         Seq(("Bias", bias.get))
                                       else Nil)
+      )
+
+    outputTemp
+  }
+
+  private def emitLayerMatMul(
+      context: EmitContext,
+      scheduler: Scheduler,
+      matMulProto: NodeProto
+  ): MemoryObject = {
+    context.mm.addPendingConst(
+      matMulProto.input(1),
+      getTensorData(tensorProtos(matMulProto.input(1)))
+    )
+
+    val (weights, bias) =
+      context.mm.getOrEmitWeightsAndBiasObjects(
+        matMulProto.input(1),
+        None
+      )
+
+    val inputVars =
+      context.mm.consumeObject(matMulProto.input(0), Seq(matMulProto.name.get))
+
+    val outputTemp =
+      context.mm.allocateTempObject(
+        matMulProto.output(0),
+        VarsDimensions(
+          inputVars.dims.number,
+          weights.dims.width
+        )
+      )
+
+    val pairs = Seq(
+      MemoryOptionalInputOutputObjects(Some(inputVars), outputTemp)
+    )
+
+    scheduler.emitMatMul(
+      weights,
+      bias,
+      pairs
+    )
+
+    if (graphPrinter.isDefined)
+      graphPrinter.get.printOp(
+        matMulProto,
+        Seq(outputTemp),
+        Seq(inputVars),
+        Seq(("Weights", weights))
       )
 
     outputTemp
@@ -2411,7 +2504,15 @@ class OnnxFrontend(
     val input1Name =
       if (addProto.input(0) == input0Temp.name) addProto.input(1)
       else addProto.input(0)
-    val input1Vars =
+
+    val input1Vars = if (tensorProtos.isDefinedAt(input1Name)) {
+      context.mm.addPendingConst(
+        input1Name,
+        getTensorData(tensorProtos(input1Name))
+      )
+
+      context.mm.getOrEmitConstObject(input1Name)
+    } else
       context.mm.consumeObject(input1Name, Seq(addProto.name.get))
 
     scheduler.emitAdd(

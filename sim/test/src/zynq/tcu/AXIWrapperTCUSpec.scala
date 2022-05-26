@@ -26,7 +26,7 @@ import tensil.{
 }
 import tensil.data.InstructionReader
 
-import tensil.tools.{Compiler, CompilerOptions}
+import tensil.tools.{Compiler, CompilerOptions, CompilerInputShapes}
 import tensil.tools.compiler.MemoryAddressHelper
 import tensil.{InstructionLayout}
 
@@ -101,7 +101,7 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
                 // compiler parameters
                 val options = CompilerOptions(
                   arch = arch,
-                  inputBatchSize = batchSize
+                  inputShapes = CompilerInputShapes.mkWithBatchSize(batchSize),
                 )
 
                 // setup compiler input/output streams
@@ -226,7 +226,7 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
                 // compiler parameters
                 val options = CompilerOptions(
                   arch = arch,
-                  inputBatchSize = batchSize,
+                  inputShapes = CompilerInputShapes.mkWithBatchSize(batchSize),
                   //printProgramFileName = Some(s"sim_resnet20v2_cifar.tasm"),
                 )
 

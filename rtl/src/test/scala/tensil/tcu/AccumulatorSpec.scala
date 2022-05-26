@@ -35,7 +35,6 @@ class AccumulatorSpec extends UnitSpec {
       m.io.output.setSinkClock(m.clock)
 
       val vec: Array[BigInt] = Array(1, 2, 3, 4)
-      val accResult          = vec.map(_ * 2)
       val data               = vec.map(_.S)
       val n                  = 100
 
@@ -43,7 +42,11 @@ class AccumulatorSpec extends UnitSpec {
         for (i <- 0 until n) {
           m.io.control.enqueue(
             chiselTypeOf(m.io.control.bits)
-              .Lit(_.address -> i.U, _.write -> true.B, _.accumulate -> true.B)
+              .Lit(
+                _.address    -> (i % depth).U,
+                _.write      -> true.B,
+                _.accumulate -> true.B
+              )
           )
         }
       }

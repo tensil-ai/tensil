@@ -20,6 +20,8 @@ import tensil.mem.SizeHandler
 import tensil.util.WithLast
 import tensil.util.decoupled.MultiEnqueue
 import tensil.mem.OutQueue
+import tensil.mutex.LockPool
+import tensil.mutex.ConditionalReleaseLockControl
 
 class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
     implicit val platformConfig: PlatformConfig
@@ -31,6 +33,7 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
   val dram1Depth           = arch.dram1Depth
   val validateInstructions = options.validateInstructions
   val defaultTimeout       = options.decoderTimeout
+  val numLocks             = 2
   implicit val layout      = new InstructionLayout(arch)
   implicit val _arch       = arch
 
@@ -155,11 +158,11 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
   val dram0 = OutQueue(dram0Handler.io.in, 1, pipe = true, flow = true)
   val dram1 = OutQueue(dram1Handler.io.in, 1, pipe = true, flow = true)
   //// local
-  val memPortAGen = new MemControlWithStride(arch.localDepth, arch.stride0Depth)
-  val memPortBGen = new MemControlWithStride(arch.localDepth, arch.stride0Depth)
+  val memPortGen = new MemControlWithStride(arch.localDepth, arch.stride0Depth)
+  // val memPortBGen = new MemControlWithStride(arch.localDepth, arch.stride0Depth)
   val memPortAHandler = Module(
     new SizeAndStrideHandler(
-      memPortAGen,
+      memPortGen,
       io.memPortA.bits,
       arch.localDepth,
       arch.stride0Depth,
@@ -168,7 +171,7 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
   )
   val memPortBHandler = Module(
     new SizeAndStrideHandler(
-      memPortBGen,
+      memPortGen,
       io.memPortB.bits,
       arch.localDepth,
       arch.stride0Depth,
@@ -177,8 +180,21 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
   )
   io.memPortA <> memPortAHandler.io.out
   io.memPortB <> memPortBHandler.io.out
-  val memPortA = OutQueue(memPortAHandler.io.in, 2)
-  val memPortB = OutQueue(memPortBHandler.io.in, 2)
+  ////// dual port lock pool
+  def select(r: MemControlWithStride): UInt = {
+    val blockSize = memDepth / numLocks
+    r.address / blockSize.U
+  }
+  val lockPool = Module(new LockPool(memPortGen, 2, numLocks, select))
+  val idA      = 0.U
+  val idB      = 1.U
+  memPortAHandler.io.in <> lockPool.io.actor(idA).out
+  memPortBHandler.io.in <> lockPool.io.actor(idB).out
+  val memPortA = lockPool.io.actor(0).in
+  val memPortB = lockPool.io.actor(1).in
+  val lock     = lockPool.io.lock
+  lockPool.io.deadlocked.nodeq()
+  lockPool.io.locked.nodeq()
   //// accumulator
   val accInGen  = new AccumulatorMemControlWithSizeWithStride(layout)
   val accOutGen = new AccumulatorMemControl(layout)
@@ -244,15 +260,18 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
   setDefault(array)
   setDefault(dram0)
   setDefault(dram1)
+  lock.noenq()
 
   val enqueuer1 = MultiEnqueue(1)
   val enqueuer2 = MultiEnqueue(2)
   val enqueuer3 = MultiEnqueue(3)
   val enqueuer4 = MultiEnqueue(4)
+  val enqueuer5 = MultiEnqueue(5)
   enqueuer1.tieOff()
   enqueuer2.tieOff()
   enqueuer3.tieOff()
   enqueuer4.tieOff()
+  enqueuer5.tieOff()
 
   when(instruction.bits.opcode === Opcode.MatMul) {
     val flags = Wire(new MatMulFlags)
@@ -279,18 +298,19 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
         ),
       )
     }.otherwise {
-      instruction.ready := enqueuer4.enqueue(
+      val req = MemControlWithStride(memDepth, arch.stride0Depth)(
+        args.memAddress,
+        args.size,
+        args.memStride,
+        false.B,
+        false.B,
+      )
+      instruction.ready := enqueuer5.enqueue(
         instruction.valid,
         dataflow,
         dataflowBundle(LocalDataFlowControl._memoryToArrayToAcc, args.size),
         memPortA,
-        MemControlWithStride(memDepth, arch.stride0Depth)(
-          args.memAddress,
-          args.size,
-          args.memStride,
-          false.B,
-          false.B,
-        ),
+        req,
         array,
         arrayBundle(false.B, flags.zeroes, args.size),
         acc,
@@ -300,6 +320,8 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
           args.size,
           args.accStride
         ),
+        lock,
+        lockControl(idA, req),
       )
     }
   }.elsewhen(instruction.bits.opcode === Opcode.LoadWeights) {
@@ -320,7 +342,14 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
       )
     }.otherwise {
       val stride = 1.U << args.stride
-      instruction.ready := enqueuer3.enqueue(
+      val req = MemControlWithStride(memDepth, arch.stride0Depth)(
+        args.address + (args.size * stride),
+        args.size,
+        args.stride,
+        true.B,
+        false.B,
+      )
+      instruction.ready := enqueuer4.enqueue(
         instruction.valid,
         dataflow,
         LocalDataFlowControlWithSize(memDepth)(
@@ -330,13 +359,9 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
         array,
         arrayBundle(true.B, flags.zeroes, args.size),
         memPortA,
-        MemControlWithStride(memDepth, arch.stride0Depth)(
-          args.address + (args.size * stride),
-          args.size,
-          args.stride,
-          true.B,
-          false.B,
-        ),
+        req,
+        lock,
+        lockControl(idA, req),
       )
     }
   }.elsewhen(instruction.bits.opcode === Opcode.DataMove) {
@@ -351,7 +376,14 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
 
     when(flags.kind === DataMoveKind.dram0ToMemory) {
       // data in
-      instruction.ready := enqueuer3.enqueue(
+      val req = MemControlWithStride(memDepth, arch.stride0Depth)(
+        args.memAddress,
+        args.size,
+        args.memStride,
+        false.B,
+        true.B,
+      )
+      instruction.ready := enqueuer4.enqueue(
         instruction.valid,
         hostDataflow,
         HostDataFlowControlWithSize(arch.localDepth)(
@@ -359,13 +391,7 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
           args.size
         ),
         memPortB,
-        MemControlWithStride(memDepth, arch.stride0Depth)(
-          args.memAddress,
-          args.size,
-          args.memStride,
-          false.B,
-          true.B,
-        ),
+        req,
         dram0,
         MemControlWithStride(arch.dram0Depth, arch.stride1Depth)(
           args.accAddress,
@@ -374,10 +400,19 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
           false.B,
           false.B,
         ),
+        lock,
+        lockControl(idB, req),
       )
     }.elsewhen(flags.kind === DataMoveKind.memoryToDram0) {
       // data out
-      instruction.ready := enqueuer3.enqueue(
+      val req = MemControlWithStride(memDepth, arch.stride0Depth)(
+        args.memAddress,
+        args.size,
+        args.memStride,
+        false.B,
+        false.B,
+      )
+      instruction.ready := enqueuer4.enqueue(
         instruction.valid,
         hostDataflow,
         HostDataFlowControlWithSize(arch.localDepth)(
@@ -385,13 +420,7 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
           args.size
         ),
         memPortB,
-        MemControlWithStride(memDepth, arch.stride0Depth)(
-          args.memAddress,
-          args.size,
-          args.memStride,
-          false.B,
-          false.B,
-        ),
+        req,
         dram0,
         MemControlWithStride(arch.dram0Depth, arch.stride1Depth)(
           args.accAddress,
@@ -400,10 +429,19 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
           false.B,
           true.B,
         ),
+        lock,
+        lockControl(idB, req),
       )
     }.elsewhen(flags.kind === DataMoveKind.dram1ToMemory) {
       // weights in
-      instruction.ready := enqueuer3.enqueue(
+      val req = MemControlWithStride(memDepth, arch.stride0Depth)(
+        args.memAddress,
+        args.size,
+        args.memStride,
+        false.B,
+        true.B,
+      )
+      instruction.ready := enqueuer4.enqueue(
         instruction.valid,
         hostDataflow,
         HostDataFlowControlWithSize(arch.localDepth)(
@@ -411,13 +449,7 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
           args.size
         ),
         memPortB,
-        MemControlWithStride(memDepth, arch.stride0Depth)(
-          args.memAddress,
-          args.size,
-          args.memStride,
-          false.B,
-          true.B,
-        ),
+        req,
         dram1,
         MemControlWithStride(arch.dram1Depth, arch.stride1Depth)(
           args.accAddress,
@@ -426,9 +458,18 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
           false.B,
           false.B,
         ),
+        lock,
+        lockControl(idB, req),
       )
     }.elsewhen(flags.kind === DataMoveKind.memoryToDram1) {
-      instruction.ready := enqueuer3.enqueue(
+      val req = MemControlWithStride(memDepth, arch.stride0Depth)(
+        args.memAddress,
+        args.size,
+        args.memStride,
+        false.B,
+        false.B,
+      )
+      instruction.ready := enqueuer4.enqueue(
         instruction.valid,
         hostDataflow,
         HostDataFlowControlWithSize(arch.localDepth)(
@@ -436,13 +477,7 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
           args.size
         ),
         memPortB,
-        MemControlWithStride(memDepth, arch.stride0Depth)(
-          args.memAddress,
-          args.size,
-          args.memStride,
-          false.B,
-          false.B,
-        ),
+        req,
         dram1,
         MemControlWithStride(arch.dram1Depth, arch.stride1Depth)(
           args.accAddress,
@@ -451,12 +486,21 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
           false.B,
           true.B,
         ),
+        lock,
+        lockControl(idB, req),
       )
     }.elsewhen(
       flags.kind === DataMoveKind.accumulatorToMemory
     ) {
       // data move acc=>mem
-      instruction.ready := enqueuer3.enqueue(
+      val req = MemControlWithStride(memDepth, arch.stride0Depth)(
+        args.memAddress,
+        args.size,
+        args.memStride,
+        false.B,
+        true.B,
+      )
+      instruction.ready := enqueuer4.enqueue(
         instruction.valid,
         dataflow,
         LocalDataFlowControlWithSize(memDepth)(
@@ -464,21 +508,24 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
           args.size
         ),
         memPortA,
-        MemControlWithStride(memDepth, arch.stride0Depth)(
-          args.memAddress,
-          args.size,
-          args.memStride,
-          false.B,
-          true.B,
-        ),
+        req,
         acc,
         accRead(args.accAddress, args.size, args.accStride),
+        lock,
+        lockControl(idA, req),
       )
     }.elsewhen(
       flags.kind === DataMoveKind.memoryToAccumulator
     ) {
       // data move mem=>acc
-      instruction.ready := enqueuer3.enqueue(
+      val req = MemControlWithStride(memDepth, arch.stride0Depth)(
+        args.memAddress,
+        args.size,
+        args.memStride,
+        false.B,
+        false.B,
+      )
+      instruction.ready := enqueuer4.enqueue(
         instruction.valid,
         dataflow,
         LocalDataFlowControlWithSize(memDepth)(
@@ -486,21 +533,24 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
           args.size
         ),
         memPortA,
-        MemControlWithStride(memDepth, arch.stride0Depth)(
-          args.memAddress,
-          args.size,
-          args.memStride,
-          false.B,
-          false.B,
-        ),
+        req,
         acc,
         accWrite(args.accAddress, false.B, args.size, args.accStride),
+        lock,
+        lockControl(idA, req),
       )
     }.elsewhen(
       flags.kind === DataMoveKind.memoryToAccumulatorAccumulate
     ) {
       // data move mem=>acc(acc)
-      instruction.ready := enqueuer3.enqueue(
+      val req = MemControlWithStride(memDepth, arch.stride0Depth)(
+        args.memAddress,
+        args.size,
+        args.memStride,
+        false.B,
+        false.B,
+      )
+      instruction.ready := enqueuer4.enqueue(
         instruction.valid,
         dataflow,
         LocalDataFlowControlWithSize(memDepth)(
@@ -508,15 +558,11 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
           args.size
         ),
         memPortA,
-        MemControlWithStride(memDepth, arch.stride0Depth)(
-          args.memAddress,
-          args.size,
-          args.memStride,
-          false.B,
-          false.B,
-        ),
+        req,
         acc,
         accWrite(args.accAddress, true.B, args.size, args.accStride),
+        lock,
+        lockControl(idA, req)
       )
     }.otherwise {
       // all invalid dataflow control kinds
@@ -608,16 +654,6 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
     io.sample.valid := false.B
   }
 
-  def allReady(ports: DecoupledIO[Data]*): Bool = {
-    ports.map(_.ready).reduce(_ && _)
-  }
-
-  def enqueue[T <: Data](port: DecoupledIO[T], value: T): Bool = {
-    port.bits <> value
-    port.valid := true.B
-    port.ready
-  }
-
   def setDefault[T <: Data](port: DecoupledIO[T]): Unit = {
     port.bits := zero(port.bits)
     port.valid := false.B
@@ -698,6 +734,21 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
     w.load := load
     w.zeroes := zeroes
     w.size := size
+    w
+  }
+
+  def lockControl(
+      by: UInt,
+      req: MemControlWithStride,
+  ): ConditionalReleaseLockControl[MemControlWithStride] = {
+    val w = Wire(
+      new ConditionalReleaseLockControl(memPortGen, 2, numLocks, 1 << 4)
+    )
+    w.lock := select(req)
+    w.acquire := true.B
+    w.by := by
+    w.delayRelease := 0.U
+    w.cond <> req
     w
   }
 }

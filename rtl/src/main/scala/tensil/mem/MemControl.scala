@@ -7,13 +7,19 @@ import chisel3._
 import chisel3.experimental.BundleLiterals.AddBundleLiteralConstructor
 import chisel3.util.log2Ceil
 import tensil.tcu.instruction.Box
+import tensil.mutex.Comparable
 
 class MemControlWithStride(depth: Long, val strideDepth: Int)
     extends MemControl(depth)
     with Stride
-    with Reverse {
+    with Reverse
+    with Comparable[MemControlWithStride] {
   val stride  = UInt(log2Ceil(strideDepth).W)
   val reverse = Bool()
+
+  def ===(other: MemControlWithStride): Bool = {
+    address === other.address && write && other.write && size === other.size && stride === other.stride && reverse === other.reverse
+  }
 }
 
 object MemControlWithStride {

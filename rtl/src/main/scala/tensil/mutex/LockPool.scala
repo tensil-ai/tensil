@@ -105,7 +105,7 @@ class LockPool[T <: Data with Comparable[T]](
 
   // release lock when condition is observed
   for (l <- lock) {
-    when(l.held && actor(l.by).valid && actor(l.by).bits === l.cond) {
+    when(l.held && actor(l.by).fire && actor(l.by).bits === l.cond) {
       // release
       // TODO use release delay
       l.held := false.B

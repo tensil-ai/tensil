@@ -46,7 +46,7 @@ class Printer(
         ""
 
     printOp(
-      "MatMul" + suffix,
+      s"MatMul${suffix}",
       s"${formatAddress(localStride, localAddress)} ${formatAddress(accumulatorStride, accumulatorAddress)}${formatSize(size)}",
       tid
     )
@@ -92,7 +92,7 @@ class Printer(
       readAccumulatorAddress.tag == MemoryTag.Accumulators && writeAccumulatorAddress.tag == MemoryTag.Accumulators && accumulate
     ) {
       printOp(
-        mnemonic + "(RWA)",
+        s"${mnemonic}(RWA)",
         s"${subInstructionName} W${MemoryAddressHelper(writeAccumulatorAddress)} R${MemoryAddressHelper(readAccumulatorAddress)}",
         tid
       )
@@ -100,7 +100,7 @@ class Printer(
       writeAccumulatorAddress.tag == MemoryTag.Accumulators && accumulate
     ) {
       printOp(
-        mnemonic + "(WA)",
+        s"${mnemonic}(WA)",
         s"${subInstructionName} W${MemoryAddressHelper(writeAccumulatorAddress)}",
         tid
       )
@@ -108,19 +108,19 @@ class Printer(
       readAccumulatorAddress.tag == MemoryTag.Accumulators && writeAccumulatorAddress.tag == MemoryTag.Accumulators
     ) {
       printOp(
-        mnemonic + "(RW)",
+        s"${mnemonic}(RW)",
         s"${subInstructionName} W${MemoryAddressHelper(writeAccumulatorAddress)} R${MemoryAddressHelper(readAccumulatorAddress)}",
         tid
       )
     } else if (writeAccumulatorAddress.tag == MemoryTag.Accumulators) {
       printOp(
-        mnemonic + "(W)",
+        s"${mnemonic}(W)",
         s"${subInstructionName} W${MemoryAddressHelper(writeAccumulatorAddress)}",
         tid
       )
     } else if (readAccumulatorAddress.tag == MemoryTag.Accumulators) {
       printOp(
-        mnemonic + "(R)",
+        s"${mnemonic}(R)",
         s"${subInstructionName} R${MemoryAddressHelper(readAccumulatorAddress)}",
         tid
       )
@@ -150,7 +150,7 @@ class Printer(
       else "(->)"
 
     printOp(
-      "DataMove" + suffix,
+      s"DataMove${suffix}",
       s"${formatAddress(localStride, localAddress)} ${formatAddress(stride, address)}${formatSize(size)}",
       tid
     )

@@ -80,7 +80,7 @@ class StatsGen(
 
     estimateQueues(tid).enqueue(estimate)
 
-    countExecution(arch.threadQueueDepth)
+    countExecution(arch.threadQueueDepth + 1)
   }
 
   def emitWait(tidToWait: Int, tid: Int): Unit = {
@@ -152,16 +152,16 @@ class StatsGen(
         "(LocalToAcc)"
     }
 
-    val mnemonicWithSuffix = "DataMove" + suffix
+    val mnemonic = s"DataMove${suffix}"
 
     count(
       tid,
-      mnemonicWithSuffix,
+      mnemonic,
       estimator.estimateCyclesAndEnergy(Opcode.DataMove, Some(size), flags),
       size
     )
-    stats.countStride(mnemonicWithSuffix, 0, localStride, size)
-    stats.countStride(mnemonicWithSuffix, 1, stride, size)
+    stats.countStride(mnemonic, 0, localStride, size)
+    stats.countStride(mnemonic, 1, stride, size)
   }
 
   def emitLoadWeights(

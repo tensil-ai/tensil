@@ -24,17 +24,17 @@ class Parallelizer(arch: Architecture) {
     val threads = (0 until arch.numberOfThreads)
       .map(i =>
         new LIR {
-          val tid         = i
-          val estimator   = new Estimator(arch)
-          var curCycles   = 0L
-          val queueCycles = mutable.Queue.empty[Long]
+          val tid           = i
+          val estimator     = new Estimator(arch)
+          var currentCycles = 0L
+          val cyclesQueue   = mutable.Queue.empty[Long]
 
           private def countCycles(cycles: Long): Unit = {
-            curCycles += cycles
-            queueCycles.enqueue(cycles)
+            currentCycles += cycles
+            cyclesQueue.enqueue(cycles)
 
-            while (queueCycles.size > arch.threadQueueDepth)
-              queueCycles.dequeue()
+            while (cyclesQueue.size > arch.threadQueueDepth + 1)
+              cyclesQueue.dequeue()
           }
 
           private def adjustLocalAddress(address: MemoryAddress) =
@@ -161,15 +161,15 @@ class Parallelizer(arch: Architecture) {
     def nextThread =
       threads
         .filter(m => parsersByTid.filter(_._2.hasNext).contains(m.tid))
-        .sortBy(_.curCycles)
+        .sortBy(_.currentCycles)
         .headOption
-    var curThread = nextThread
+    var currentThread = nextThread
 
-    while (curThread.isDefined) {
-      val curParser = parsersByTid(curThread.get.tid)
+    while (currentThread.isDefined) {
+      val currentParser = parsersByTid(currentThread.get.tid)
 
-      curParser.parseNext(curThread.get)
-      curThread = nextThread
+      currentParser.parseNext(currentThread.get)
+      currentThread = nextThread
     }
 
     /**
@@ -181,8 +181,8 @@ class Parallelizer(arch: Architecture) {
       * This in the future will be replaced with the barrier consisting
       * of mutual WAITs.
       */
-    val threadTotalCycles = threads.map(_.curCycles)
-    val threadQueueCycles = threads.map(_.queueCycles.sum)
+    val threadTotalCycles  = threads.map(_.currentCycles)
+    val threadQueuedCycles = threads.map(_.cyclesQueue.sum)
 
     for (thread <- threads) {
       val longerThreads = threads.filter(t =>
@@ -192,7 +192,7 @@ class Parallelizer(arch: Architecture) {
 
       if (!longerThreads.isEmpty) {
         val cyclesToPadLongestQueue =
-          longerThreads.map(t => threadQueueCycles(t.tid)).max
+          longerThreads.map(t => threadQueuedCycles(t.tid)).max
         val cyclesToPadLongestThread =
           longerThreads
             .map(t => threadTotalCycles(t.tid))

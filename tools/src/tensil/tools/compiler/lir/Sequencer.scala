@@ -22,60 +22,69 @@ import tensil.Architecture
 
 class Sequencer(
     arch: Architecture,
-    targetLir: LIR
+    readLir: LIR,
+    writeLir: LIR
 ) extends LIR {
   private val estimator = new Estimator(arch)
 
-  case class Op(
+  case class Instruction(
       var cycles: Long,
-      run: () => Unit
+      execute: (LIR) => Unit
   )
 
-  private val opQueues =
-    Array.fill(arch.numberOfThreads)(mutable.Queue.empty[Op])
+  private val instructionQueues =
+    Array.fill(arch.numberOfThreads)(mutable.Queue.empty[Instruction])
 
-  private def execute(maxQueueSize: Int): Unit = {
+  private def executeQueue(maxQueueSize: Int): Unit = {
     val nonEmptyTids =
-      opQueues.map(_.size).zipWithIndex.filter(_._1 != 0).map(_._2)
-    val runs = mutable.ArrayBuffer.empty[() => Unit]
+      instructionQueues.map(_.size).zipWithIndex.filter(_._1 != 0).map(_._2)
+
+    def dequeueAndExecute(queue: mutable.Queue[Instruction]): Unit = {
+      queue.dequeue().execute(writeLir)
+
+      if (!queue.isEmpty)
+        queue.front.execute(readLir)
+    }
 
     val estimates = if (nonEmptyTids.size > 1) {
       val minCycles =
-        nonEmptyTids.map(opQueues(_).front.cycles).min
+        nonEmptyTids.map(instructionQueues(_).front.cycles).min
       for (tid <- nonEmptyTids.toSeq)
-        yield
-          if (opQueues(tid).front.cycles == minCycles)
-            runs += opQueues(tid).dequeue().run
-          else
-            opQueues(tid).front.cycles -= minCycles
+        if (instructionQueues(tid).front.cycles == minCycles)
+          dequeueAndExecute(instructionQueues(tid))
+        else
+          instructionQueues(tid).front.cycles -= minCycles
 
     } else if (nonEmptyTids.size == 1) {
-      val queue = opQueues(nonEmptyTids(0))
+      val queue = instructionQueues(nonEmptyTids(0))
 
       if (queue.size > maxQueueSize) {
         val dequeueSize = queue.size - maxQueueSize
-        for (_ <- 0 until dequeueSize) yield runs += queue.dequeue().run
+        for (_ <- 0 until dequeueSize) dequeueAndExecute(queue)
       }
     }
-
-    runs.foreach(_())
   }
 
   private def submit(
       tid: Int,
       cycles: Long,
-      run: () => Unit
+      execute: (LIR) => Unit
   ): Unit = {
-    opQueues(tid).enqueue(Op(cycles, run))
+    val queue    = instructionQueues(tid)
+    val wasEmpty = queue.isEmpty
+    queue.enqueue(Instruction(cycles, execute))
 
-    execute(arch.threadQueueDepth)
+    if (wasEmpty)
+      execute(readLir)
+
+    executeQueue(arch.threadQueueDepth + 1)
   }
 
   def emitWait(tidToWait: Int, tid: Int): Unit = {
     submit(
       tid,
       estimator.estimateCyclesAndEnergy(Opcode.Wait).cycles,
-      () => targetLir.emitWait(tidToWait, tid)
+      (lir) => lir.emitWait(tidToWait, tid)
     )
   }
 
@@ -91,8 +100,8 @@ class Sequencer(
     submit(
       tid,
       estimator.estimateCyclesAndEnergy(Opcode.MatMul, Some(size)).cycles,
-      () =>
-        targetLir.emitMatMul(
+      (lir) =>
+        lir.emitMatMul(
           accumulate,
           localStride,
           localAddress,
@@ -116,8 +125,8 @@ class Sequencer(
     submit(
       tid,
       estimator.estimateCyclesAndEnergy(Opcode.SIMD).cycles,
-      () =>
-        targetLir.emitSIMD(
+      (lir) =>
+        lir.emitSIMD(
           accumulate,
           simdOp,
           simdSourceLeft,
@@ -148,8 +157,8 @@ class Sequencer(
           StreamGen.mkDataMoveFlags(toLocal, accumulate, address.tag)
         )
         .cycles,
-      () =>
-        targetLir.emitDataMove(
+      (lir) =>
+        lir.emitDataMove(
           toLocal,
           accumulate,
           localStride,
@@ -170,8 +179,8 @@ class Sequencer(
     submit(
       tid,
       estimator.estimateCyclesAndEnergy(Opcode.LoadWeights, Some(size)).cycles,
-      () =>
-        targetLir.emitLoadWeights(
+      (lir) =>
+        lir.emitLoadWeights(
           localStride,
           localAddress,
           size,
@@ -179,7 +188,11 @@ class Sequencer(
         )
     )
 
-  def endEmit(): Unit =
-    while (opQueues.exists(!_.isEmpty))
-      execute(0)
+  def endEmit(): Unit = {
+    while (instructionQueues.exists(!_.isEmpty))
+      executeQueue(0)
+
+    readLir.endEmit()
+    writeLir.endEmit()
+  }
 }

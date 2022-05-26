@@ -70,6 +70,9 @@ class LockPool[T <: Data with Comparable[T]](
       // allow actor to proceed when not blocked
       io.actor(id).out <> a
     }
+    // when(blocked && a.valid) {
+    //   printf(p"$id blocked from executing request $a\n")
+    // }
     blocked
   })
 

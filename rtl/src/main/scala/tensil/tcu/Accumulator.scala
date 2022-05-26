@@ -49,8 +49,8 @@ class Accumulator[T <: Data with Num[T]](
 
   val portA        = mem.io.portA
   val portB        = mem.io.portB
-  val portAControl = portA.control
-  val portBControl = OutQueue(portB.control, 1, pipe = true, flow = true)
+  val portAControl = OutQueue(portA.control, 1, pipe = true, flow = true)
+  val portBControl = portB.control
 
   mem.io.programCounter := io.programCounter
   mem.io.tracepoint := io.tracepoint
@@ -63,61 +63,78 @@ class Accumulator[T <: Data with Num[T]](
   io.wrote <> portA.wrote
   portB.wrote.nodeq()
 
-  portB.input <> adder.io.output
-  portB.output.ready := false.B
+  // portB.input <> adder.io.output
+  // portB.output.ready := false.B
 
-  val inputDemux = OutQueue(
-    decoupled.Demux(
-      input,
-      portA.input,
-      adder.io.left,
-      name = "acc.input"
-    ),
+  // val inputDemux = OutQueue(
+  //   decoupled.Demux(
+  //     input,
+  //     portA.input,
+  //     adder.io.left,
+  //     name = "acc.input"
+  //   ),
+  //   1,
+  //   pipe = true,
+  //   flow = true
+  // )
+  // val memOutputDemux = OutQueue(
+  //   decoupled.Demux(
+  //     portA.output,
+  //     io.output,
+  //     adder.io.right,
+  //     name = "acc.memOutput"
+  //   ),
+  //   1,
+  //   pipe = true,
+  //   flow = true,
+  // )
+  // inputDemux.tieOff()
+  // memOutputDemux.tieOff()
+
+  io.output <> portA.output
+  portB.input.noenq()
+  adder.io.right <> portB.output
+
+  val inputDemuxModule = Module(
+    new decoupled.Demux(chiselTypeOf(input.bits), 2)
+  )
+  val inputDemux =
+    OutQueue(inputDemuxModule.io.sel, 1, pipe = true, flow = true)
+  inputDemuxModule.io.in <> input
+  adder.io.left <> inputDemuxModule.io.out(1)
+  val portAInputMux = OutQueue(
+    decoupled.Mux(inputDemuxModule.io.out(0), adder.io.output, portA.input),
     1,
     pipe = true,
     flow = true
   )
-  val memOutputDemux = OutQueue(
-    decoupled.Demux(
-      portA.output,
-      io.output,
-      adder.io.right,
-      name = "acc.memOutput"
-    ),
-    1,
-    pipe = true,
-    flow = true,
-  )
-  inputDemux.tieOff()
-  memOutputDemux.tieOff()
+  inputDemux.noenq()
+  portAInputMux.noenq()
 
-  val readEnqueued = RegInit(false.B)
-  readEnqueued := false.B
-
-  val writeEnqueuer = MultiEnqueue(2)
-  val readEnqueuer  = MultiEnqueue(2)
+  val writeEnqueuer = MultiEnqueue(3)
+  val readEnqueuer  = MultiEnqueue(1)
   val accEnqueuer   = MultiEnqueue(4)
   writeEnqueuer.tieOff()
   readEnqueuer.tieOff()
   accEnqueuer.tieOff()
 
   // flag to indicate whether we were performing write accumulate on last cycle
-  val writeAccumulating = RegInit(false.B)
-  writeAccumulating := false.B
+  // val writeAccumulating = RegInit(false.B)
+  // writeAccumulating := false.B
 
   when(control.bits.write) {
     when(control.bits.accumulate) {
-      writeAccumulating := true.B
+      // writeAccumulating := true.B
       control.ready := accEnqueuer.enqueue(
         control.valid,
-        // read
+        // write to port A
         portAControl,
-        MemControl(depth)(control.bits.address, false.B),
-        memOutputDemux,
-        1.U,
-        // write acc
-        portBControl,
         MemControl(depth)(control.bits.address, true.B),
+        portAInputMux,
+        1.U,
+        // read from port B
+        portBControl,
+        MemControl(depth)(control.bits.address, false.B),
         inputDemux,
         1.U,
       )
@@ -129,21 +146,21 @@ class Accumulator[T <: Data with Num[T]](
         MemControl(depth)(control.bits.address, true.B),
         inputDemux,
         0.U,
+        portAInputMux,
+        0.U,
       )
     }
   }.otherwise {
     // just read
-    when(!writeAccumulating) {
-      control.ready := readEnqueuer.enqueue(
-        control.valid,
-        portAControl,
-        MemControl(depth)(control.bits.address, false.B),
-        memOutputDemux,
-        0.U
-      )
-    }.otherwise {
-      // wait for write accumulate to finish
-      control.ready := false.B
-    }
+    // when(!writeAccumulating) {
+    control.ready := readEnqueuer.enqueue(
+      control.valid,
+      portAControl,
+      MemControl(depth)(control.bits.address, false.B),
+    )
+    // }.otherwise {
+    //   // wait for write accumulate to finish
+    //   control.ready := false.B
+    // }
   }
 }

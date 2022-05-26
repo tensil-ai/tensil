@@ -21,10 +21,10 @@ class Parallelizer(arch: Architecture) {
       parsersByTid: Map[Int, Parser],
       targetLir: LIR
   ): Unit = {
-    val threads = parsersByTid.keys
-      .map(parserTid =>
+    val threads = (0 until arch.numberOfThreads)
+      .map(i =>
         new LIR {
-          val tid         = parserTid
+          val tid         = i
           val estimator   = new Estimator(arch)
           var curCycles   = 0L
           val queueCycles = mutable.Queue.empty[Long]

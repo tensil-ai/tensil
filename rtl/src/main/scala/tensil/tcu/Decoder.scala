@@ -159,7 +159,6 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
   val dram1 = OutQueue(dram1Handler.io.in, 1, pipe = true, flow = true)
   //// local
   val memPortGen = new MemControlWithStride(arch.localDepth, arch.stride0Depth)
-  // val memPortBGen = new MemControlWithStride(arch.localDepth, arch.stride0Depth)
   val memPortAHandler = Module(
     new SizeAndStrideHandler(
       memPortGen,
@@ -193,7 +192,8 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
   val memPortA = lockPool.io.actor(0).in
   val memPortB = lockPool.io.actor(1).in
   val lock     = lockPool.io.lock
-  lockPool.io.deadlocked.nodeq()
+  lockPool.io.deadlocked
+    .nodeq() // TODO connect this to perf sampler to count deadlocks
   lockPool.io.locked.nodeq()
   //// accumulator
   val accInGen  = new AccumulatorMemControlWithSizeWithStride(layout)

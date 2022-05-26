@@ -13,8 +13,6 @@ import scala.collection.mutable
 import tensil.mem.MemKind
 import chiseltest.internal.TesterThreadList
 import chiseltest.VerilatorBackendAnnotation
-// import chiseltest.internal.VerilatorBackendAnnotation
-// import chisel3.tester.experimental.TestOptionBuilder._
 import tensil.mem.MemControl
 import tensil.decoupled.decoupledVecToDriver
 import tensil.tcu.instruction.Instruction

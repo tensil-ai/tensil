@@ -4,17 +4,11 @@
 package tensil.zynq.tcu
 
 import java.io.{ByteArrayOutputStream, ByteArrayInputStream, FileInputStream}
-
 import scala.io.Source
-
 import org.scalatest.tagobjects.Slow
-
 import chisel3._
 import chisel3.experimental.FixedPoint
-// import chisel3.tester.experimental.TestOptionBuilder._
-
 import chiseltest._
-// import chiseltest.internal.VerilatorBackendAnnotation
 import chiseltest.VerilatorBackendAnnotation
 
 import tensil.{

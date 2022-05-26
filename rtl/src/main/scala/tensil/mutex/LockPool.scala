@@ -70,9 +70,6 @@ class LockPool[T <: Data with Comparable[T]](
       // allow actor to proceed when not blocked
       io.actor(id).out <> a
     }
-    // when(blocked && a.valid) {
-    //   printf(p"$id blocked from executing request $a\n")
-    // }
     blocked
   })
 
@@ -125,67 +122,17 @@ class LockPool[T <: Data with Comparable[T]](
           when(l.by === lockControl.bits.by) {
             // same actor acquiring lock, so allowed
             acquire(l)
-          }.otherwise {
-            // do nothing
           }
-        }.otherwise {
-          // do nothing
         }
       }
     }.otherwise {
       when(incoming) {
-        when(incomingObserved) {
-          // do nothing
-        }.otherwise {
+        when(!incomingObserved) {
           acquire(l)
         }
-      }.otherwise {
-        // do nothing
       }
     }
   }
-
-  // val l = lock(lockControl.bits.lock)
-  // when(l.held) {
-  //   when(l.by === lockControl.bits.by) {
-  //     // lock continues to be held by same port unless request specifies acquire = false (i.e. manual release)
-  //     lockControl.ready := true.B
-  //     when(lockControl.valid) {
-  //       l.held := lockControl.bits.acquire
-  //       // update release condition
-  //       l.cond <> lockControl.bits.cond
-  //     }
-  //   }.otherwise {
-  //     // other port holds lock, have to wait for it to release to acquire it
-  //     lockControl.ready := false.B
-  //   }
-  // }.otherwise {
-  //   // can acquire it
-  //   lockControl.ready := true.B
-  //   when(lockControl.valid) {
-  //     l.held := lockControl.bits.acquire
-  //     l.by := lockControl.bits.by
-  //     l.cond <> lockControl.bits.cond
-  //   }
-  // }
-
-  // // release lock when condition is observed
-  // for ((l, id) <- lock.zipWithIndex) {
-  //   when(l.held && actor(l.by).fire && actor(l.by).bits === l.cond) {
-  //     // condition met: release
-  //     l.held := false.B
-  //   }.elsewhen(
-  //     lockControl.valid && lockControl.bits.lock === id.U && actor(
-  //       lockControl.bits.by
-  //     ).fire && actor(
-  //       lockControl.bits.by
-  //     ).bits === lockControl.bits.cond
-  //   ) {
-  //     // condition on incoming lock control met on same cycle as lock was to be acquired
-  //     // therefore don't acquire
-  //     l.held := false.B
-  //   }
-  // }
 
   // when all actors are blocked, allow the actor holding lock 0 to proceed
   when(block.reduce((a, b) => a && b)) {

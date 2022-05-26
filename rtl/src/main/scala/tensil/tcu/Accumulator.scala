@@ -63,34 +63,6 @@ class Accumulator[T <: Data with Num[T]](
   io.wrote <> portA.wrote
   portB.wrote.nodeq()
 
-  // portB.input <> adder.io.output
-  // portB.output.ready := false.B
-
-  // val inputDemux = OutQueue(
-  //   decoupled.Demux(
-  //     input,
-  //     portA.input,
-  //     adder.io.left,
-  //     name = "acc.input"
-  //   ),
-  //   1,
-  //   pipe = true,
-  //   flow = true
-  // )
-  // val memOutputDemux = OutQueue(
-  //   decoupled.Demux(
-  //     portA.output,
-  //     io.output,
-  //     adder.io.right,
-  //     name = "acc.memOutput"
-  //   ),
-  //   1,
-  //   pipe = true,
-  //   flow = true,
-  // )
-  // inputDemux.tieOff()
-  // memOutputDemux.tieOff()
-
   io.output <> portA.output
   portB.input.noenq()
   adder.io.right <> portB.output
@@ -118,13 +90,8 @@ class Accumulator[T <: Data with Num[T]](
   readEnqueuer.tieOff()
   accEnqueuer.tieOff()
 
-  // flag to indicate whether we were performing write accumulate on last cycle
-  // val writeAccumulating = RegInit(false.B)
-  // writeAccumulating := false.B
-
   when(control.bits.write) {
     when(control.bits.accumulate) {
-      // writeAccumulating := true.B
       control.ready := accEnqueuer.enqueue(
         control.valid,
         // write to port A
@@ -152,15 +119,10 @@ class Accumulator[T <: Data with Num[T]](
     }
   }.otherwise {
     // just read
-    // when(!writeAccumulating) {
     control.ready := readEnqueuer.enqueue(
       control.valid,
       portAControl,
       MemControl(depth)(control.bits.address, false.B),
     )
-    // }.otherwise {
-    //   // wait for write accumulate to finish
-    //   control.ready := false.B
-    // }
   }
 }

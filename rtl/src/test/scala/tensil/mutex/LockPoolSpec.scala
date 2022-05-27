@@ -8,6 +8,8 @@ import chiseltest._
 import tensil.FunUnitSpec
 import chisel3.util.log2Ceil
 import chisel3.experimental.BundleLiterals._
+import chisel3.util.Decoupled
+import chisel3.util.Queue
 
 class LockPoolSpec extends FunUnitSpec {
   describe("LockPool") {
@@ -23,8 +25,8 @@ class LockPoolSpec extends FunUnitSpec {
         r.address / blockSize.U
       }
 
-      def init(): LockPool[Request] =
-        new LockPool(gen, numActors, numLocks, select)
+      def init(): LockPoolTester[Request] =
+        new LockPoolTester(gen, numActors, numLocks, select)
 
       it("should allow requests to proceed when there are no locks acquired") {
         decoupledTest(init()) { m =>
@@ -305,6 +307,52 @@ class LockPoolSpec extends FunUnitSpec {
 
     }
   }
+}
+
+class LockPoolTester[T <: Data with Comparable[T]](
+    gen: T,
+    numActors: Int,
+    numLocks: Int,
+    select: T => UInt
+) extends Module {
+  val maxDelay = 1 << 4
+  val m        = Module(new LockPool(gen, numActors, numLocks, select))
+  val io = IO(new Bundle {
+    val actor = Vec(
+      numActors,
+      new Bundle {
+        val in  = Flipped(Decoupled(gen))
+        val out = Decoupled(gen)
+      }
+    )
+    val lock = Flipped(
+      Decoupled(
+        new ConditionalReleaseLockControl(
+          gen,
+          numActors,
+          numLocks,
+          maxDelay
+        )
+      )
+    )
+    val locked = Decoupled(
+      new ConditionalReleaseLockControl(
+        gen,
+        numActors,
+        numLocks,
+        maxDelay
+      )
+    )
+    val deadlocked = Decoupled(Bool())
+  })
+
+  for (i <- 0 until io.actor.length) {
+    m.io.actor(i).in <> Queue(io.actor(i).in, 2)
+    io.actor(i).out <> m.io.actor(i).out
+  }
+  m.io.lock <> Queue(io.lock, 2)
+  io.locked <> m.io.locked
+  io.deadlocked <> m.io.deadlocked
 }
 
 class Request(val depth: Long) extends Bundle with Comparable[Request] {

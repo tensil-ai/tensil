@@ -12,9 +12,11 @@ import tensil.util.decoupled
 import tensil.util.decoupled.MultiEnqueue
 import tensil.util.decoupled.VecAdder
 import tensil.util.decoupled.QueueWithReporting
-import tensil.mem.{Mem, MemControl}
+import tensil.mem.{Mem, MemControl, MemControlWithComparable}
 import tensil.mem.DualPortMem
 import tensil.mem.OutQueue
+import tensil.mutex.LockPool
+import tensil.mutex.ConditionalReleaseLockControl
 
 class Accumulator[T <: Data with Num[T]](
     val gen: T,
@@ -47,10 +49,28 @@ class Accumulator[T <: Data with Num[T]](
   val control = Queue(io.control, 1, pipe = true, flow = true)
   val input   = Queue(io.input, 2)
 
-  val portA        = mem.io.portA
-  val portB        = mem.io.portB
-  val portAControl = OutQueue(portA.control, 1, pipe = true, flow = true)
-  val portBControl = portB.control
+  val portA = mem.io.portA
+  val portB = mem.io.portB
+  // val portAControl = OutQueue(portA.control, 1, pipe = true, flow = true)
+  // val portBControl = portB.control
+  // val portAControlOut = OutQueue(portA.control, 1, pipe = true, flow = true)
+  val portAControlOut = portA.control
+  val portBControlOut = portB.control
+
+  val lockCondGen                               = new MemControlWithComparable(depth)
+  def select(r: MemControlWithComparable): UInt = 0.U
+  val lockPool = Module(
+    new LockPool(lockCondGen, 2, 1, select)
+  )
+  val portAControl =
+    OutQueue(lockPool.io.actor(0).in, 1, pipe = true, flow = true)
+  val portBControl = lockPool.io.actor(1).in
+  portAControlOut <> lockPool.io.actor(0).out
+  portBControlOut <> lockPool.io.actor(1).out
+  val lock = lockPool.io.lock
+  lock.noenq()
+  lockPool.io.locked.nodeq()
+  lockPool.io.deadlocked.nodeq()
 
   mem.io.programCounter := io.programCounter
   mem.io.tracepoint := io.tracepoint
@@ -83,7 +103,7 @@ class Accumulator[T <: Data with Num[T]](
   inputDemux.noenq()
   portAInputMux.noenq()
 
-  val writeEnqueuer = MultiEnqueue(3)
+  val writeEnqueuer = MultiEnqueue(4)
   val readEnqueuer  = MultiEnqueue(1)
   val accEnqueuer   = MultiEnqueue(4)
   writeEnqueuer.tieOff()
@@ -96,25 +116,28 @@ class Accumulator[T <: Data with Num[T]](
         control.valid,
         // write to port A
         portAControl,
-        MemControl(depth)(control.bits.address, true.B),
-        portAInputMux,
-        1.U,
+        MemControlWithComparable(depth)(control.bits.address, true.B),
         // read from port B
         portBControl,
-        MemControl(depth)(control.bits.address, false.B),
+        MemControlWithComparable(depth)(control.bits.address, false.B),
         inputDemux,
+        1.U,
+        portAInputMux,
         1.U,
       )
     }.otherwise {
       // just write
+      val req = MemControlWithComparable(depth)(control.bits.address, true.B)
       control.ready := writeEnqueuer.enqueue(
         control.valid,
         portAControl,
-        MemControl(depth)(control.bits.address, true.B),
+        req,
         inputDemux,
         0.U,
         portAInputMux,
         0.U,
+        lock,
+        lockControl(0.U, req),
       )
     }
   }.otherwise {
@@ -122,7 +145,22 @@ class Accumulator[T <: Data with Num[T]](
     control.ready := readEnqueuer.enqueue(
       control.valid,
       portAControl,
-      MemControl(depth)(control.bits.address, false.B),
+      MemControlWithComparable(depth)(control.bits.address, false.B),
     )
+  }
+
+  def lockControl(
+      by: UInt,
+      req: MemControlWithComparable,
+  ): ConditionalReleaseLockControl[MemControlWithComparable] = {
+    val w = Wire(
+      new ConditionalReleaseLockControl(lockCondGen, 2, 1, 1 << 4)
+    )
+    w.lock := select(req)
+    w.acquire := true.B
+    w.by := by
+    w.delayRelease := 0.U
+    w.cond <> req
+    w
   }
 }

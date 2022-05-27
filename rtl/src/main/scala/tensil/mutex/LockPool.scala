@@ -49,8 +49,8 @@ class LockPool[T <: Data with Comparable[T]](
     val deadlocked = Decoupled(Bool())
   })
 
-  val actor       = VecInit(io.actor.map(a => Queue(a.in, 2)))
-  val lockControl = Queue(io.lock, 2)
+  val actor       = VecInit(io.actor.map(a => a.in))
+  val lockControl = io.lock
 
   val lock = RegInit(
     VecInit(
@@ -64,8 +64,10 @@ class LockPool[T <: Data with Comparable[T]](
     // block by default
     io.actor(id).out.noenq()
     a.ready := false.B
-    val requiredLock = lock(select(a.bits))
-    val blocked      = requiredLock.held && requiredLock.by =/= id.U
+    val requiredLockId = select(a.bits)
+    val requiredLock   = lock(requiredLockId)
+    val blocked =
+      (requiredLock.held && requiredLock.by =/= id.U) || (lockControl.fire && lockControl.bits.lock === requiredLockId && lockControl.bits.by =/= id.U)
     when(!blocked) {
       // allow actor to proceed when not blocked
       io.actor(id).out <> a
@@ -78,8 +80,7 @@ class LockPool[T <: Data with Comparable[T]](
   io.locked.valid := lockControl.fire
 
   // for signalling when deadlocked
-  io.deadlocked.bits := DontCare
-  io.deadlocked.valid := false.B
+  io.deadlocked.noenq()
 
   def acquire(l: ConditionalReleaseLock[T]): Unit = {
     when(lockControl.valid) {

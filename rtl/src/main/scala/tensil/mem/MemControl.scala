@@ -52,6 +52,26 @@ object MemControlWithStride {
   }
 }
 
+class MemControlWithComparable(depth: Long)
+    extends MemControl(depth)
+    with Comparable[MemControlWithComparable] {
+  def ===(other: MemControlWithComparable): Bool = {
+    write === other.write && address === other.address && size === other.size
+  }
+}
+
+object MemControlWithComparable {
+  def apply(
+      depth: Long
+  )(address: UInt, write: Bool): MemControlWithComparable = {
+    val w = Wire(new MemControlWithComparable(depth))
+    w.address := address
+    w.write := write
+    w.size := 0.U
+    w
+  }
+}
+
 class MemControl(val depth: Long) extends Bundle with Address with Size {
   val write   = Bool()
   val address = UInt(log2Ceil(depth).W)
@@ -59,9 +79,6 @@ class MemControl(val depth: Long) extends Bundle with Address with Size {
 }
 
 object MemControl {
-  val depth       = Box(256)
-  val strideDepth = Box(128)
-
   def apply(depth: Long)(address: UInt, write: Bool): MemControl =
     apply(depth, address, 0.U, write)
 
@@ -84,9 +101,5 @@ object MemControl {
       w.size := size
       w
     }
-  }
-
-  def apply(address: UInt, write: Bool): MemControl = {
-    apply(depth.get)(address, write)
   }
 }

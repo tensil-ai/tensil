@@ -8,6 +8,7 @@ import scala.collection.mutable
 import tensil.tools.{TracepointCondition, TracepointsMap}
 import tensil.tools.compiler.{
   LIR,
+  InstructionContext,
   MemoryAddress,
   MemoryAddressHelper,
   MemoryAddressRaw,
@@ -21,14 +22,16 @@ class TracepointCollector(
     conditions: Seq[TracepointCondition],
     resolveRefToObject: (MemoryRef) => Option[MemoryObject] = (ref) => None
 ) extends LIR {
-  private var instructionOffset: InstructionAddress = InstructionAddress.Zero
   private val instructionTracepointsMapsBuffer =
     mutable.Map.empty[InstructionAddress, TracepointsMap]
 
-  def instructionsCount          = instructionOffset
   def instructionTracepointsMaps = instructionTracepointsMapsBuffer.toMap
 
-  def emitWait(tidToWait: Int, tid: Int): Unit = incInstructionsCount()
+  def emitWait(
+      tidToWait: Int,
+      tid: Int,
+      context: Option[InstructionContext]
+  ): Unit = {}
 
   def emitMatMul(
       accumulate: Boolean,
@@ -37,9 +40,10 @@ class TracepointCollector(
       accumulatorStride: Int,
       accumulatorAddress: MemoryAddress,
       size: MemoryAddressRaw,
-      tid: Int
+      tid: Int,
+      context: Option[InstructionContext]
   ): Unit =
-    emitTracepoints(accumulatorAddress, size, accumulatorStride)
+    collectTracepoints(accumulatorAddress, size, accumulatorStride, context)
 
   def emitSIMD(
       accumulate: Boolean,
@@ -49,9 +53,10 @@ class TracepointCollector(
       simdDestination: Int,
       writeAccumulatorAddress: MemoryAddress,
       readAccumulatorAddress: MemoryAddress,
-      tid: Int
+      tid: Int,
+      context: Option[InstructionContext]
   ): Unit =
-    emitTracepoints(writeAccumulatorAddress, 0L, 1)
+    collectTracepoints(writeAccumulatorAddress, 0L, 1, context)
 
   def emitDataMove(
       toLocal: Boolean,
@@ -61,37 +66,35 @@ class TracepointCollector(
       stride: Int,
       address: MemoryAddress,
       size: MemoryAddressRaw,
-      tid: Int
+      tid: Int,
+      context: Option[InstructionContext]
   ): Unit =
     if (toLocal)
-      emitTracepoints(localAddress, size, localStride)
+      collectTracepoints(localAddress, size, localStride, context)
     else
-      emitTracepoints(address, size, stride)
+      collectTracepoints(address, size, stride, context)
 
   def emitLoadWeights(
       localStride: Int,
       localAddress: MemoryAddress,
       size: MemoryAddressRaw,
-      tid: Int
-  ): Unit = incInstructionsCount()
+      tid: Int,
+      context: Option[InstructionContext]
+  ): Unit = {}
 
   def endEmit(): Unit = {}
 
-  private def incInstructionsCount(): Unit = instructionOffset += 1
-
-  private def emitTracepoints(
+  private def collectTracepoints(
       address: MemoryAddress,
       size: MemoryAddressRaw,
-      stride: Int
-  ) {
-    incInstructionsCount()
+      stride: Int,
+      context: Option[InstructionContext]
+  ): Unit = {
+    val writer = new TracepointsWriter(conditions, resolveRefToObject)
+    val step   = 1 << stride
 
-    val tracepointsWriter =
-      new TracepointsWriter(conditions, resolveRefToObject)
-    val step = 1 << stride
-
-    for (i <- 0L until size + 1) {
-      tracepointsWriter.emitWrite(
+    for (i <- 0L until size + 1)
+      writer.write(
         MemoryAddress(
           tag = address.tag,
           ref = address.ref,
@@ -99,10 +102,7 @@ class TracepointCollector(
         )
       )
 
-      val tracepointsMap = tracepointsWriter.toMap()
-
-      if (!tracepointsMap.isEmpty)
-        instructionTracepointsMapsBuffer(instructionOffset) = tracepointsMap
-    }
+    if (!writer.isEmpty)
+      instructionTracepointsMapsBuffer(context.get.address.get) = writer.toMap
   }
 }

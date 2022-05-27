@@ -7,6 +7,7 @@ import scala.collection.mutable
 
 import tensil.tools.compiler.{
   LIR,
+  InstructionContext,
   MemoryAddress,
   MemoryAddressHelper,
   MemoryAddressRaw,
@@ -83,7 +84,7 @@ class StatsGen(
     countExecution(arch.threadQueueDepth + 1)
   }
 
-  def emitWait(tidToWait: Int, tid: Int): Unit = {
+  def emitWait(tidToWait: Int, tid: Int, context: Option[InstructionContext]): Unit = {
     count(
       tid,
       "Wait",
@@ -98,7 +99,8 @@ class StatsGen(
       accumulatorStride: Int,
       accumulatorAddress: MemoryAddress,
       size: MemoryAddressRaw,
-      tid: Int
+      tid: Int,
+      context: Option[InstructionContext]
   ): Unit = {
     val mnemonic = "MatMul"
 
@@ -121,7 +123,8 @@ class StatsGen(
       simdDestination: Int,
       writeAccumulatorAddress: MemoryAddress,
       readAccumulatorAddress: MemoryAddress,
-      tid: Int
+      tid: Int,
+      context: Option[InstructionContext]
   ): Unit = {
     count(
       tid,
@@ -138,7 +141,8 @@ class StatsGen(
       stride: Int,
       address: MemoryAddress,
       size: MemoryAddressRaw,
-      tid: Int
+      tid: Int,
+      context: Option[InstructionContext]
   ): Unit = {
     val flags = StreamGen.mkDataMoveFlags(toLocal, accumulate, address.tag)
     val suffix = flags match {
@@ -168,7 +172,8 @@ class StatsGen(
       localStride: Int,
       localAddress: MemoryAddress,
       size: MemoryAddressRaw,
-      tid: Int
+      tid: Int,
+      context: Option[InstructionContext]
   ): Unit = {
     val mnemonic = "LoadWeights"
 

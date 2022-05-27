@@ -4,10 +4,20 @@
 package tensil.tools.compiler.lir
 
 import tensil.tools.compiler.{LIR, InstructionContext, MemoryAddress, MemoryAddressRaw}
+import tensil.tools.compiler.InstructionAddress
 
-class Broadcast(lirs: LIR*) extends LIR {
+class InstructionAddressInjector(targetLir: LIR) extends LIR {
+  private var instructionOffset: InstructionAddress = InstructionAddress.Zero
+  private def inject(context: Option[InstructionContext]): Option[InstructionContext] = {
+    val r = InstructionContext.injectInstructionAddress(context, instructionOffset)
+    instructionOffset += InstructionAddress.One
+    r
+  }
+
+  def instructionsCount = instructionOffset
+
   def emitWait(tid: Int, tidToWait: Int, context: Option[InstructionContext]): Unit =
-    lirs.foreach(_.emitWait(tid, tidToWait, context))
+    targetLir.emitWait(tid, tidToWait, inject(context))
 
   def emitMatMul(
       accumulate: Boolean,
@@ -19,17 +29,15 @@ class Broadcast(lirs: LIR*) extends LIR {
       tid: Int,
       context: Option[InstructionContext]
   ): Unit =
-    lirs.foreach(
-      _.emitMatMul(
-        accumulate,
-        localStride,
-        localAddress,
-        accumulatorStride,
-        accumulatorAddress,
-        size,
-        tid,
-        context
-      )
+    targetLir.emitMatMul(
+      accumulate: Boolean,
+      localStride,
+      localAddress,
+      accumulatorStride,
+      accumulatorAddress,
+      size,
+      tid,
+      inject(context)
     )
 
   def emitSIMD(
@@ -43,18 +51,16 @@ class Broadcast(lirs: LIR*) extends LIR {
       tid: Int,
       context: Option[InstructionContext]
   ): Unit =
-    lirs.foreach(
-      _.emitSIMD(
-        accumulate,
-        simdOp,
-        simdSourceLeft,
-        simdSourceRight,
-        simdDestination,
-        writeAccumulatorAddress,
-        readAccumulatorAddress,
-        tid,
-        context
-      )
+    targetLir.emitSIMD(
+      accumulate,
+      simdOp,
+      simdSourceLeft,
+      simdSourceRight,
+      simdDestination,
+      writeAccumulatorAddress,
+      readAccumulatorAddress,
+      tid,
+      inject(context)
     )
 
   def emitDataMove(
@@ -68,18 +74,16 @@ class Broadcast(lirs: LIR*) extends LIR {
       tid: Int,
       context: Option[InstructionContext]
   ): Unit =
-    lirs.foreach(
-      _.emitDataMove(
-        toLocal,
-        accumulate,
-        localStride,
-        localAddress,
-        stride,
-        address,
-        size,
-        tid,
-        context
-      )
+    targetLir.emitDataMove(
+      toLocal,
+      accumulate,
+      localStride,
+      localAddress,
+      stride,
+      address,
+      size,
+      tid,
+      inject(context)
     )
 
   def emitLoadWeights(
@@ -89,9 +93,13 @@ class Broadcast(lirs: LIR*) extends LIR {
       tid: Int,
       context: Option[InstructionContext]
   ): Unit =
-    lirs.foreach(
-      _.emitLoadWeights(localStride, localAddress, size, tid, context)
+    targetLir.emitLoadWeights(
+      localStride,
+      localAddress,
+      size,
+      tid,
+      inject(context)
     )
 
-  def endEmit(): Unit = lirs.foreach(_.endEmit())
+  def endEmit(): Unit = {}
 }

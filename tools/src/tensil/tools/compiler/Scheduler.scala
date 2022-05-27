@@ -668,7 +668,8 @@ class Scheduler(
             initKey,
             Some(initStats)
           )
-          val stageInit = emitStageInit(initSegment, stage.constsToLoad)
+          val stageInit =
+            emitStageInit(initSegment.segmentLir, stage.constsToLoad)
 
           val partitionSegmentAndStats = stage.partitions.zipWithIndex.par
             .map({
@@ -712,9 +713,9 @@ class Scheduler(
                   )
 
                 emitStagePartition(
-                  loadSegment,
-                  computeSegment,
-                  saveSegment,
+                  loadSegment.segmentLir,
+                  computeSegment.segmentLir,
+                  saveSegment.segmentLir,
                   stageInit,
                   traverseRoots(partition.roots.get)
                 )

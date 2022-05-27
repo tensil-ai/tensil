@@ -31,35 +31,37 @@ import tensil.tools.compiler.{
   MemoryAddress,
   MemoryAddressHelper,
   LIR,
+  InstructionContext,
   lir
 }
 import tensil.NumericWithMAC
+import tensil.tools.compiler.InstructionAddress
 
 class Emulator[T : NumericWithMAC : ClassTag](
     dataType: ArchitectureDataTypeWithBase[T],
     arch: Architecture
 ) {
-  private val emulatorExecutive = new EmulatorExecutive(arch)
+  private val executive = new EmulatorExecutive(arch)
 
   private def arrayToStream(bytes: Array[Byte]): InputStream = {
     new ByteArrayInputStream(bytes)
   }
 
   def writeDRAM0(addresses: Seq[MemoryAddressRaw], stream: InputStream): Unit =
-    emulatorExecutive.writeDRAM0(addresses, new DataInputStream(stream))
+    executive.writeDRAM0(addresses, new DataInputStream(stream))
   def writeDRAM0(addresses: Seq[MemoryAddressRaw], bytes: Array[Byte]): Unit =
     writeDRAM0(addresses, arrayToStream(bytes))
 
   def readDRAM0(addresses: Seq[MemoryAddressRaw], stream: OutputStream): Unit =
-    emulatorExecutive.readDRAM0(addresses, new DataOutputStream(stream))
+    executive.readDRAM0(addresses, new DataOutputStream(stream))
   def readDRAM0(addresses: Seq[MemoryAddressRaw]): Array[Byte] = {
     val bytesStream = new ByteArrayOutputStream()
-    emulatorExecutive.readDRAM0(addresses, new DataOutputStream(bytesStream))
+    executive.readDRAM0(addresses, new DataOutputStream(bytesStream))
     bytesStream.toByteArray()
   }
 
   def writeDRAM1(size: MemoryAddressRaw, stream: InputStream) =
-    emulatorExecutive.writeDRAM1(0L until size, new DataInputStream(stream))
+    executive.writeDRAM1(0L until size, new DataInputStream(stream))
   def writeDRAM1(size: MemoryAddressRaw, bytes: Array[Byte]): Unit =
     writeDRAM1(size, arrayToStream(bytes))
 
@@ -69,20 +71,84 @@ class Emulator[T : NumericWithMAC : ClassTag](
   def run(stream: InputStream, trace: ExecutiveTrace): Unit = {
     val startTime = System.nanoTime()
 
-    try {
-      val emulatorTrace = new EmulatorTrace(trace, emulatorExecutive)
-      val lirParser     = new lir.StreamParser(arch, stream)
+    val traceLir = new LIR {
 
-      val lirSequencer = new lir.Sequencer(
-        arch = arch,
-        readLir = emulatorExecutive.readLir,
-        writeLir = new lir.Broadcast(
-          emulatorTrace,
-          emulatorExecutive.writeLir
-        )
+      /**
+        * This will run the trace for inital tracepoints.
+        * See MemoryManager.emitInitialTracepoints.
+        */
+      trace.runTrace(-InstructionAddress.One, executive)
+
+      private def runTrace(context: Option[InstructionContext]): Unit =
+        trace.runTrace(context.get.address.get, executive)
+
+      def emitWait(
+          tidToWait: Int,
+          tid: Int,
+          context: Option[InstructionContext]
+      ): Unit =
+        runTrace(context)
+
+      def emitMatMul(
+          accumulate: Boolean,
+          localStride: Int,
+          localAddress: MemoryAddress,
+          accumulatorStride: Int,
+          accumulatorAddress: MemoryAddress,
+          size: MemoryAddressRaw,
+          tid: Int,
+          context: Option[InstructionContext]
+      ): Unit = runTrace(context)
+
+      def emitSIMD(
+          accumulate: Boolean,
+          simdOp: Int,
+          simdSourceLeft: Int,
+          simdSourceRight: Int,
+          simdDestination: Int,
+          writeAccumulatorAddress: MemoryAddress,
+          readAccumulatorAddress: MemoryAddress,
+          tid: Int,
+          context: Option[InstructionContext]
+      ): Unit = runTrace(context)
+
+      def emitDataMove(
+          toLocal: Boolean,
+          accumulate: Boolean,
+          localStride: Int,
+          localAddress: MemoryAddress,
+          stride: Int,
+          address: MemoryAddress,
+          size: MemoryAddressRaw,
+          tid: Int,
+          context: Option[InstructionContext]
+      ): Unit = runTrace(context)
+
+      def emitLoadWeights(
+          localStride: Int,
+          localAddress: MemoryAddress,
+          size: MemoryAddressRaw,
+          tid: Int,
+          context: Option[InstructionContext]
+      ): Unit = runTrace(context)
+
+      def endEmit(): Unit = {}
+    }
+
+    val parser =
+      lir.Parser.injectInstructionAddress(new lir.StreamParser(arch, stream))
+
+    val sequencerLir = new lir.Sequencer(
+      arch = arch,
+      readLir = executive.readLir,
+      writeLir = new lir.Broadcast(
+        executive.writeLir,
+        traceLir
       )
+    )
 
-      lirParser.parseAll(lirSequencer)
+    try {
+      parser.parseAll(sequencerLir)
     } finally {
       val endTime = System.nanoTime()
 
@@ -95,59 +161,6 @@ class Emulator[T : NumericWithMAC : ClassTag](
 
       dataType.reportAndResetOverUnderflowStats()
     }
-  }
-
-  private class EmulatorTrace(trace: ExecutiveTrace, executive: Executive)
-      extends LIR {
-    var instructionOffset = 0L
-
-    private def runTrace(): Unit = {
-      trace.runTrace(instructionOffset, executive)
-      instructionOffset += 1
-    }
-
-    def emitWait(tidToWait: Int, tid: Int): Unit = runTrace()
-
-    def emitMatMul(
-        accumulate: Boolean,
-        localStride: Int,
-        localAddress: MemoryAddress,
-        accumulatorStride: Int,
-        accumulatorAddress: MemoryAddress,
-        size: MemoryAddressRaw,
-        tid: Int
-    ): Unit = runTrace()
-
-    def emitSIMD(
-        accumulate: Boolean,
-        simdOp: Int,
-        simdSourceLeft: Int,
-        simdSourceRight: Int,
-        simdDestination: Int,
-        writeAccumulatorAddress: MemoryAddress,
-        readAccumulatorAddress: MemoryAddress,
-        tid: Int
-    ): Unit = runTrace()
-
-    def emitDataMove(
-        toLocal: Boolean,
-        accumulate: Boolean,
-        localStride: Int,
-        localAddress: MemoryAddress,
-        stride: Int,
-        address: MemoryAddress,
-        size: MemoryAddressRaw,
-        tid: Int
-    ): Unit = runTrace()
-
-    def emitLoadWeights(
-        localStride: Int,
-        localAddress: MemoryAddress,
-        size: MemoryAddressRaw,
-        tid: Int
-    ): Unit = runTrace()
-
-    def endEmit(): Unit = runTrace()
   }
 
   private class EmulatorExecutive(arch: Architecture) extends Executive {
@@ -271,7 +284,11 @@ class Emulator[T : NumericWithMAC : ClassTag](
       finishRead(accumulatorArray, accumulatorReads, offset)
 
     val readLir = new LIR {
-      def emitWait(tidToWait: Int, tid: Int): Unit = {}
+      def emitWait(
+          tidToWait: Int,
+          tid: Int,
+          context: Option[InstructionContext]
+      ): Unit = {}
 
       def emitMatMul(
           accumulate: Boolean,
@@ -280,7 +297,8 @@ class Emulator[T : NumericWithMAC : ClassTag](
           accumulatorStride: Int,
           accumulatorAddress: MemoryAddress,
           size: MemoryAddressRaw,
-          tid: Int
+          tid: Int,
+          context: Option[InstructionContext]
       ): Unit =
         if (localAddress.tag != MemoryTag.Zeroes) {
           val localBase = localAddress.raw.toInt * arch.arraySize.toInt
@@ -298,7 +316,8 @@ class Emulator[T : NumericWithMAC : ClassTag](
           simdDestination: Int,
           writeAccumulatorAddress: MemoryAddress,
           readAccumulatorAddress: MemoryAddress,
-          tid: Int
+          tid: Int,
+          context: Option[InstructionContext]
       ): Unit =
         if (
           (simdSourceLeft == SIMDSource.Input || simdSourceRight == SIMDSource.Input) && readAccumulatorAddress.tag == MemoryTag.Accumulators
@@ -315,7 +334,8 @@ class Emulator[T : NumericWithMAC : ClassTag](
           accumulatorOrDRAMStride: Int,
           accumulatorOrDRAMAddress: MemoryAddress,
           size: MemoryAddressRaw,
-          tid: Int
+          tid: Int,
+          context: Option[InstructionContext]
       ): Unit = {
         val localBase = localAddress.raw.toInt * arch.arraySize.toInt
         val accumulatorOrDRAMBase =
@@ -347,7 +367,8 @@ class Emulator[T : NumericWithMAC : ClassTag](
           localStride: Int,
           localAddress: MemoryAddress,
           size: MemoryAddressRaw,
-          tid: Int
+          tid: Int,
+          context: Option[InstructionContext]
       ): Unit =
         if (localAddress.tag != MemoryTag.Zeroes) {
           val localBase = localAddress.raw.toInt * arch.arraySize.toInt
@@ -361,7 +382,11 @@ class Emulator[T : NumericWithMAC : ClassTag](
     }
 
     val writeLir = new LIR {
-      def emitWait(tidToWait: Int, tid: Int): Unit = {}
+      def emitWait(
+          tidToWait: Int,
+          tid: Int,
+          context: Option[InstructionContext]
+      ): Unit = {}
 
       def emitMatMul(
           accumulate: Boolean,
@@ -370,7 +395,8 @@ class Emulator[T : NumericWithMAC : ClassTag](
           accumulatorStride: Int,
           accumulatorAddress: MemoryAddress,
           size: MemoryAddressRaw,
-          tid: Int
+          tid: Int,
+          context: Option[InstructionContext]
       ): Unit = {
         val localBase = localAddress.raw.toInt * arch.arraySize.toInt
         val accumulatorBase =
@@ -412,7 +438,8 @@ class Emulator[T : NumericWithMAC : ClassTag](
           accumulatorOrDRAMStride: Int,
           accumulatorOrDRAMAddress: MemoryAddress,
           size: MemoryAddressRaw,
-          tid: Int
+          tid: Int,
+          context: Option[InstructionContext]
       ): Unit = {
         val localBase = localAddress.raw.toInt * arch.arraySize.toInt
         val accumulatorOrDRAMBase =
@@ -470,7 +497,8 @@ class Emulator[T : NumericWithMAC : ClassTag](
           localStride: Int,
           localAddress: MemoryAddress,
           size: MemoryAddressRaw,
-          tid: Int
+          tid: Int,
+          context: Option[InstructionContext]
       ): Unit = {
         val localBase = localAddress.raw.toInt * arch.arraySize.toInt
         val localStep = 1 << localStride
@@ -497,7 +525,8 @@ class Emulator[T : NumericWithMAC : ClassTag](
           simdDestination: Int,
           writeAccumulatorAddress: MemoryAddress,
           readAccumulatorAddress: MemoryAddress,
-          tid: Int
+          tid: Int,
+          context: Option[InstructionContext]
       ): Unit = {
         val input =
           if (readAccumulatorAddress.tag == MemoryTag.Accumulators)

@@ -9,6 +9,7 @@ import tensil.InstructionLayout
 import tensil.tools.CompilerException
 import tensil.tools.compiler.{
   LIR,
+  InstructionContext,
   MemoryAddress,
   MemoryAddressHelper,
   MemoryAddressRaw,
@@ -44,14 +45,19 @@ object StreamGen {
 
 class StreamGen(
     layout: InstructionLayout,
-    stream: OutputStream
+    stream: OutputStream,
+    closeAtEndEmit: Boolean = false
 ) extends LIR {
   private var currentInstructionSizeBits: Int = 0
   private var currentInstruction: BigInt      = 0
 
   private val binaryDataStream = new DataOutputStream(stream)
 
-  def emitWait(tidToWait: Int, tid: Int): Unit = {
+  def emitWait(
+      tidToWait: Int,
+      tid: Int,
+      context: Option[InstructionContext]
+  ): Unit = {
     emitTidOperand0(tidToWait)
     emitHeader(tid, Opcode.Wait)
     emitInstruction()
@@ -64,7 +70,8 @@ class StreamGen(
       accumulatorStride: Int,
       accumulatorAddress: MemoryAddress,
       size: MemoryAddressRaw,
-      tid: Int
+      tid: Int,
+      context: Option[InstructionContext]
   ): Unit = {
     require(
       localAddress.tag == MemoryTag.Local || localAddress.tag == MemoryTag.Zeroes
@@ -109,7 +116,8 @@ class StreamGen(
       simdDestination: Int,
       writeAccumulatorAddress: MemoryAddress,
       readAccumulatorAddress: MemoryAddress,
-      tid: Int
+      tid: Int,
+      context: Option[InstructionContext]
   ): Unit = {
     require(
       writeAccumulatorAddress.tag == MemoryTag.Accumulators || writeAccumulatorAddress.tag == MemoryTag.Invalid
@@ -153,7 +161,8 @@ class StreamGen(
       stride: Int,
       address: MemoryAddress,
       size: MemoryAddressRaw,
-      tid: Int
+      tid: Int,
+      context: Option[InstructionContext]
   ): Unit = {
     require(
       localAddress.tag == MemoryTag.Local
@@ -186,7 +195,8 @@ class StreamGen(
       localStride: Int,
       localAddress: MemoryAddress,
       size: MemoryAddressRaw,
-      tid: Int
+      tid: Int,
+      context: Option[InstructionContext]
   ): Unit = {
     require(
       localAddress.tag == MemoryTag.Local || localAddress.tag == MemoryTag.Zeroes
@@ -203,7 +213,9 @@ class StreamGen(
     emitInstruction()
   }
 
-  def endEmit(): Unit = {}
+  def endEmit(): Unit =
+    if (closeAtEndEmit)
+      stream.close()
 
   private def emitAccumulatorStrideAddressOperand0(
       stride: Int,

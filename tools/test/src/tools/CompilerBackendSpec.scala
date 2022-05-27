@@ -91,9 +91,9 @@ class CompilerBackendSpec extends FlatSpec {
     val backend = mk16BitBackend()
 
     val segment = backend.mkSegment(SegmentKey)
-    segment.emitNoOp()
-    segment.emitNoOp()
-    segment.emitNoOp()
+    segment.segmentLir.emitNoOp()
+    segment.segmentLir.emitNoOp()
+    segment.segmentLir.emitNoOp()
     backend.emitSegment(segment)
     backend.writeSegments(out)
 
@@ -120,9 +120,9 @@ class CompilerBackendSpec extends FlatSpec {
     val backend = mk32BitBackend()
 
     val segment = backend.mkSegment(SegmentKey)
-    segment.emitNoOp()
-    segment.emitNoOp()
-    segment.emitNoOp()
+    segment.segmentLir.emitNoOp()
+    segment.segmentLir.emitNoOp()
+    segment.segmentLir.emitNoOp()
     backend.emitSegment(segment)
     backend.writeSegments(out)
 
@@ -149,9 +149,9 @@ class CompilerBackendSpec extends FlatSpec {
     val backend = mk64BitBackend()
 
     val segment = backend.mkSegment(SegmentKey)
-    segment.emitNoOp()
-    segment.emitNoOp()
-    segment.emitNoOp()
+    segment.segmentLir.emitNoOp()
+    segment.segmentLir.emitNoOp()
+    segment.segmentLir.emitNoOp()
     backend.emitSegment(segment)
     backend.writeSegments(out)
 
@@ -178,7 +178,7 @@ class CompilerBackendSpec extends FlatSpec {
     val backend = mk32BitBackend()
 
     val segment = backend.mkSegment(SegmentKey)
-    segment.emitMatMul(
+    segment.segmentLir.emitMatMul(
       accumulate = false,
       0,
       MemoryAddress(MemoryTag.Local, MemoryRef.Invalid, 0x00012345L),
@@ -186,7 +186,7 @@ class CompilerBackendSpec extends FlatSpec {
       MemoryAddress(MemoryTag.Accumulators, MemoryRef.Invalid, 0x0089abcdL),
       0x543210L
     )
-    segment.emitMatMul(
+    segment.segmentLir.emitMatMul(
       accumulate = true,
       2,
       MemoryAddress(MemoryTag.Local, MemoryRef.Invalid, 0x00012345L),
@@ -194,7 +194,7 @@ class CompilerBackendSpec extends FlatSpec {
       MemoryAddress(MemoryTag.Accumulators, MemoryRef.Invalid, 0x0089abcdL),
       0x543210L
     )
-    segment.emitMatMul(
+    segment.segmentLir.emitMatMul(
       accumulate = false,
       0,
       MemoryAddress(MemoryTag.Zeroes, MemoryRef.Invalid, 0x00012345L),
@@ -202,7 +202,7 @@ class CompilerBackendSpec extends FlatSpec {
       MemoryAddress(MemoryTag.Accumulators, MemoryRef.Invalid, 0x0089abcdL),
       0x543210L
     )
-    segment.emitMatMul(
+    segment.segmentLir.emitMatMul(
       accumulate = true,
       0,
       MemoryAddress(MemoryTag.Zeroes, MemoryRef.Invalid, 0x00012345L),
@@ -256,7 +256,7 @@ class CompilerBackendSpec extends FlatSpec {
     val backend = mk32BitBackend()
 
     val segment = backend.mkSegment(SegmentKey)
-    segment.emitSIMD(
+    segment.segmentLir.emitSIMD(
       accumulate = false,
       SIMDOp.Zero,
       0,
@@ -265,7 +265,7 @@ class CompilerBackendSpec extends FlatSpec {
       MemoryAddress(MemoryTag.Invalid, MemoryRef.Invalid, 0x00012345L),
       MemoryAddress(MemoryTag.Invalid, MemoryRef.Invalid, 0x0089abcdL)
     )
-    segment.emitSIMD(
+    segment.segmentLir.emitSIMD(
       accumulate = false,
       SIMDOp.Max,
       SIMDSource.Input,
@@ -309,7 +309,7 @@ class CompilerBackendSpec extends FlatSpec {
 
     val segment = backend.mkSegment(SegmentKey)
 
-    segment.emitDataMove(
+    segment.segmentLir.emitDataMove(
       toLocal = true,
       accumulate = false,
       0,
@@ -318,7 +318,7 @@ class CompilerBackendSpec extends FlatSpec {
       MemoryAddress(MemoryTag.Vars, MemoryRef.Invalid, 0x0089abcdL),
       0x00543210L
     )
-    segment.emitDataMove(
+    segment.segmentLir.emitDataMove(
       toLocal = false,
       accumulate = false,
       2,
@@ -327,7 +327,7 @@ class CompilerBackendSpec extends FlatSpec {
       MemoryAddress(MemoryTag.Vars, MemoryRef.Invalid, 0x0089abcdL),
       0x00543210L
     )
-    segment.emitDataMove(
+    segment.segmentLir.emitDataMove(
       toLocal = true,
       accumulate = false,
       3,
@@ -336,7 +336,7 @@ class CompilerBackendSpec extends FlatSpec {
       MemoryAddress(MemoryTag.Consts, MemoryRef.Invalid, 0x0089abcdL),
       0x00543210L
     )
-    segment.emitDataMove(
+    segment.segmentLir.emitDataMove(
       toLocal = false,
       accumulate = false,
       1,
@@ -345,7 +345,7 @@ class CompilerBackendSpec extends FlatSpec {
       MemoryAddress(MemoryTag.Consts, MemoryRef.Invalid, 0x0089abcdL),
       0x00543210L
     )
-    segment.emitDataMove(
+    segment.segmentLir.emitDataMove(
       toLocal = true,
       accumulate = true,
       1,
@@ -354,7 +354,7 @@ class CompilerBackendSpec extends FlatSpec {
       MemoryAddress(MemoryTag.Accumulators, MemoryRef.Invalid, 0x0089abcdL),
       0x00543210L
     )
-    segment.emitDataMove(
+    segment.segmentLir.emitDataMove(
       toLocal = false,
       accumulate = false,
       2,
@@ -363,7 +363,7 @@ class CompilerBackendSpec extends FlatSpec {
       MemoryAddress(MemoryTag.Accumulators, MemoryRef.Invalid, 0x0089abcdL),
       0x00543210L
     )
-    segment.emitDataMove(
+    segment.segmentLir.emitDataMove(
       toLocal = false,
       accumulate = true,
       3,
@@ -442,27 +442,27 @@ class CompilerBackendSpec extends FlatSpec {
     val backend = mk32BitBackend()
 
     val segment = backend.mkSegment(SegmentKey)
-    segment.emitLoadWeights(
+    segment.segmentLir.emitLoadWeights(
       0,
       MemoryAddress(MemoryTag.Local, MemoryRef.Invalid, 0x00012345L),
       0x0089abcdL
     )
-    segment.emitLoadWeights(
+    segment.segmentLir.emitLoadWeights(
       1,
       MemoryAddress(MemoryTag.Local, MemoryRef.Invalid, 0x00012345L),
       0x0089abcdL
     )
-    segment.emitLoadWeights(
+    segment.segmentLir.emitLoadWeights(
       2,
       MemoryAddress(MemoryTag.Local, MemoryRef.Invalid, 0x00012345L),
       0x0089abcdL
     )
-    segment.emitLoadWeights(
+    segment.segmentLir.emitLoadWeights(
       3,
       MemoryAddress(MemoryTag.Local, MemoryRef.Invalid, 0x00012345L),
       0x0089abcdL
     )
-    segment.emitLoadWeights(
+    segment.segmentLir.emitLoadWeights(
       0,
       MemoryAddress.Zeroes,
       0x0089abcdL

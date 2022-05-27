@@ -8,6 +8,7 @@ import scala.collection.mutable
 import tensil.InstructionLayout
 import tensil.tools.compiler.{
   LIR,
+  InstructionContext,
   MemoryAddress,
   MemoryAddressHelper,
   MemoryAddressRaw,
@@ -80,11 +81,11 @@ class Sequencer(
     executeQueue(arch.threadQueueDepth + 1)
   }
 
-  def emitWait(tidToWait: Int, tid: Int): Unit = {
+  def emitWait(tidToWait: Int, tid: Int, context: Option[InstructionContext]): Unit = {
     submit(
       tid,
       estimator.estimateCyclesAndEnergy(Opcode.Wait).cycles,
-      (lir) => lir.emitWait(tidToWait, tid)
+      (lir) => lir.emitWait(tidToWait, tid, context)
     )
   }
 
@@ -95,7 +96,8 @@ class Sequencer(
       accumulatorStride: Int,
       accumulatorAddress: MemoryAddress,
       size: MemoryAddressRaw,
-      tid: Int
+      tid: Int,
+      context: Option[InstructionContext]
   ): Unit =
     submit(
       tid,
@@ -108,7 +110,8 @@ class Sequencer(
           accumulatorStride,
           accumulatorAddress,
           size,
-          tid
+          tid,
+          context
         )
     )
 
@@ -120,7 +123,8 @@ class Sequencer(
       simdDestination: Int,
       writeAccumulatorAddress: MemoryAddress,
       readAccumulatorAddress: MemoryAddress,
-      tid: Int
+      tid: Int,
+      context: Option[InstructionContext]
   ): Unit =
     submit(
       tid,
@@ -134,7 +138,8 @@ class Sequencer(
           simdDestination,
           writeAccumulatorAddress,
           readAccumulatorAddress,
-          tid
+          tid,
+          context
         )
     )
 
@@ -146,7 +151,8 @@ class Sequencer(
       stride: Int,
       address: MemoryAddress,
       size: MemoryAddressRaw,
-      tid: Int
+      tid: Int,
+      context: Option[InstructionContext]
   ): Unit =
     submit(
       tid,
@@ -166,7 +172,8 @@ class Sequencer(
           stride,
           address,
           size,
-          tid
+          tid,
+          context
         )
     )
 
@@ -174,7 +181,8 @@ class Sequencer(
       localStride: Int,
       localAddress: MemoryAddress,
       size: MemoryAddressRaw,
-      tid: Int
+      tid: Int,
+      context: Option[InstructionContext]
   ): Unit =
     submit(
       tid,
@@ -184,7 +192,8 @@ class Sequencer(
           localStride,
           localAddress,
           size,
-          tid
+          tid,
+          context
         )
     )
 

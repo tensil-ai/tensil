@@ -7,6 +7,7 @@ import scala.collection.mutable
 
 import tensil.tools.compiler.{
   LIR,
+  InstructionContext,
   MemoryAddress,
   MemoryAddressHelper,
   MemoryAddressRaw,
@@ -50,9 +51,13 @@ class Parallelizer(arch: Architecture) {
           def emitPaddingNoOps(cycles: Long) =
             for (_ <- 0L until cycles) emitWait(tid)
 
-          override def emitWait(tidToWait: Int, ignoredTid: Int): Unit = {
+          override def emitWait(
+              tidToWait: Int,
+              ignoredTid: Int,
+              context: Option[InstructionContext]
+          ): Unit = {
             countCycles(estimator.estimateCyclesAndEnergy(Opcode.Wait).cycles)
-            targetLir.emitWait(tidToWait, tid)
+            targetLir.emitWait(tidToWait, tid, context)
           }
 
           override def emitMatMul(
@@ -62,7 +67,8 @@ class Parallelizer(arch: Architecture) {
               accumulatorStride: Int,
               accumulatorAddress: MemoryAddress,
               size: MemoryAddressRaw,
-              ignoredTid: Int
+              ignoredTid: Int,
+              context: Option[InstructionContext]
           ): Unit = {
             countCycles(
               estimator
@@ -76,7 +82,8 @@ class Parallelizer(arch: Architecture) {
               accumulatorStride,
               accumulatorAddress,
               size,
-              tid
+              tid,
+              context
             )
           }
 
@@ -88,7 +95,8 @@ class Parallelizer(arch: Architecture) {
               simdDestination: Int,
               writeAccumulatorAddress: MemoryAddress,
               readAccumulatorAddress: MemoryAddress,
-              ignoredTid: Int
+              ignoredTid: Int,
+              context: Option[InstructionContext]
           ): Unit = {
             countCycles(estimator.estimateCyclesAndEnergy(Opcode.SIMD).cycles)
             targetLir.emitSIMD(
@@ -99,7 +107,8 @@ class Parallelizer(arch: Architecture) {
               simdDestination,
               writeAccumulatorAddress,
               readAccumulatorAddress,
-              tid
+              tid,
+              context
             )
           }
 
@@ -111,7 +120,8 @@ class Parallelizer(arch: Architecture) {
               stride: Int,
               address: MemoryAddress,
               size: MemoryAddressRaw,
-              ignoredTid: Int
+              ignoredTid: Int,
+              context: Option[InstructionContext]
           ): Unit = {
             countCycles(
               estimator
@@ -130,7 +140,8 @@ class Parallelizer(arch: Architecture) {
               stride,
               address,
               size,
-              tid
+              tid,
+              context
             )
           }
 
@@ -138,7 +149,8 @@ class Parallelizer(arch: Architecture) {
               localStride: Int,
               localAddress: MemoryAddress,
               size: MemoryAddressRaw,
-              ignoredTid: Int
+              ignoredTid: Int,
+              context: Option[InstructionContext]
           ): Unit = {
             countCycles(
               estimator
@@ -149,7 +161,8 @@ class Parallelizer(arch: Architecture) {
               localStride,
               adjustLocalAddress(localAddress),
               size,
-              tid
+              tid,
+              context
             )
           }
 

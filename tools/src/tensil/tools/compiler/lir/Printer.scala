@@ -7,6 +7,7 @@ import java.io.{FileOutputStream, DataOutputStream}
 
 import tensil.tools.compiler.{
   LIR,
+  InstructionContext,
   MemoryAddress,
   MemoryAddressHelper,
   MemoryAddressRaw,
@@ -18,16 +19,20 @@ import tensil.tools.compiler.{
 class Printer(
     printProgramFileName: String
 ) extends LIR {
-  private var instructionOffset: InstructionAddress = InstructionAddress.Zero
   private val stream = new DataOutputStream(
     new FileOutputStream(printProgramFileName)
   )
 
-  def emitWait(tidToWait: Int, tid: Int): Unit =
+  def emitWait(
+      tidToWait: Int,
+      tid: Int,
+      context: Option[InstructionContext]
+  ): Unit =
     printOp(
       "Wait",
       s"$tidToWait",
-      tid
+      tid,
+      context
     )
 
   def emitMatMul(
@@ -37,7 +42,8 @@ class Printer(
       accumulatorStride: Int,
       accumulatorAddress: MemoryAddress,
       size: MemoryAddressRaw,
-      tid: Int
+      tid: Int,
+      context: Option[InstructionContext]
   ): Unit = {
     val suffix =
       if (accumulate)
@@ -48,7 +54,8 @@ class Printer(
     printOp(
       s"MatMul${suffix}",
       s"${formatAddress(localStride, localAddress)} ${formatAddress(accumulatorStride, accumulatorAddress)}${formatSize(size)}",
-      tid
+      tid,
+      context
     )
   }
 
@@ -60,7 +67,8 @@ class Printer(
       simdDestination: Int,
       writeAccumulatorAddress: MemoryAddress,
       readAccumulatorAddress: MemoryAddress,
-      tid: Int
+      tid: Int,
+      context: Option[InstructionContext]
   ): Unit = {
     val mnemonic = "SIMD"
 
@@ -94,7 +102,8 @@ class Printer(
       printOp(
         s"${mnemonic}(RWA)",
         s"${subInstructionName} W${MemoryAddressHelper(writeAccumulatorAddress)} R${MemoryAddressHelper(readAccumulatorAddress)}",
-        tid
+        tid,
+        context
       )
     } else if (
       writeAccumulatorAddress.tag == MemoryTag.Accumulators && accumulate
@@ -102,7 +111,8 @@ class Printer(
       printOp(
         s"${mnemonic}(WA)",
         s"${subInstructionName} W${MemoryAddressHelper(writeAccumulatorAddress)}",
-        tid
+        tid,
+        context
       )
     } else if (
       readAccumulatorAddress.tag == MemoryTag.Accumulators && writeAccumulatorAddress.tag == MemoryTag.Accumulators
@@ -110,25 +120,29 @@ class Printer(
       printOp(
         s"${mnemonic}(RW)",
         s"${subInstructionName} W${MemoryAddressHelper(writeAccumulatorAddress)} R${MemoryAddressHelper(readAccumulatorAddress)}",
-        tid
+        tid,
+        context
       )
     } else if (writeAccumulatorAddress.tag == MemoryTag.Accumulators) {
       printOp(
         s"${mnemonic}(W)",
         s"${subInstructionName} W${MemoryAddressHelper(writeAccumulatorAddress)}",
-        tid
+        tid,
+        context
       )
     } else if (readAccumulatorAddress.tag == MemoryTag.Accumulators) {
       printOp(
         s"${mnemonic}(R)",
         s"${subInstructionName} R${MemoryAddressHelper(readAccumulatorAddress)}",
-        tid
+        tid,
+        context
       )
     } else
       printOp(
         mnemonic,
         subInstructionName,
-        tid
+        tid,
+        context
       )
   }
 
@@ -140,7 +154,8 @@ class Printer(
       stride: Int,
       address: MemoryAddress,
       size: MemoryAddressRaw,
-      tid: Int
+      tid: Int,
+      context: Option[InstructionContext]
   ): Unit = {
     val suffix =
       if (toLocal)
@@ -152,7 +167,8 @@ class Printer(
     printOp(
       s"DataMove${suffix}",
       s"${formatAddress(localStride, localAddress)} ${formatAddress(stride, address)}${formatSize(size)}",
-      tid
+      tid,
+      context
     )
   }
 
@@ -160,12 +176,14 @@ class Printer(
       localStride: Int,
       localAddress: MemoryAddress,
       size: MemoryAddressRaw,
-      tid: Int
+      tid: Int,
+      context: Option[InstructionContext]
   ): Unit =
     printOp(
       "LoadWeights",
       s"${formatAddress(localStride, localAddress)}${formatSize(size)}",
-      tid
+      tid,
+      context
     )
 
   def endEmit(): Unit = stream.close()
@@ -173,11 +191,12 @@ class Printer(
   private def printOp(
       mnemonic: String,
       operands: String,
-      tid: Int
+      tid: Int,
+      context: Option[InstructionContext]
   ): Unit = {
-    stream.writeBytes(s"[$instructionOffset] $tid $mnemonic $operands\r\n")
-
-    instructionOffset += 1
+    stream.writeBytes(
+      s"[${context.get.address.get}] $tid $mnemonic $operands\r\n"
+    )
   }
 
   private def formatAddress(stride: Int, address: MemoryAddress) =

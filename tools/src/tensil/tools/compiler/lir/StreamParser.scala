@@ -19,16 +19,25 @@ import tensil.tools.compiler.{
   SIMDFlags
 }
 
-class StreamParser(arch: Architecture, stream: InputStream)
-    extends Parser {
+class StreamParser(
+    arch: Architecture,
+    val stream: InputStream,
+    closeAtEof: Boolean = false
+) extends Parser {
   val layout = new InstructionLayout(arch)
   val bytes =
     Array.fill[Byte](layout.instructionSizeBytes + 1)(0)
   var bytesRead: Option[Boolean] = None
 
   override def hasNext: Boolean = {
-    if (!bytesRead.isDefined)
-      bytesRead = Some(stream.read(bytes, 0, layout.instructionSizeBytes) != -1)
+    if (!bytesRead.isDefined) {
+      val eof = stream.read(bytes, 0, layout.instructionSizeBytes) == -1
+
+      if (eof && closeAtEof)
+        stream.close()
+
+      bytesRead = Some(!eof)
+    }
 
     bytesRead.get
   }

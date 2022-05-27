@@ -84,7 +84,11 @@ class StatsGen(
     countExecution(arch.threadQueueDepth + 1)
   }
 
-  def emitWait(tidToWait: Int, tid: Int, context: Option[InstructionContext]): Unit = {
+  def emitWait(
+      tidToWait: Int,
+      tid: Int,
+      context: Option[InstructionContext]
+  ): Unit = {
     count(
       tid,
       "Wait",

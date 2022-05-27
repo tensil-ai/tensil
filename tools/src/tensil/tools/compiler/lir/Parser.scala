@@ -29,15 +29,24 @@ object Parser {
     new Parser {
       private var instructionOffset: InstructionAddress =
         InstructionAddress.Zero
-      private def inject(context: Option[InstructionContext]): Option[InstructionContext] = {
-        val r = InstructionContext.injectInstructionAddress(context, instructionOffset)
+      private def inject(
+          context: Option[InstructionContext]
+      ): Option[InstructionContext] = {
+        val r = InstructionContext.injectInstructionAddress(
+          context,
+          instructionOffset
+        )
         instructionOffset += InstructionAddress.One
         r
       }
 
       private var currentLir: Option[LIR] = None
       private val injectedLir = new LIR {
-        def emitWait(tid: Int, tidToWait: Int, context: Option[InstructionContext]): Unit =
+        def emitWait(
+            tid: Int,
+            tidToWait: Int,
+            context: Option[InstructionContext]
+        ): Unit =
           currentLir.get.emitWait(tid, tidToWait, inject(context))
 
         def emitMatMul(
@@ -151,7 +160,11 @@ object Parser {
 
       private var currentLir: Option[LIR] = None
       private val injectedLir = new LIR {
-        def emitWait(tid: Int, tidToWait: Int, context: Option[InstructionContext]): Unit =
+        def emitWait(
+            tid: Int,
+            tidToWait: Int,
+            context: Option[InstructionContext]
+        ): Unit =
           currentLir.get.emitWait(tid, tidToWait, inject(context))
 
         def emitMatMul(

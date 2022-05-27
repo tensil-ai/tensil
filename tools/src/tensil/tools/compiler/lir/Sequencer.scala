@@ -81,7 +81,11 @@ class Sequencer(
     executeQueue(arch.threadQueueDepth + 1)
   }
 
-  def emitWait(tidToWait: Int, tid: Int, context: Option[InstructionContext]): Unit = {
+  def emitWait(
+      tidToWait: Int,
+      tid: Int,
+      context: Option[InstructionContext]
+  ): Unit = {
     submit(
       tid,
       estimator.estimateCyclesAndEnergy(Opcode.Wait).cycles,

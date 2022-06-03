@@ -47,7 +47,7 @@ class Sequencer(
         queue.front.execute(readLir)
     }
 
-    val estimates = if (nonEmptyTids.size > 1) {
+    if (nonEmptyTids.size > 1) {
       val minCycles =
         nonEmptyTids.map(instructionQueues(_).front.cycles).min
       for (tid <- nonEmptyTids.toSeq)

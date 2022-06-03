@@ -1548,7 +1548,7 @@ class OnnxFrontend(
         getTensorData(tensorProtos(resizeProto.input(1)))
           .asInstanceOf[TensorData[Float]]
 
-    val (scaleWidth, scaleHeight) =
+    val (scaleHeight, scaleWidth) =
       if (scales.data.size == 4) (scales.data(2), scales.data(3))
       else
         throw new CompilerException(

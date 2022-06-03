@@ -20,7 +20,9 @@ case class Args(
     schedulerSummary: Boolean = false,
     partitionsSummary: Boolean = false,
     stridesSummary: Boolean = false,
-    instructionsSummary: Boolean = false
+    instructionsSummary: Boolean = false,
+    writeGraph: Boolean = false,
+    writeProgramAssembly: Boolean = false,
 )
 
 object Main extends App {
@@ -84,11 +86,24 @@ object Main extends App {
       .valueName("true|false")
       .action((x, c) => c.copy(instructionsSummary = x))
       .text("Print instructions summary, defaults to false")
+
+    opt[Boolean]("write-graph")
+      .valueName("true|false")
+      .action((x, c) => c.copy(writeGraph = x))
+      .text("Write graph in dot format")
+
+    opt[Boolean]("write-program-assembly")
+      .valueName("true|false")
+      .action((x, c) => c.copy(writeProgramAssembly = x))
+      .text("Write program assembly")
   }
 
   argParser.parse(args, Args()) match {
     case Some(args) =>
-      val arch = Architecture.read(args.archFile)
+      val arch     = Architecture.read(args.archFile)
+      val archName = args.archFile.getName().split("\\.")(0)
+      val modelName =
+        s"${args.modelFile.getName().replaceAll("[^a-zA-Z\\d\\s:]", "_")}_${archName}"
 
       val options = CompilerOptions(
         arch = arch,
@@ -99,12 +114,12 @@ object Main extends App {
         printSchedulerSummary = args.schedulerSummary,
         printPartitionsSummary = args.partitionsSummary,
         printStridesSummary = args.stridesSummary,
-        printInstructionsSummary = args.instructionsSummary
+        printInstructionsSummary = args.instructionsSummary,
+        printGraphFileName =
+          if (args.writeGraph) Some(s"${modelName}.dot") else None,
+        printProgramFileName =
+          if (args.writeProgramAssembly) Some(s"${modelName}.tasm") else None
       )
-
-      val archName = args.archFile.getName().split("\\.")(0)
-      val modelName =
-        s"${args.modelFile.getName().replaceAll("[^a-zA-Z\\d\\s:]", "_")}_${archName}"
 
       Compiler.compile(
         modelName,
@@ -127,6 +142,18 @@ object Main extends App {
         "Program",
         new File(s"${modelName}.tprog").getAbsolutePath()
       )
+
+      if (options.printGraphFileName.isDefined)
+        tb.addNamedLine(
+          "Graph",
+          new File(options.printGraphFileName.get).getAbsolutePath()
+        )
+
+      if (options.printProgramFileName.isDefined)
+        tb.addNamedLine(
+          "Program assembly",
+          new File(options.printProgramFileName.get).getAbsolutePath()
+        )
 
       print(tb)
 

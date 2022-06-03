@@ -263,12 +263,14 @@ class MemoryManager(
       broadcastDims: Option[MemoryDimensions] = None
   ): MemoryObject = {
     val tensorData = pendingFloatConsts(name)
+    val tensorSize = tensorData.shape.product
     val (dims, padding) =
       if (
-        broadcastDims.isDefined && broadcastDims.get.modelDimensions.toArray != tensorData.shape
+        broadcastDims.isDefined &&
+        broadcastDims.get.sizeScalars != tensorSize
       ) {
-        if (tensorData.shape.fold(1)(_ * _) != 1)
-          throw new CompilerException("Only scala broadcast is supported")
+        if (tensorSize != 1)
+          throw new CompilerException("Only scalar broadcast is supported")
 
         (broadcastDims.get, tensorData.data(0))
       } else (mkConstsDimensions(tensorData.shape), 0f)
@@ -276,10 +278,9 @@ class MemoryManager(
     dims.buildConsts((pos: Seq[Int], offset: Int) => {
       if (
         tensorData.shape.zipWithIndex
-          .map {
+          .forall {
             case (dim, i) => pos(i) < dim
           }
-          .forall(_ == true)
       )
         dataType.writeFloatConst(
           tensorData.data(offset),

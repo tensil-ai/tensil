@@ -3,7 +3,7 @@
 
 package tensil.tools.compiler
 
-abstract trait HIR {
+trait HIR {
   def emitMatMul(
       weightsObj: MemoryObject,
       biasObj: Option[MemoryObject],

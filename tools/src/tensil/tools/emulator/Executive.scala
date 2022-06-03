@@ -5,7 +5,7 @@ package tensil.tools.emulator
 
 import tensil.tools.compiler.{MemoryAddressRaw}
 
-abstract trait Executive {
+trait Executive {
   def peekAccumulator(address: MemoryAddressRaw): Array[Float]
   def peekLocal(address: MemoryAddressRaw): Array[Float]
   def peekDRAM0(address: MemoryAddressRaw): Array[Float]

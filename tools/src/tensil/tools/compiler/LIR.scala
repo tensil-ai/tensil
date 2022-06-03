@@ -3,7 +3,7 @@
 
 package tensil.tools.compiler
 
-abstract trait LIR {
+trait LIR {
   final def emitNoOp(tid: Int = 0, context: Option[InstructionContext] = None) =
     emitWait(tid, tid, context)
 

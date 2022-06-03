@@ -262,7 +262,7 @@ object Parser {
   }
 }
 
-abstract trait Parser {
+trait Parser {
   def parseAll(lir: LIR): Unit = {
     while (hasNext)
       parseNext(lir)

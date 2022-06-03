@@ -45,9 +45,11 @@ class Accumulator[T <: Data with Num[T]](
       debug = debug,
     )
   )
-  val adder   = Module(new VecAdder(gen, height))
-  val control = Queue(io.control, 1, pipe = true, flow = true)
-  val input   = Queue(io.input, 2)
+  val adder = Module(new VecAdder(gen, height))
+  // val control = Queue(io.control, 1, pipe = true, flow = true)
+  val control = io.control
+  // val input   = Queue(io.input, 2)
+  val input = io.input
 
   val portA = mem.io.portA
   val portB = mem.io.portB

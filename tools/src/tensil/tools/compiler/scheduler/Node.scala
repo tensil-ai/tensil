@@ -94,6 +94,18 @@ class AddNode(
     if (input1.tag == MemoryTag.Consts) Seq(input1) else Nil
 }
 
+class SIMDNode(
+    val op: Int,
+    val input0: MemoryAddress,
+    val input1: MemoryAddress,
+    output: MemoryAddress
+) extends TempOutputNode(output) {
+  require(input0.tag == MemoryTag.Temp)
+  require(input1.tag == MemoryTag.Temp)
+
+  override lazy val inputTemps = Seq(input0, input1)
+}
+
 class ReluNode(
     val input: MemoryAddress,
     output: MemoryAddress

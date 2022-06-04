@@ -21,6 +21,13 @@ trait HIR {
       outputObj: MemoryObject
   ): Unit
 
+  def emitSIMDOp(
+      simdOp: Int,
+      input0Obj: MemoryObject,
+      input1Obj: MemoryObject,
+      outputObj: MemoryObject
+  ): Unit
+
   def emitRelu(
       inputObj: MemoryObject,
       outputObj: MemoryObject

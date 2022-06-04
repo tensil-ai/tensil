@@ -258,6 +258,8 @@ class OnnxFrontend(
             rewriteSimple(remainingProtos, emitActivate(_, nodeProto), emitters)
           case "Add" =>
             rewriteSimple(remainingProtos, emitAdd(_, nodeProto), emitters)
+          case "Sub" | "Mul" =>
+            rewriteSimple(remainingProtos, emitSIMDOp(_, nodeProto), emitters)
           case "Transpose" =>
             rewriteSimple(
               remainingProtos,
@@ -1833,6 +1835,53 @@ class OnnxFrontend(
     finishLayer(scheduler, context)
   }
 
+  private def emitSIMDOp(
+      context: EmitContext,
+      nodeProto: NodeProto
+  ): EmitResult = {
+    val scheduler = startLayer(Seq(nodeProto))
+
+    val input0Vars =
+      context.mm.consumeObject(nodeProto.input(0), Seq(nodeProto.name.get))
+
+    val input0Temp = context.mm.allocateTempObject(
+      input0Vars.name,
+      input0Vars.dims
+    )
+
+    scheduler.emitLoad(input0Vars, input0Temp)
+
+    val input1VarsOrConst = if (tensorProtos.isDefinedAt(nodeProto.input(1))) {
+      context.mm.addPendingConst(
+        nodeProto.input(1),
+        getTensorData(tensorProtos(nodeProto.input(1)))
+      )
+
+      context.mm.getOrEmitConstObject(nodeProto.input(1), Some(input0Temp.dims))
+    } else
+      context.mm.consumeObject(nodeProto.input(1), Seq(nodeProto.name.get))
+
+    val input1Temp = context.mm.allocateTempObject(
+      input1VarsOrConst.name,
+      input1VarsOrConst.dims
+    )
+
+    scheduler.emitLoad(input1VarsOrConst, input1Temp)
+
+    val outputTemp =
+      emitLayerSIMDOp(context, scheduler, nodeProto, input0Temp, input1Temp)
+
+    val outputVars = context.mm.allocateVarsObject(
+      outputTemp.name,
+      outputTemp.dims,
+      findInterLayerOutputs(context, nodeProto.output(0), None)
+    )
+
+    scheduler.emitSave(outputTemp, outputVars)
+
+    finishLayer(scheduler, context)
+  }
+
   private def emitLayerConv(
       context: EmitContext,
       scheduler: Scheduler,
@@ -2499,19 +2548,19 @@ class OnnxFrontend(
       if (addProto.input(0) == input0Temp.name) addProto.input(1)
       else addProto.input(0)
 
-    val input1Vars = if (tensorProtos.isDefinedAt(input1Name)) {
+    val input1VarsOrConst = if (tensorProtos.isDefinedAt(input1Name)) {
       context.mm.addPendingConst(
         input1Name,
         getTensorData(tensorProtos(input1Name))
       )
 
-      context.mm.getOrEmitConstObject(input1Name)
+      context.mm.getOrEmitConstObject(input1Name, Some(input0Temp.dims))
     } else
       context.mm.consumeObject(input1Name, Seq(addProto.name.get))
 
     scheduler.emitAdd(
       input0Temp,
-      input1Vars,
+      input1VarsOrConst,
       outputTemp
     )
 
@@ -2519,7 +2568,41 @@ class OnnxFrontend(
       graphPrinter.get.printOp(
         addProto,
         Seq(outputTemp),
-        Seq(input1Vars, input0Temp)
+        Seq(input1VarsOrConst, input0Temp)
+      )
+
+    outputTemp
+  }
+
+  private def emitLayerSIMDOp(
+      context: EmitContext,
+      scheduler: Scheduler,
+      nodeProto: NodeProto,
+      input0Temp: MemoryObject,
+      input1Temp: MemoryObject,
+  ): MemoryObject = {
+    val outputTemp = context.mm.allocateTempObject(
+      nodeProto.output(0),
+      input0Temp.dims
+    )
+
+    val op = nodeProto.opType.get match {
+      case "Sub" => SIMDOp.Subtract
+      case "Mul" => SIMDOp.Multiply
+    }
+
+    scheduler.emitSIMDOp(
+      op,
+      input0Temp,
+      input1Temp,
+      outputTemp
+    )
+
+    if (graphPrinter.isDefined)
+      graphPrinter.get.printOp(
+        nodeProto,
+        Seq(outputTemp),
+        Seq(input0Temp, input1Temp)
       )
 
     outputTemp

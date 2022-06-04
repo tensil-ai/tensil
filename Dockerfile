@@ -9,7 +9,7 @@ ADD tools ./tools
 ADD rtl ./rtl
 
 RUN ls -la
-RUN ./mill '{rtl,tools}.assembly'
+RUN ./mill '{rtl,tools,emulator}.assembly'
 
 FROM azul/zulu-openjdk:11 as models
 
@@ -31,6 +31,7 @@ COPY ./arch/* /demo/arch/
 
 RUN mkdir -p /opt/tensil
 COPY --from=build /work/out/rtl/assembly.dest/out.jar /opt/tensil/rtl.jar
-COPY --from=build /work/out/tools/assembly.dest/out.jar /opt/tensil/tools.jar
+COPY --from=build /work/out/tools/assembly.dest/out.jar /opt/tensil/compiler.jar
+COPY --from=build /work/out/emulator/assembly.dest/out.jar /opt/tensil/emulator.jar
 
 COPY ./docker/bin/* /usr/bin/

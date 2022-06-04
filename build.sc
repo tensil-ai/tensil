@@ -47,6 +47,14 @@ object tools extends ScalaPBModule { m =>
   }
 }
 
+object emulator extends ScalaModule { m =>
+  def moduleDeps = Seq(tools)
+
+  def scalaVersion   = tools.scalaVersion
+
+  def mainClass = Some("tensil.tools.emulator.Main")
+}
+
 object rtl extends SbtModule { m =>
   def moduleDeps = Seq(common)
 

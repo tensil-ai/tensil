@@ -24,6 +24,7 @@ object EmulatorHelper {
   ): Unit = {
     val modelStream = new FileInputStream(s"$modelName.tmodel")
     val model       = upickle.default.read[Model](modelStream)
+    modelStream.close()
 
     model.arch.dataType.name match {
       case ArchitectureDataType.FLOAT32.name =>
@@ -223,10 +224,12 @@ object EmulatorHelper {
         new DataInputStream(inputStream)
       )
 
-      var trace = new ExecutiveTrace(traceContext)
+      val trace         = new ExecutiveTrace(traceContext)
+      val programStream = new FileInputStream(model.program.fileName)
 
-      emulator.run(new FileInputStream(model.program.fileName), trace)
+      emulator.run(programStream, trace)
 
+      programStream.close()
       trace.printTrace()
 
       for (output <- model.outputs) {

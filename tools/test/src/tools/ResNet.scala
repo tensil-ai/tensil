@@ -20,7 +20,7 @@ object ResNet {
     val inputPrep           = new ByteArrayOutputStream()
     val inputPrepDataStream = new DataOutputStream(inputPrep)
 
-    Util.writeCsv(
+    ArchitectureDataTypeUtil.writeFromCsv(
       dataType,
       inputPrepDataStream,
       arraySize,
@@ -46,8 +46,8 @@ object ResNet {
 
     for (i <- 0 until count) {
       val expected = GoldenClasses(i)
-      val actual = Util.argMax(
-        Util.readResult(dataType, output, arraySize, ClassSize)
+      val actual = ArchitectureDataTypeUtil.argMax(
+        ArchitectureDataTypeUtil.readResult(dataType, output, arraySize, ClassSize)
       )
 
       println(s"expected=$expected, actual=$actual")

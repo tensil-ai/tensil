@@ -8,47 +8,47 @@ import scala.io.Source
 import scala.reflect.ClassTag
 import tensil.ArchitectureDataType
 
-object Util {
+object ArchitectureDataTypeUtil {
   def readResult(
       dataType: ArchitectureDataType,
-      stream: DataInputStream,
+      dataStream: DataInputStream,
       arraySize: Int,
       resultSize: Int
   ): Array[Float] = {
     var y = Array.fill(resultSize)(0f)
 
     for (i <- 0 until resultSize)
-      y(i) = dataType.readFloatConst(stream)
+      y(i) = dataType.readFloatConst(dataStream)
 
     val extra       = if ((resultSize % arraySize) != 0) 1 else 0
     val alignedSize = (arraySize * ((resultSize / arraySize) + extra))
 
     for (_ <- 0 until alignedSize - resultSize)
-      dataType.readFloatConst(stream)
+      dataType.readFloatConst(dataStream)
 
     y
   }
 
   def writeArgs(
       dataType: ArchitectureDataType,
-      stream: DataOutputStream,
+      dataStream: DataOutputStream,
       arraySize: Int,
       xs: Float*
   ): Unit = {
     for (i <- 0 until xs.size)
-      dataType.writeFloatConst(xs(i), stream)
+      dataType.writeFloatConst(xs(i), dataStream)
 
     for (i <- 0 until arraySize - xs.size)
-      dataType.writeFloatConst(0f, stream)
+      dataType.writeFloatConst(0f, dataStream)
   }
 
-  def writeCsv(
+  def writeFromCsv(
       dataType: ArchitectureDataType,
-      stream: DataOutputStream,
+      dataStream: DataOutputStream,
       arraySize: Int,
-      fileName: String
+      csvFileName: String
   ): Unit = {
-    val source = Source.fromFile(fileName)
+    val source = Source.fromFile(csvFileName)
 
     for (line <- source.getLines()) {
       val pixel = line.split(",").map(_.toFloat)
@@ -56,10 +56,29 @@ object Util {
       assert(pixel.size == arraySize)
 
       for (x <- pixel)
-        dataType.writeFloatConst(x, stream)
+        dataType.writeFloatConst(x, dataStream)
     }
 
     source.close()
+  }
+
+  def readToCsv(
+      dataType: ArchitectureDataType,
+      dataStream: DataInputStream,
+      arraySize: Int,
+      size: Long,
+      csvFileName: String
+  ): Unit = {
+    val csvStream = new DataOutputStream(new FileOutputStream(csvFileName))
+
+    for (_ <- 0L until size) {
+      for (_ <- 0 until arraySize)
+        csvStream.writeBytes(s"${dataType.readFloatConst(dataStream)},")
+
+      csvStream.writeBytes("\r\n")
+    }
+
+    csvStream.close()
   }
 
   def convertCsvToData(
@@ -70,7 +89,7 @@ object Util {
   ): Unit = {
     val stream = new FileOutputStream(dataFileName)
 
-    writeCsv(dataType, new DataOutputStream(stream), arraySize, csvFileName)
+    writeFromCsv(dataType, new DataOutputStream(stream), arraySize, csvFileName)
 
     stream.close()
   }

@@ -65,7 +65,7 @@ object MaxPool {
     for (
       k <- 0 until expectedPixels.length; l <- 0 until expectedPixels(0).length
     ) {
-      val pixel = Util.readResult(dataType, output, arraySize, 5)
+      val pixel = ArchitectureDataTypeUtil.readResult(dataType, output, arraySize, 5)
 
       for (i <- 0 until 5)
         rmse.addSample(pixel(i), expectedPixels(k)(l)(i))

@@ -20,7 +20,7 @@ object ResNet50 {
     val inputPrep           = new ByteArrayOutputStream()
     val inputPrepDataStream = new DataOutputStream(inputPrep)
 
-    Util.writeCsv(
+    ArchitectureDataTypeUtil.writeFromCsv(
       dataType,
       inputPrepDataStream,
       arraySize,
@@ -47,8 +47,8 @@ object ResNet50 {
 
     for (i <- 0 until count) {
       assert(
-        Util.argMax(
-          Util.readResult(dataType, output, arraySize, 1000)
+        ArchitectureDataTypeUtil.argMax(
+          ArchitectureDataTypeUtil.readResult(dataType, output, arraySize, 1000)
         ) == GoldenClasses(i)
       )
     }

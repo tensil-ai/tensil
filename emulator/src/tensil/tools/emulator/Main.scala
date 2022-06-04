@@ -129,10 +129,14 @@ object Main extends App {
       arch = model.arch
     )
 
+    val constsStream = new FileInputStream(model.consts(0).fileName)
+
     emulator.writeDRAM1(
       model.consts(0).size,
-      new FileInputStream(model.consts(0).fileName)
+      constsStream
     )
+
+    constsStream.close()
 
     require(model.inputs.size == inputFiles.size)
 
@@ -148,7 +152,8 @@ object Main extends App {
       )
 
       require(
-        inputPrep.size() == input.size * model.arch.arraySize * dataType.sizeBytes
+        inputPrep
+          .size() == input.size * model.arch.arraySize * dataType.sizeBytes
       )
 
       val inputStream = new DataInputStream(

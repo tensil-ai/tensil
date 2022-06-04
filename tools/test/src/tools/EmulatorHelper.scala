@@ -206,10 +206,14 @@ object EmulatorHelper {
       arch = model.arch
     )
 
+    val constsStream = new FileInputStream(model.consts(0).fileName)
+
     emulator.writeDRAM1(
       model.consts(0).size,
-      new FileInputStream(model.consts(0).fileName)
+      constsStream
     )
+
+    constsStream.close()
 
     val outputs = mutable.Map.empty[String, ByteArrayOutputStream]
     val count   = Math.max(inputBatchSize, minimumInputCount(model.name))

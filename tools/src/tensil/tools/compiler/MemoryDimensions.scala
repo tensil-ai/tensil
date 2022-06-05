@@ -167,28 +167,39 @@ class MemoryDimensions private (
       dimension
   }
 
-  def buildConsts(build: (Seq[Int], Int) => Unit): Unit = {
+  def buildConsts(build: (Option[Int]) => Unit): Unit = {
     def atLayout(i: Int) =
       atVectors(layout(i)) * (if (i == order - 1) arraySize else 1)
 
     def modelPos(layoutPos: Int*) =
       (0 until layoutPos.size).map(i => layoutPos(layout.indexOf(i)))
 
-    def modelOffset(modelPos: Seq[Int]): Int =
-      if (order > 0)
-        modelPos(modelPos.size - 1) +
-          (if (order > 1)
-             ((if (order > 2)
-                 ((if (order > 3)
-                     modelPos(modelPos.size - 4) * dimensions(modelPos.size - 3)
-                   else 0) + modelPos(modelPos.size - 3)) * dimensions(
-                   modelPos.size - 2
+    def modelOffset(modelPos: Seq[Int]): Option[Int] =
+      if (
+        dimensions.zipWithIndex
+          .forall {
+            case (dim, i) => modelPos(i) < dim
+          }
+      )
+        Some(
+          if (order > 0)
+            modelPos(modelPos.size - 1) +
+              (if (order > 1)
+                 ((if (order > 2)
+                     ((if (order > 3)
+                         modelPos(modelPos.size - 4) * dimensions(
+                           modelPos.size - 3
+                         )
+                       else 0) + modelPos(modelPos.size - 3)) * dimensions(
+                       modelPos.size - 2
+                     )
+                   else 0) + modelPos(modelPos.size - 2)) * dimensions(
+                   modelPos.size - 1
                  )
-               else 0) + modelPos(modelPos.size - 2)) * dimensions(
-               modelPos.size - 1
-             )
-           else 0)
-      else 0
+               else 0)
+          else 0
+        )
+      else None
 
     if (order > 0)
       for (i0 <- 0 until atLayout(0))
@@ -197,23 +208,14 @@ class MemoryDimensions private (
             if (order > 2)
               for (i2 <- 0 until atLayout(2))
                 if (order > 3)
-                  for (i3 <- 0 until atLayout(3)) {
-                    val pos = modelPos(i0, i1, i2, i3)
-                    build(pos, modelOffset(pos))
-                  }
-                else {
-                  val pos = modelPos(i0, i1, i2)
-                  build(pos, modelOffset(pos))
-                }
-            else {
-              val pos = modelPos(i0, i1)
-              build(pos, modelOffset(pos))
-            }
-        else {
-          val pos = modelPos(i0)
-          build(pos, modelOffset(pos))
-        }
-
+                  for (i3 <- 0 until atLayout(3))
+                    build(modelOffset(modelPos(i0, i1, i2, i3)))
+                else
+                  build(modelOffset(modelPos(i0, i1, i2)))
+            else
+              build(modelOffset(modelPos(i0, i1)))
+        else
+          build(modelOffset(modelPos(i0)))
   }
 
   def numberVectors      = atVectors(numberIndex)

@@ -165,9 +165,9 @@ class Backend(
            )
          else if (window.size == 1)
            /**
-             * For single-threaded situation simply take all four
-             * segments for the same partition in window of single
-             * partition.
+             * For the single-threaded situation looking at a moving
+             * window of 1 partition and simply taking all four
+             * segments from it.
              */
            Seq(
              (window(0).tid, window(0).init),

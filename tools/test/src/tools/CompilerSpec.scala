@@ -8,7 +8,7 @@ import org.scalatest._
 import org.scalatest.tagobjects.Slow
 import org.tensorflow.framework.types.DataType
 import tensil.{ArchitectureDataType, Architecture}
-import tensil.tools.golden.ExecutiveTraceContext
+import tensil.tools.emulator.ExecutiveTraceContext
 import tensil.tools.compiler.{MemoryDimensions, MemoryTag}
 
 class CompilerSpec extends FlatSpec {
@@ -197,7 +197,7 @@ class CompilerSpec extends FlatSpec {
       ).map(_.toByte)
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -274,7 +274,7 @@ class CompilerSpec extends FlatSpec {
       ).map(_.toByte)
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -362,7 +362,7 @@ class CompilerSpec extends FlatSpec {
       ).map(_.toByte)
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -490,7 +490,7 @@ class CompilerSpec extends FlatSpec {
       ).map(_.toByte)
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -573,7 +573,7 @@ class CompilerSpec extends FlatSpec {
       ).map(_.toByte)
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -701,7 +701,7 @@ class CompilerSpec extends FlatSpec {
       ).map(_.toByte)
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -801,7 +801,7 @@ class CompilerSpec extends FlatSpec {
       ).map(_.toByte)
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -952,7 +952,7 @@ class CompilerSpec extends FlatSpec {
       ).map(_.toByte)
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -1084,7 +1084,7 @@ class CompilerSpec extends FlatSpec {
       ).map(_.toByte)
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1139,9 +1139,9 @@ class CompilerSpec extends FlatSpec {
     dram0Depth = Kibi * 64,
     dram1Depth = Kibi * 64,
     accumulatorDepth = 256,
-    localDepth = 4096,
+    localDepth = Kibi * 4,
     stride0Depth = 8,
-    stride1Depth = 8
+    stride1Depth = 8,
   )
 
   it should "Compile TF MLP MNIST for 784x784 array with 64K memories" in {
@@ -1158,7 +1158,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1179,7 +1179,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1199,7 +1199,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1220,7 +1220,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1240,7 +1240,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1262,7 +1262,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1304,7 +1304,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1324,7 +1324,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1341,7 +1341,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1358,7 +1358,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1375,7 +1375,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1392,7 +1392,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1409,7 +1409,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1426,7 +1426,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1443,7 +1443,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1463,7 +1463,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1482,7 +1482,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1502,7 +1502,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1519,7 +1519,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1539,7 +1539,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1556,7 +1556,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1576,7 +1576,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1593,7 +1593,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1613,7 +1613,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1630,7 +1630,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1647,7 +1647,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1664,7 +1664,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1684,7 +1684,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1703,7 +1703,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1723,7 +1723,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1740,7 +1740,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1786,7 +1786,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1806,7 +1806,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1827,7 +1827,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1847,7 +1847,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1857,7 +1857,7 @@ class CompilerSpec extends FlatSpec {
     val name = "cnn_mnist_16x16_acc256_loc4k"
     val options = CompilerOptions(
       arch = MNIST16x16With256Acc4KLocArchitecture,
-      printSummary = true,
+      printSummary = true
     )
 
     Compiler.compile(
@@ -1867,7 +1867,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1889,7 +1889,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1910,7 +1910,7 @@ class CompilerSpec extends FlatSpec {
       options
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize
     )
@@ -1934,6 +1934,16 @@ class CompilerSpec extends FlatSpec {
     stride1Depth = 8,
   )
 
+  val ResNetFp16bp8MtArchitecture = Architecture.mkWithDefaults(
+    dataType = ArchitectureDataType.FP16BP8,
+    arraySize = 8,
+    accumulatorDepth = Kibi * 2,
+    localDepth = Kibi * 8 * 2,
+    stride0Depth = 8,
+    stride1Depth = 8,
+    numberOfThreads = 2,
+  )
+
   it should "Compile TF float ResNet20V2 (CIFAR)" taggedAs (Slow) in {
     val name         = "resnet20v2_cifar_8x8_float"
     val traceContext = new ExecutiveTraceContext()
@@ -1950,7 +1960,7 @@ class CompilerSpec extends FlatSpec {
       traceContext
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -1964,7 +1974,6 @@ class CompilerSpec extends FlatSpec {
       arch = ResNetFp16bp8Architecture,
       printSummary = true,
       printLayersSummary = true,
-      collectBackendStats = true,
       printGraphFileName = Some(s"${name}.dot"),
       //printProgramFileName = Some(s"${name}.tasm"),
       tracepointConditions = List(
@@ -1980,7 +1989,36 @@ class CompilerSpec extends FlatSpec {
       traceContext
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize,
+      traceContext = traceContext
+    )
+  }
+
+  it should "Compile TF fixed16bp8-mt ResNet20V2 (CIFAR)" in {
+    val name         = "resnet20v2_cifar_8x8_fixed16bp8_mt"
+    val traceContext = new ExecutiveTraceContext()
+    val options = CompilerOptions(
+      arch = ResNetFp16bp8MtArchitecture,
+      printSummary = true,
+      printLayersSummary = true,
+      printGraphFileName = Some(s"${name}.dot"),
+      //printProgramFileName = Some(s"${name}.tasm"),
+      tracepointConditions = List(
+        TracepointCondition(MemoryTag.Vars, "model/dense/Softmax")
+      )
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/resnet20v2_cifar.pb",
+      List("Identity"),
+      options,
+      traceContext
+    )
+
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -2004,7 +2042,7 @@ class CompilerSpec extends FlatSpec {
       traceContext
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -2019,7 +2057,6 @@ class CompilerSpec extends FlatSpec {
       inputShapes = CompilerInputShapes.mkWithBatchSize(10),
       printSummary = true,
       printLayersSummary = true,
-      collectBackendStats = true,
       printGraphFileName = Some(s"${name}.dot"),
       //printProgramFileName = Some(s"${name}.tasm"),
       tracepointConditions = List(
@@ -2035,7 +2072,88 @@ class CompilerSpec extends FlatSpec {
       traceContext
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize,
+      traceContext = traceContext
+    )
+  }
+
+  it should "Compile TF fixed16bp8-mt ResNet20V2 (CIFAR) and input batch of 10" in {
+    val name         = "resnet20v2_cifar_8x8_batch10_fixed16bp8_mt"
+    val traceContext = new ExecutiveTraceContext()
+    val options = CompilerOptions(
+      arch = ResNetFp16bp8MtArchitecture,
+      inputShapes = CompilerInputShapes.mkWithBatchSize(10),
+      printSummary = true,
+      printLayersSummary = true,
+      printGraphFileName = Some(s"${name}.dot"),
+      //printProgramFileName = Some(s"${name}.tasm"),
+      tracepointConditions = List(
+        TracepointCondition(MemoryTag.Vars, "model/dense/Softmax")
+      )
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/resnet20v2_cifar.pb",
+      List("Identity"),
+      options,
+      traceContext
+    )
+
+    EmulatorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize,
+      traceContext = traceContext
+    )
+  }
+
+  it should "Compile ONNX float ResNet20V2 (CIFAR)" taggedAs (Slow) in {
+    val name         = "resnet20v2_cifar_float_onnx"
+    val traceContext = new ExecutiveTraceContext()
+    val options = CompilerOptions(
+      arch = ResNetFloat32Architecture,
+      printSummary = true
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/resnet20v2_cifar.onnx",
+      List("Identity:0"),
+      options,
+      traceContext
+    )
+
+    EmulatorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize,
+      traceContext = traceContext
+    )
+  }
+
+  it should "Compile ONNX fixed16bp8 ResNet20V2 (CIFAR)" in {
+    val name         = "resnet20v2_cifar_fixed16bp8_onnx"
+    val traceContext = new ExecutiveTraceContext()
+    val options = CompilerOptions(
+      arch = ResNetFp16bp8Architecture,
+      printSummary = true,
+      printLayersSummary = true,
+      printGraphFileName = Some(s"${name}.dot"),
+      tracepointConditions = List(
+        TracepointCondition(MemoryTag.Vars, "Identity:0")
+      )
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/resnet20v2_cifar.onnx",
+      List("Identity:0"),
+      options,
+      traceContext
+    )
+
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -2078,6 +2196,16 @@ class CompilerSpec extends FlatSpec {
     stride1Depth = 8,
   )
 
+  val YoloTinyFp16bp8MtArchitecture = Architecture.mkWithDefaults(
+    dataType = ArchitectureDataType.FP16BP8,
+    arraySize = 8,
+    accumulatorDepth = Kibi * 2,
+    localDepth = Kibi * 8 * 2,
+    stride0Depth = 8,
+    stride1Depth = 8,
+    numberOfThreads = 2,
+  )
+
   val YoloSize = 416
 
   it should "Compile TF float YoloV4-tiny" taggedAs (Slow) in {
@@ -2096,7 +2224,7 @@ class CompilerSpec extends FlatSpec {
       traceContext
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -2119,7 +2247,7 @@ class CompilerSpec extends FlatSpec {
       traceContext
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -2142,7 +2270,7 @@ class CompilerSpec extends FlatSpec {
       traceContext
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -2156,7 +2284,6 @@ class CompilerSpec extends FlatSpec {
       arch = YoloTinyFp16bp8Architecture,
       printSummary = true,
       printLayersSummary = true,
-      collectBackendStats = true,
       printGraphFileName = Some(s"${name}.dot"),
       /*tracepointConditions = List(
         TracepointCondition(MemoryTag.Vars, "model/conv2d_17/BiasAdd"),
@@ -2172,7 +2299,84 @@ class CompilerSpec extends FlatSpec {
       traceContext
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize,
+      traceContext = traceContext
+    )
+  }
+
+  it should "Compile TF fixed16bp8-mt YoloV4-tiny" in {
+    val name         = s"yolov4_tiny_${YoloSize}_8x8_fixed16bp8_mt"
+    val traceContext = new ExecutiveTraceContext()
+    val options = CompilerOptions(
+      arch = YoloTinyFp16bp8MtArchitecture,
+      printSummary = true,
+      printLayersSummary = true,
+      printGraphFileName = Some(s"${name}.dot"),
+      /*tracepointConditions = List(
+        TracepointCondition(MemoryTag.Vars, "model/conv2d_17/BiasAdd"),
+        TracepointCondition(MemoryTag.Vars, "model/conv2d_20/BiasAdd")
+      )*/
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/yolov4_tiny_${YoloSize}.pb",
+      TinyYolo(YoloSize, onnx = false).GoldenOutputFileNames.keys.toList,
+      options,
+      traceContext
+    )
+
+    EmulatorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize,
+      traceContext = traceContext
+    )
+  }
+
+  it should "Compile ONNX float YoloV4-tiny" taggedAs (Slow) in {
+    val name         = s"yolov4_tiny_${YoloSize}_8x8_float_onnx"
+    val traceContext = new ExecutiveTraceContext()
+    val options = CompilerOptions(
+      arch = YoloTinyFloat32Architecture,
+      printSummary = true
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/yolov4_tiny_${YoloSize}.onnx",
+      TinyYolo(YoloSize, onnx = true).GoldenOutputFileNames.keys.toList,
+      options,
+      traceContext
+    )
+
+    EmulatorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize,
+      traceContext = traceContext
+    )
+  }
+
+  it should "Compile ONNX fixed16bp8 YoloV4-tiny" in {
+    val name         = s"yolov4_tiny_${YoloSize}_8x8_fixed16bp8_onnx"
+    val traceContext = new ExecutiveTraceContext()
+    val options = CompilerOptions(
+      arch = YoloTinyFp16bp8Architecture,
+      printSummary = true,
+      printLayersSummary = true,
+      printGraphFileName = Some(s"${name}.dot")
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/yolov4_tiny_${YoloSize}.onnx",
+      TinyYolo(YoloSize, onnx = true).GoldenOutputFileNames.keys.toList,
+      options,
+      traceContext
+    )
+
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -2201,6 +2405,18 @@ class CompilerSpec extends FlatSpec {
     stride1Depth = 8,
   )
 
+  val ResNet50Fp16bp8MtArchitecture = Architecture.mkWithDefaults(
+    dataType = ArchitectureDataType.FP16BP8,
+    arraySize = 16,
+    dram0Depth = Mebi * 4,
+    dram1Depth = Mebi * 4,
+    accumulatorDepth = Kibi * 2,
+    localDepth = Kibi * 8 * 2,
+    stride0Depth = 8,
+    stride1Depth = 8,
+    numberOfThreads = 2,
+  )
+
   it should "Compile TF float ResNet50V2 (ImageNet)" taggedAs (Slow) in {
     val name         = "resnet50v2_imagenet_float"
     val traceContext = new ExecutiveTraceContext()
@@ -2217,7 +2433,7 @@ class CompilerSpec extends FlatSpec {
       traceContext
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -2240,59 +2456,30 @@ class CompilerSpec extends FlatSpec {
       traceContext
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
     )
   }
 
-  it should "Compile ONNX float ResNet20V2 (CIFAR)" taggedAs (Slow) in {
-    val name         = "resnet20v2_cifar_float_onnx"
+  it should "Compile TF fixed16bp8-mt ResNet50V2 (ImageNet)" taggedAs (Slow) in {
+    val name         = "resnet50v2_imagenet_fixed16bp8_mt"
     val traceContext = new ExecutiveTraceContext()
     val options = CompilerOptions(
-      arch = ResNetFloat32Architecture,
+      arch = ResNet50Fp16bp8MtArchitecture,
       printSummary = true
     )
 
     Compiler.compile(
       name,
-      s"${Models}/resnet20v2_cifar.onnx",
-      List("Identity:0"),
+      s"${Models}/resnet50v2_imagenet.pb",
+      List("Identity"),
       options,
       traceContext
     )
 
-    GoldenProcessorHelper.test(
-      name,
-      inputBatchSize = options.inputShapes.batchSize,
-      traceContext = traceContext
-    )
-  }
-
-  it should "Compile ONNX fixed16bp8 ResNet20V2 (CIFAR)" in {
-    val name         = "resnet20v2_cifar_fixed16bp8_onnx"
-    val traceContext = new ExecutiveTraceContext()
-    val options = CompilerOptions(
-      arch = ResNetFp16bp8Architecture,
-      printSummary = true,
-      printLayersSummary = true,
-      collectBackendStats = true,
-      printGraphFileName = Some(s"${name}.dot"),
-      tracepointConditions = List(
-        TracepointCondition(MemoryTag.Vars, "Identity:0")
-      )
-    )
-
-    Compiler.compile(
-      name,
-      s"${Models}/resnet20v2_cifar.onnx",
-      List("Identity:0"),
-      options,
-      traceContext
-    )
-
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -2315,7 +2502,7 @@ class CompilerSpec extends FlatSpec {
       traceContext
     )
 
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext
@@ -2329,7 +2516,6 @@ class CompilerSpec extends FlatSpec {
       arch = ResNet50Fp16bp8Architecture,
       printSummary = true,
       printLayersSummary = true,
-      collectBackendStats = true,
       printGraphFileName = Some(s"${name}.dot"),
       tracepointConditions = List(
         TracepointCondition(MemoryTag.Vars, "Identity:0")
@@ -2344,56 +2530,7 @@ class CompilerSpec extends FlatSpec {
       traceContext
     )
 
-    GoldenProcessorHelper.test(
-      name,
-      inputBatchSize = options.inputShapes.batchSize,
-      traceContext = traceContext
-    )
-  }
-
-  it should "Compile ONNX float YoloV4-tiny" taggedAs (Slow) in {
-    val name         = s"yolov4_tiny_${YoloSize}_8x8_float_onnx"
-    val traceContext = new ExecutiveTraceContext()
-    val options = CompilerOptions(
-      arch = YoloTinyFloat32Architecture,
-      printSummary = true
-    )
-
-    Compiler.compile(
-      name,
-      s"${Models}/yolov4_tiny_${YoloSize}.onnx",
-      TinyYolo(YoloSize, onnx = true).GoldenOutputFileNames.keys.toList,
-      options,
-      traceContext
-    )
-
-    GoldenProcessorHelper.test(
-      name,
-      inputBatchSize = options.inputShapes.batchSize,
-      traceContext = traceContext
-    )
-  }
-
-  it should "Compile ONNX fixed16bp8 YoloV4-tiny" in {
-    val name         = s"yolov4_tiny_${YoloSize}_8x8_fixed16bp8_onnx"
-    val traceContext = new ExecutiveTraceContext()
-    val options = CompilerOptions(
-      arch = YoloTinyFp16bp8Architecture,
-      printSummary = true,
-      printLayersSummary = true,
-      collectBackendStats = true,
-      printGraphFileName = Some(s"${name}.dot")
-    )
-
-    Compiler.compile(
-      name,
-      s"${Models}/yolov4_tiny_${YoloSize}.onnx",
-      TinyYolo(YoloSize, onnx = true).GoldenOutputFileNames.keys.toList,
-      options,
-      traceContext
-    )
-
-    GoldenProcessorHelper.test(
+    EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
       traceContext = traceContext

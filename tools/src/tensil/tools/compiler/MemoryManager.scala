@@ -330,9 +330,9 @@ class MemoryManager(
   }
 
   private def emitInitialTracepoints(obj: MemoryObject): Unit = {
-    val tracepointsWriter =
+    val writer =
       new TracepointsWriter(tracepointConditions, resolveRefToObject(_))
-    obj.span.foreach(tracepointsWriter.emitWrite(_))
-    traceContext.emitTracepoints(0L, tracepointsWriter.toMap())
+    obj.span.foreach(writer.write(_))
+    traceContext.emitTracepoints(-InstructionAddress.One, writer.toMap)
   }
 }

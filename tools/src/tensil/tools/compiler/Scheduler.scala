@@ -23,24 +23,27 @@ import _root_.tensil.tools.{
 import _root_.tensil.tools.compiler.scheduler._
 import _root_.tensil.tools.util
 import _root_.tensil.{TablePrinter, TableLine, Architecture}
+import java.io.DataOutputStream
 
 case class SchedulerResult(
-    accumulatorUtilization: Float,
-    localUtilization: Float,
     numberOfCombinedStages: Int,
     numberOfStages: Int,
     numberOfPartitions: Int,
+    cycles: Long,
+    energy: Long,
+    accumulatorUtilization: Float,
+    localUtilization: Float,
     macs: Long,
     macEfficiency: Float
 ) {}
 
 class Scheduler(
-    name: String,
+    layerIndex: Int,
     arch: Architecture,
     options: CompilerOptions
-) {
+) extends HIR {
   if (options.printProgress) {
-    println(s"$name, emitting HIR ...")
+    println(s"LAYER $layerIndex, emitting HIR ...")
   }
 
   private var tempOutputNodes =
@@ -61,7 +64,7 @@ class Scheduler(
       weightsObj: MemoryObject,
       biasObj: Option[MemoryObject],
       inputOutputPairs: Seq[MemoryOptionalInputOutputObjects]
-  ) {
+  ): Unit = {
     countMacs(weightsObj, inputOutputPairs)
 
     if (
@@ -394,7 +397,6 @@ class Scheduler(
 
   def emit(
       backend: Backend,
-      backendStats: Option[BackendStats] = None,
       backendBufferSize: Int = 256 * 1024
   ): SchedulerResult = {
     if (options.printProgress) {
@@ -500,7 +502,7 @@ class Scheduler(
                 )
 
                 if (
-                  accumulatorSize > arch.accumulatorDepth || localSize > arch.localDepth
+                  accumulatorSize > arch.accumulatorDepth || localSize > arch.threadLocalDepth
                 ) {
                   if (n == 1)
                     /**
@@ -633,6 +635,7 @@ class Scheduler(
       }
     }
 
+    val name                   = s"LAYER $layerIndex"
     val numberOfStages         = rootsByStages.size
     val stages                 = combineStages()
     val numberOfCombinedStages = stages.size
@@ -646,9 +649,7 @@ class Scheduler(
       accumulatorSize.toFloat / arch.accumulatorDepth.toFloat
     val localUtilization = localSize.toFloat / arch.localDepth.toFloat
 
-    val collectStats = backendStats.isDefined
-    val layerStats =
-      if (collectStats) Some(new BackendStats()) else None
+    val stats = new Stats()
 
     if (options.printProgress) {
       println(
@@ -657,73 +658,100 @@ class Scheduler(
       println(s"Emitting LIR ...")
     }
 
-    def printPartitionsSummary(
-        stream: BackendStream,
-        stats: Option[BackendStats]
-    ) =
-      if (options.printPartitionsSummary && collectStats) {
-        val tb = new TablePrinter(Some(s"${stream.name} SCHEDULER SUMMARY"))
-        BackendStats.printSummary(stats.get, tb, arch)
-        print(tb)
-      }
-
     val instructionsCounts = stages.zipWithIndex.par
       .map({
         case (stage, i) =>
-          val initStats =
-            if (collectStats) Some(new BackendStats()) else None
-          val initStream = backend.mkStream(s"$name, STAGE $i, INIT", initStats)
-          val stageInit  = emitStageInit(initStream, stage.constsToLoad)
+          val initKey =
+            BackendSegmentKey(layerIndex, i, 0, BackendSegmentKey.Init)
+          val initStats = new Stats()
+          val initSegment = backend.mkSegment(
+            initKey,
+            Some(initStats)
+          )
+          val stageInit =
+            emitStageInit(initSegment.segmentLir, stage.constsToLoad)
 
-          val partitionStreamAndStats = stage.partitions.zipWithIndex.par
+          val partitionSegmentAndStats = stage.partitions.zipWithIndex.par
             .map({
               case (partition, j) =>
-                val partitionStats =
-                  if (collectStats) Some(new BackendStats()) else None
-                val partitionStream =
-                  backend
-                    .mkStream(s"$name, STAGE $i, PARTITION $j", partitionStats)
+                val loadKey = BackendSegmentKey(
+                  layerIndex,
+                  i,
+                  j,
+                  BackendSegmentKey.Load
+                )
+                val computeKey = BackendSegmentKey(
+                  layerIndex,
+                  i,
+                  j,
+                  BackendSegmentKey.Compute
+                )
+                val saveKey = BackendSegmentKey(
+                  layerIndex,
+                  i,
+                  j,
+                  BackendSegmentKey.Save
+                )
+
+                val (loadStats, computeStats, saveStats) =
+                  (new Stats(), new Stats(), new Stats())
+
+                val (loadSegment, computeSegment, saveSegment) =
+                  (
+                    backend.mkSegment(
+                      loadKey,
+                      Some(loadStats)
+                    ),
+                    backend.mkSegment(
+                      computeKey,
+                      Some(computeStats)
+                    ),
+                    backend.mkSegment(
+                      saveKey,
+                      Some(saveStats)
+                    )
+                  )
 
                 emitStagePartition(
-                  partitionStream,
+                  loadSegment.segmentLir,
+                  computeSegment.segmentLir,
+                  saveSegment.segmentLir,
                   stageInit,
                   traverseRoots(partition.roots.get)
                 )
 
-                (partitionStream, partitionStats)
+                Seq(
+                  (loadSegment, loadStats),
+                  (computeSegment, computeStats),
+                  (saveSegment, saveStats)
+                )
             })
             .seq
 
-          (initStream, initStats, partitionStreamAndStats)
+          (initSegment, initStats, partitionSegmentAndStats)
       })
       .seq
       .map({
-        case ((initStream, initStats, partitionStreamAndStats)) => {
-          printPartitionsSummary(initStream, initStats)
+        case ((initSegment, initStats, partitionSegmentAndStats)) => {
+          backend.emitSegment(initSegment)
 
-          val buffer = Array.fill[Byte](backendBufferSize)(0)
-          backend.writeStream(initStream, buffer)
+          stats.add(initStats)
 
-          if (collectStats) layerStats.get.add(initStats.get)
+          val instructionsCounts =
+            partitionSegmentAndStats.map(segmentAndStats => {
+              segmentAndStats.foreach(v => stats.add(v._2))
 
-          val instructionsCounts = partitionStreamAndStats.map {
-            case (partitionStream, partitionStats) => {
-              printPartitionsSummary(partitionStream, partitionStats)
+              for ((partitionSegment, partitionStats) <- segmentAndStats)
+                yield {
+                  backend.emitSegment(partitionSegment)
 
-              backend.writeStream(partitionStream, buffer)
+                  partitionSegment.instructionsCount
+                }
+            })
 
-              if (collectStats)
-                layerStats.get.add(partitionStats.get)
-
-              partitionStream.instructionsCount
-            }
-          }
-
-          (initStream.instructionsCount, instructionsCounts)
+          (initSegment.instructionsCount, instructionsCounts.flatten)
         }
       })
-
-    if (collectStats) backendStats.get.add(layerStats.get)
 
     if (options.printProgress) {
       println(
@@ -733,10 +761,7 @@ class Scheduler(
 
     val stageInitInstructionCounts = instructionsCounts.map(_._1)
     val partitionInstructionCounts = instructionsCounts.map(_._2).flatten
-    val macEfficiency =
-      if (collectStats)
-        BackendStats.macEfficiency(layerStats.get, arch, macs)
-      else 0f
+    val macEfficiency              = Stats.macEfficiency(stats, arch, macs)
 
     if (options.printSchedulerSummary) {
       val tb = new TablePrinter(Some(s"$name SCHEDULER SUMMARY"))
@@ -762,8 +787,7 @@ class Scheduler(
         "Partition average number of instructions",
         partitionInstructionCounts.sum / partitionInstructionCounts.size
       )
-      if (collectStats)
-        BackendStats.printSummary(layerStats.get, tb, arch, Some(macs))
+      Stats.printSummary(stats, tb, arch, Some(macs))
       tb.addNamedLine(
         "Total number of instructions",
         stageInitInstructionCounts.sum + partitionInstructionCounts.sum
@@ -774,21 +798,18 @@ class Scheduler(
       )
       tb.addNamedLine("Local utilization (%)", localUtilization * 100f)
       val (macsLetter, macsDivisor) =
-        BackendStats.getUnitsLetterAndDivisor(macs)
+        Stats.getUnitsLetterAndDivisor(macs)
       tb.addNamedLine(
         s"True MACs (${macsLetter}MAC)",
         macs.toFloat / macsDivisor
       )
-      if (collectStats)
-        tb.addNamedLine("MAC efficiency (%)", macEfficiency * 100f)
+      tb.addNamedLine("MAC efficiency (%)", macEfficiency * 100f)
       print(tb)
-    }
 
-    if (collectStats) {
       if (options.printInstructionsSummary) {
-        BackendStats.printCompositionSummary(name, layerStats.get)
-        BackendStats.printCyclesSummary(name, layerStats.get)
-        BackendStats.printEnergySummary(name, layerStats.get)
+        Stats.printCompositionSummary(name, stats)
+        Stats.printCyclesSummary(name, stats)
+        Stats.printEnergySummary(name, stats)
       }
 
       if (options.printStridesSummary) {
@@ -797,10 +818,10 @@ class Scheduler(
             select: StrideStats => Any
         ): Unit = {
           val tb = new TablePrinter(Some(title), true)
-          BackendStats.printStrideStats(
+          Stats.printStrideStats(
             arch.stride0Depth,
             arch.stride1Depth,
-            layerStats.get,
+            stats,
             select,
             tb
           )
@@ -820,13 +841,15 @@ class Scheduler(
     }
 
     SchedulerResult(
-      accumulatorUtilization = accumulatorUtilization,
-      localUtilization = localUtilization,
       numberOfStages = numberOfStages,
       numberOfCombinedStages = numberOfCombinedStages,
       numberOfPartitions = numberOfPartitions,
+      cycles = stats.aggregateCycles,
+      energy = stats.aggregateEnergy,
+      accumulatorUtilization = accumulatorUtilization,
+      localUtilization = localUtilization,
       macs = macs,
-      macEfficiency = macEfficiency
+      macEfficiency = macEfficiency,
     )
   }
 
@@ -897,7 +920,7 @@ class Scheduler(
   )
 
   private def emitStageInit(
-      stream: BackendStream,
+      lir: LIR,
       constsToLoad: Seq[MemoryAddress]
   ): StageInitInfo = {
     var toLocalRenameNext: MemoryAddressRaw = 0
@@ -905,7 +928,7 @@ class Scheduler(
       mutable.Map.empty[MemoryAddressRaw, MemoryAddressRaw]
 
     val loadLocalRollup = new DoubleAddressRollup(
-      stream.emitDataMove(toLocal = true, accumulate = false, _, _, _, _, _),
+      lir.emitDataMove(toLocal = true, accumulate = false, _, _, _, _, _),
       arch
     )
 
@@ -924,12 +947,15 @@ class Scheduler(
     }
 
     loadLocalRollup.finalEmit()
+    lir.endEmit()
 
     StageInitInfo(constsToLocalRenameMap = constsToLocalRenameMap.toMap)
   }
 
   private def emitStagePartition(
-      stream: BackendStream,
+      loadLir: LIR,
+      computeLir: LIR,
+      saveLir: LIR,
       stage: StageInitInfo,
       nodes: Seq[Node]
   ): Unit = {
@@ -1014,7 +1040,8 @@ class Scheduler(
     }
 
     val loadLocalRollup = new DoubleAddressRollup(
-      stream.emitDataMove(toLocal = true, accumulate = false, _, _, _, _, _),
+      loadLir
+        .emitDataMove(toLocal = true, accumulate = false, _, _, _, _, _),
       arch
     )
 
@@ -1099,7 +1126,7 @@ class Scheduler(
       (weightsKey, weightsSeq) <- groupedMatMulWeights.toSeq.sortBy(_._2.head)
     ) {
       val loadWeightsRollup = new SingleAddressReverseRollup(
-        stream.emitLoadWeights(_, _, _),
+        computeLir.emitLoadWeights(_, _, _),
         arch
       )
 
@@ -1114,11 +1141,11 @@ class Scheduler(
       loadWeightsRollup.finalEmit()
 
       val matMulRollup = new DoubleAddressRollup(
-        stream.emitMatMul(accumulate = false, _, _, _, _, _),
+        computeLir.emitMatMul(accumulate = false, _, _, _, _, _),
         arch
       )
       val matMulAccumulateRollup = new DoubleAddressRollup(
-        stream.emitMatMul(accumulate = true, _, _, _, _, _),
+        computeLir.emitMatMul(accumulate = true, _, _, _, _, _),
         arch
       )
 
@@ -1163,7 +1190,7 @@ class Scheduler(
     }
 
     val loadAccRollup = new DoubleAddressRollup(
-      stream
+      computeLir
         .emitDataMove(toLocal = false, accumulate = false, _, _, _, _, _),
       arch
     )
@@ -1196,7 +1223,7 @@ class Scheduler(
       val outputAccAddress = allocateAccumulator(addNode.output)
       val inputAccAddress  = locateAccumulator(addNode.input0)
 
-      stream.emitSIMD(
+      computeLir.emitSIMD(
         accumulate = false,
         SIMDOp.Move,
         SIMDSource.Input,
@@ -1208,7 +1235,8 @@ class Scheduler(
     }
 
     val addRollup = new DoubleAddressRollup(
-      stream.emitDataMove(toLocal = false, accumulate = true, _, _, _, _, _),
+      computeLir
+        .emitDataMove(toLocal = false, accumulate = true, _, _, _, _, _),
       arch
     )
 
@@ -1242,7 +1270,7 @@ class Scheduler(
       val offsetAccAddress = locateAccumulator(normNode.offset)
       val inputAccAddress  = locateAccumulator(normNode.input)
 
-      stream.emitSIMD(
+      computeLir.emitSIMD(
         accumulate = false,
         SIMDOp.Move,
         SIMDSource.Input,
@@ -1252,7 +1280,7 @@ class Scheduler(
         inputAccAddress
       )
 
-      stream.emitSIMD(
+      computeLir.emitSIMD(
         accumulate = false,
         SIMDOp.Multiply,
         SIMDSource.Input,
@@ -1262,7 +1290,7 @@ class Scheduler(
         scaleAccAddress
       )
 
-      stream.emitSIMD(
+      computeLir.emitSIMD(
         accumulate = false,
         SIMDOp.Add,
         SIMDSource.Input,
@@ -1286,7 +1314,7 @@ class Scheduler(
         val scaleAccAddress = locateAccumulator(interpolateNode.scales(i))
         val inputAccAddress = locateAccumulator(interpolateNode.inputs(i))
 
-        stream.emitSIMD(
+        computeLir.emitSIMD(
           accumulate = false,
           SIMDOp.Move,
           SIMDSource.Input,
@@ -1296,7 +1324,7 @@ class Scheduler(
           inputAccAddress
         )
 
-        stream.emitSIMD(
+        computeLir.emitSIMD(
           accumulate = (i != 0),
           SIMDOp.Multiply,
           SIMDSource.Input,
@@ -1322,7 +1350,7 @@ class Scheduler(
 
       if (!reluInited) {
         reluInited = true
-        stream.emitSIMD(
+        computeLir.emitSIMD(
           accumulate = false,
           SIMDOp.Zero,
           0,
@@ -1333,7 +1361,7 @@ class Scheduler(
         )
       }
 
-      stream.emitSIMD(
+      computeLir.emitSIMD(
         accumulate = false,
         SIMDOp.Max,
         SIMDSource.Input,
@@ -1355,7 +1383,7 @@ class Scheduler(
       val inputAccAddress  = locateAccumulator(softmaxNode.input)
 
       // TODO: Implement Softmax
-      stream.emitSIMD(
+      computeLir.emitSIMD(
         accumulate = false,
         SIMDOp.Move,
         SIMDSource.Input,
@@ -1377,7 +1405,7 @@ class Scheduler(
       val alphaAccAddress  = locateAccumulator(leakyReluNode.alpha)
       val inputAccAddress  = locateAccumulator(leakyReluNode.input)
 
-      stream.emitSIMD(
+      computeLir.emitSIMD(
         accumulate = false,
         SIMDOp.Move,
         SIMDSource.Input,
@@ -1387,7 +1415,7 @@ class Scheduler(
         alphaAccAddress
       )
 
-      stream.emitSIMD(
+      computeLir.emitSIMD(
         accumulate = false,
         SIMDOp.Multiply,
         SIMDSource.Input,
@@ -1397,7 +1425,7 @@ class Scheduler(
         inputAccAddress
       )
 
-      stream.emitSIMD(
+      computeLir.emitSIMD(
         accumulate = false,
         SIMDOp.Max,
         SIMDSource.Input,
@@ -1425,7 +1453,7 @@ class Scheduler(
 
         if (poolNode.op == "MaxPool") {
           if (first && last)
-            stream.emitSIMD(
+            computeLir.emitSIMD(
               accumulate = false,
               SIMDOp.Move,
               SIMDSource.Input,
@@ -1435,7 +1463,7 @@ class Scheduler(
               inputAccAddress
             )
           else if (first)
-            stream.emitSIMD(
+            computeLir.emitSIMD(
               accumulate = false,
               SIMDOp.Max,
               SIMDSource.Input,
@@ -1445,7 +1473,7 @@ class Scheduler(
               inputAccAddress
             )
           else if (last)
-            stream.emitSIMD(
+            computeLir.emitSIMD(
               accumulate = false,
               SIMDOp.Max,
               SIMDSource.Input,
@@ -1455,7 +1483,7 @@ class Scheduler(
               inputAccAddress
             )
           else
-            stream.emitSIMD(
+            computeLir.emitSIMD(
               accumulate = false,
               SIMDOp.Max,
               SIMDSource.Input,
@@ -1466,7 +1494,7 @@ class Scheduler(
             )
         } else if (poolNode.op == "AvgPool") {
           if (first)
-            stream.emitSIMD(
+            computeLir.emitSIMD(
               accumulate = false,
               SIMDOp.Max,
               SIMDSource.Input,
@@ -1476,7 +1504,7 @@ class Scheduler(
               inputAccAddress
             )
           else {
-            stream.emitSIMD(
+            computeLir.emitSIMD(
               accumulate = false,
               SIMDOp.Add,
               SIMDSource.Input,
@@ -1491,7 +1519,7 @@ class Scheduler(
                 poolNode.multiplier.get
               )
 
-              stream.emitSIMD(
+              computeLir.emitSIMD(
                 accumulate = false,
                 SIMDOp.Multiply,
                 SIMDSource.Input,
@@ -1511,7 +1539,8 @@ class Scheduler(
     }
 
     val saveAccRollup = new DoubleAddressRollup(
-      stream.emitDataMove(toLocal = true, accumulate = false, _, _, _, _, _),
+      computeLir
+        .emitDataMove(toLocal = true, accumulate = false, _, _, _, _, _),
       arch
     )
 
@@ -1534,7 +1563,7 @@ class Scheduler(
     saveAccRollup.finalEmit()
 
     val saveLocalRollup = new DoubleAddressRollup(
-      stream
+      saveLir
         .emitDataMove(toLocal = false, accumulate = false, _, _, _, _, _),
       arch
     )
@@ -1556,5 +1585,8 @@ class Scheduler(
     }
 
     saveLocalRollup.finalEmit()
+    loadLir.endEmit()
+    computeLir.endEmit()
+    saveLir.endEmit()
   }
 }

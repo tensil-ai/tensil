@@ -23,12 +23,16 @@ case class Architecture(
     @key("simd_registers_depth") simdRegistersDepth: Int,
     @key("stride0_depth") stride0Depth: Int,
     @key("stride1_depth") stride1Depth: Int,
+    @key("number_of_threads") numberOfThreads: Int,
+    @key("thread_queue_depth") threadQueueDepth: Int,
 ) {
   override def toString() =
     s"Architecture($dataType, ${arraySize}x${arraySize}, acc=$accumulatorDepth, loc=$localDepth, drams=[$dram0Depth,$dram1Depth], strides=[$stride0Depth,$stride1Depth], simdRegs=$simdRegistersDepth)"
 
   def varsDepth   = dram0Depth
   def constsDepth = dram1Depth
+
+  def threadLocalDepth = localDepth / numberOfThreads
 
   def writeDriverArchitectureParams(fileName: String): Unit = {
     val stream = new FileOutputStream(fileName)
@@ -88,6 +92,8 @@ object Architecture {
       simdRegistersDepth: Int = 1,
       stride0Depth: Int = 1,
       stride1Depth: Int = 1,
+      numberOfThreads: Int = 1,
+      threadQueueDepth: Int = 8,
   ): Architecture =
     Architecture(
       dataType = dataType,
@@ -99,11 +105,13 @@ object Architecture {
       simdRegistersDepth = simdRegistersDepth,
       stride0Depth = stride0Depth,
       stride1Depth = stride1Depth,
+      numberOfThreads = numberOfThreads,
+      threadQueueDepth = threadQueueDepth
     )
 
   implicit val rw: ReadWriter[Architecture] = macroRW
 
-  val tiny = Architecture(
+  val tiny = mkWithDefaults(
     dataType = ArchitectureDataType.FP16BP8,
     arraySize = 8,
     localDepth = 8192,
@@ -115,7 +123,7 @@ object Architecture {
     stride1Depth = 8,
   )
 
-  val formal = Architecture(
+  val formal = mkWithDefaults(
     dataType = ArchitectureDataType.FP16BP8,
     arraySize = 2,
     localDepth = 4,

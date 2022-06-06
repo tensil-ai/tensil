@@ -14,7 +14,13 @@ object log2Ceil {
 case class InstructionLayout(
     arch: Architecture
 ) {
-  private val headerSizeBits = roundSizeBits(8)
+  val tidSizeBits    = log2Ceil(arch.numberOfThreads)
+  val opcodeSizeBits = 3
+  val flagsSizeBits  = 4
+
+  val headerSizeBits = roundSizeBits(
+    tidSizeBits + opcodeSizeBits + tidSizeBits
+  )
 
   val localOperandSizeBits       = log2Ceil(arch.localDepth)
   val dram0OperandSizeBits       = log2Ceil(arch.dram0Depth)

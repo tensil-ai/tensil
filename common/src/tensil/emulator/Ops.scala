@@ -1,4 +1,4 @@
-package tensil.golden
+package tensil.emulator
 
 import scala.reflect.ClassTag
 import tensil.NumericWithMAC

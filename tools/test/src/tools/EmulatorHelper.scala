@@ -5,7 +5,7 @@ package tensil.tools
 
 import java.io._
 import scala.reflect.ClassTag
-import tensil.tools.golden.{Processor, ExecutiveTraceContext}
+import tensil.tools.emulator.{Emulator, ExecutiveTraceContext, ExecutiveTrace}
 import scala.collection.mutable
 import tensil.{
   Architecture,
@@ -15,9 +15,8 @@ import tensil.{
   FloatAsIfIntegralWithMAC
 }
 import tensil.tools.model.Model
-import tensil.tools.golden.ExecutiveTrace
 
-object GoldenProcessorHelper {
+object EmulatorHelper {
   def test(
       modelName: String,
       inputBatchSize: Int = 1,
@@ -201,12 +200,12 @@ object GoldenProcessorHelper {
       inputBatchSize: Int,
       traceContext: ExecutiveTraceContext
   ): Unit = {
-    val processor = new Processor(
+    val emulator = new Emulator(
       dataType = dataType,
       arch = model.arch
     )
 
-    processor.writeDRAM1(
+    emulator.writeDRAM1(
       model.consts(0).size,
       new FileInputStream(model.consts(0).fileName)
     )
@@ -219,21 +218,21 @@ object GoldenProcessorHelper {
       prepareInputStream(model.name, dataType, model.arch.arraySize, count)
 
     for (_ <- 0 until count / inputBatchSize) {
-      processor.writeDRAM0(
+      emulator.writeDRAM0(
         input.base until input.base + input.size,
         new DataInputStream(inputStream)
       )
 
       var trace = new ExecutiveTrace(traceContext)
 
-      processor.run(new FileInputStream(model.program.fileName), trace)
+      emulator.run(new FileInputStream(model.program.fileName), trace)
 
       trace.printTrace()
 
       for (output <- model.outputs) {
         val outputStream =
           outputs.getOrElseUpdate(output.name, new ByteArrayOutputStream())
-        processor.readDRAM0(
+        emulator.readDRAM0(
           output.base until output.base + output.size,
           new DataOutputStream(outputStream)
         )

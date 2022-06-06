@@ -154,7 +154,7 @@ class Backend(
         (if (window.size == 3)
            /**
              * This is looking at a moving window of 3 partitions
-             * Taking save segment rom the first, compute from the
+             * Taking save segment from the first, compute from the
              * second, and init-load from the third.
              */
            Seq(

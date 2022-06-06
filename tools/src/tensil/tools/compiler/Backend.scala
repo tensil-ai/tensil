@@ -91,6 +91,16 @@ class Backend(
     }
 
     var curInit: Option[BackendSegment] = None
+
+    /**
+      * Pad with `windowSize - 1` in the beginning and the end
+      * to ensure that first init-load and last save segments
+      * are handled correctly by the windowing.
+      *
+      * Pad between layers to ensure that segments between layers
+      * don't get parallelized since this may cause violation of
+      * data dependencies.
+      */
     val partitions = Seq.fill(windowSize - 1)(ThreadedPartition()) ++
       (for (
         layerSegments <-
@@ -108,6 +118,10 @@ class Backend(
             case (key, segment) => (key.kind, segment)
           }
 
+          /**
+            * Replicate init segment for each thread to ensure
+            * that init consts are loaded in theard's local memory
+            */
           val init = if (partitionSegments.head._1.partition == 0) {
             curInit = kindSegments.get(BackendSegmentKey.Init)
             curInit

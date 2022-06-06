@@ -1,10 +1,11 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /* Copyright © 2019-2022 Tensil AI Company */
 
-package tensil.tools
+package tensil.tools.compiler
 
 import java.io.{DataOutputStream, FileOutputStream}
 import tensil.{Architecture, ArchitectureDataType, InstructionLayout}
+import tensil.tools.{Compiler, CompilerOptions, CompilerInputShapes}
 
 import java.io.File
 import tensil.TablePrinter

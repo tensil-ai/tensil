@@ -105,7 +105,7 @@ rm main.tar.gz
 ### Run compiler from source code
 
 ```
-./mill tools.run -a ./arch/pynqz1.tarch -m ./models/resnet20v2_cifar.onnx -o "Identity:0" -s true
+./mill compiler.run -a ./arch/pynqz1.tarch -m ./models/resnet20v2_cifar.onnx -o "Identity:0" -s true
 ```
 
 ### Run emulator from source code

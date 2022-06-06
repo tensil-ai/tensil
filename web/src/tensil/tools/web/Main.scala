@@ -239,7 +239,7 @@ object CompilerTask {
   }
 }
 
-object CompilerApp extends App {
+object Main extends App {
   // Number of tasks to be configured from container environment
   CompilerTask.process(1)
 }

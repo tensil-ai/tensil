@@ -84,18 +84,13 @@ class Backend(
         )
     }
 
-    var nextTid = 0
-
     case class ThreadedPartition(
+        tid: Int,
         init: Option[BackendSegment] = None,
         load: Option[BackendSegment] = None,
         compute: Option[BackendSegment] = None,
         save: Option[BackendSegment] = None,
-    ) {
-      val tid = nextTid
-
-      nextTid = (nextTid + 1) % layout.arch.numberOfThreads
-    }
+    )
 
     var curInit: Option[BackendSegment] = None
 
@@ -108,7 +103,8 @@ class Backend(
       * don't get parallelized since this may cause violation of
       * data dependencies.
       */
-    val partitions = Seq.fill(windowSize - 1)(ThreadedPartition()) ++
+    val padding = Map.empty[Int, BackendSegment]
+    val partitions = Seq.fill(windowSize - 1)(padding) ++
       (for (
         layerSegments <-
           segments.groupBy(_._1.layer).toSeq.sortBy(_._1).map(_._2)
@@ -121,7 +117,7 @@ class Backend(
               .sortBy(_._1)
               .map(_._2)
         ) yield {
-          val kindSegments = partitionSegments.map {
+          val partitionSegmentsByKind = partitionSegments.toMap.map {
             case (key, segment) => (key.kind, segment)
           }
 
@@ -129,22 +125,26 @@ class Backend(
             * Replicate init segment for each thread to ensure
             * that init consts are loaded in theard's local memory
             */
-          val init = if (partitionSegments.head._1.partition == 0) {
-            curInit = kindSegments.get(BackendSegmentKey.Init)
-            curInit
+          if (partitionSegments.head._1.partition == 0) {
+            curInit = partitionSegmentsByKind.get(BackendSegmentKey.Init)
+            partitionSegmentsByKind
           } else if (
             partitionSegments.head._1.partition < layout.arch.numberOfThreads
           ) {
-            curInit
-          } else None
+            partitionSegmentsByKind + (BackendSegmentKey.Init -> curInit.get)
+          } else partitionSegmentsByKind
+        }) ++ Seq.fill(windowSize - 1)(padding)).reduceLeft(_ ++ _)
 
-          ThreadedPartition(
-            init = init,
-            load = kindSegments.get(BackendSegmentKey.Load),
-            compute = kindSegments.get(BackendSegmentKey.Compute),
-            save = kindSegments.get(BackendSegmentKey.Save)
-          )
-        }) ++ Seq.fill(windowSize - 1)(ThreadedPartition())).reduceLeft(_ ++ _)
+    val threadedPartitions = partitions.zipWithIndex.map {
+      case (segmentsByKind, i) =>
+        ThreadedPartition(
+          tid = i % layout.arch.numberOfThreads,
+          init = segmentsByKind.get(BackendSegmentKey.Init),
+          load = segmentsByKind.get(BackendSegmentKey.Load),
+          compute = segmentsByKind.get(BackendSegmentKey.Compute),
+          save = segmentsByKind.get(BackendSegmentKey.Save),
+        )
+    }
 
     val parallelizer = new lir.Parallelizer(layout.arch)
     def parallelizePartitions(window: Seq[ThreadedPartition]) = {
@@ -203,7 +203,7 @@ class Backend(
     }
 
     for (i <- 0 until partitions.size - (windowSize - 1)) {
-      parallelizePartitions(partitions.slice(i, i + windowSize))
+      parallelizePartitions(threadedPartitions.slice(i, i + windowSize))
     }
 
     writingLir.endEmit()

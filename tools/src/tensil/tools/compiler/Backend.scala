@@ -152,6 +152,11 @@ class Backend(
 
       val streamsAndTracepointsMapsByTid =
         (if (window.size == 3)
+           /**
+             * This is looking at a moving window of 3 partitions
+             * Taking save segment rom the first, compute from the
+             * second, and init-load from the third.
+             */
            Seq(
              (window(0).tid, window(0).save),
              (window(2).tid, window(2).init),
@@ -159,6 +164,11 @@ class Backend(
              (window(1).tid, window(1).compute)
            )
          else if (window.size == 1)
+           /**
+             * For single-threaded situation simply take all four
+             * segments for the same partition in window of single
+             * partition.
+             */
            Seq(
              (window(0).tid, window(0).init),
              (window(0).tid, window(0).load),

@@ -105,7 +105,9 @@ object EmulatorHelper {
           arraySize,
           count
         )
-    } else
+    } else if (modelName.startsWith("speech_commands"))
+      SpeechCommands.prepareInputStream(dataType, arraySize, count)
+    else
       throw new IllegalArgumentException()
 
   private def assertOutput(
@@ -182,7 +184,9 @@ object EmulatorHelper {
       val yoloPattern(yoloSize) = modelName
       TinyYolo(yoloSize.toInt, onnx = modelName.endsWith("onnx"))
         .assertOutput(outputName, dataType, arraySize, bytes)
-    } else
+    } else if (modelName.startsWith("speech_commands"))
+      SpeechCommands.assertOutput(dataType, arraySize, bytes, count)
+    else
       throw new IllegalArgumentException()
 
   private def minimumInputCount(modelName: String): Int =
@@ -190,7 +194,10 @@ object EmulatorHelper {
       4
     else if (modelName.startsWith("resnet50v2"))
       3
-    else if (modelName.startsWith("resnet20v2"))
+    else if (
+      modelName
+        .startsWith("resnet20v2") || modelName.startsWith("speech_commands")
+    )
       10
     else
       1

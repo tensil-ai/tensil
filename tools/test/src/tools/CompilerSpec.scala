@@ -2536,4 +2536,78 @@ class CompilerSpec extends FlatSpec {
       traceContext = traceContext
     )
   }
+
+  val SpeechCommandsFp16bp8Architecture = Architecture.mkWithDefaults(
+    dataType = ArchitectureDataType.FP16BP8,
+    arraySize = 8,
+    accumulatorDepth = Kibi * 2,
+    localDepth = Kibi * 8,
+    stride0Depth = 8,
+    stride1Depth = 8,
+  )
+
+  val SpeechCommandsFloatArchitecture = Architecture.mkWithDefaults(
+    dataType = ArchitectureDataType.FLOAT32,
+    arraySize = 8,
+    accumulatorDepth = Kibi * 2,
+    localDepth = Kibi * 8,
+    stride0Depth = 8,
+    stride1Depth = 8,
+  )
+
+  it should "Compile ONNX fixed16bp8 SpeechCommands" in {
+    val name         = "speech_commands_fixed16bp8_onnx"
+    val traceContext = new ExecutiveTraceContext()
+    val options = CompilerOptions(
+      arch = SpeechCommandsFp16bp8Architecture,
+      printSummary = true,
+      printLayersSummary = true,
+      printGraphFileName = Some(s"${name}.dot"),
+      tracepointConditions = List(
+        TracepointCondition(MemoryTag.Vars, "dense_3")
+      )
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/speech_commands.onnx",
+      List("dense_3"),
+      options,
+      traceContext
+    )
+
+    EmulatorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize,
+      traceContext = traceContext
+    )
+  }
+
+  it should "Compile ONNX float SpeechCommands" taggedAs (Slow) in {
+    val name         = "speech_commands_fixed16bp8_onnx"
+    val traceContext = new ExecutiveTraceContext()
+    val options = CompilerOptions(
+      arch = SpeechCommandsFloatArchitecture,
+      printSummary = true,
+      printLayersSummary = true,
+      printGraphFileName = Some(s"${name}.dot"),
+      tracepointConditions = List(
+        TracepointCondition(MemoryTag.Vars, "dense_3")
+      )
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/speech_commands.onnx",
+      List("dense_3"),
+      options,
+      traceContext
+    )
+
+    EmulatorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize,
+      traceContext = traceContext
+    )
+  }
 }

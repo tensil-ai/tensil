@@ -70,6 +70,13 @@ class Backend(
 
     val windowSize = layout.arch.numberOfThreads match {
       case 1 => 1
+      /**
+        * For 2 threads we interlace LIR from init-load-save and
+        * compute segments. This is achieved by looking at a
+        * moving window of 3 partitions and taking save segment
+        * from the first, compute from the second, and init-load
+        * from the third.
+        */
       case 2 => 3
       case _ =>
         throw new CompilerException(

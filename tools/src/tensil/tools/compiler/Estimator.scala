@@ -33,12 +33,15 @@ class Estimator(arch: Architecture) {
   private val InternalTransferCycles = 1
 
   private val DRAMTransferEnergy = 100
+  private val DRAMTransferCycles = 1
 
+  /*
   private val DRAMTransferSetupReadCycles  = 32
   private val DRAMTransferSetupWriteCycles = 0
   private val DRAMTransferReadCycles       = 2
   private val DRAMTransferWriteCycles      = 1
   private val DRAMTransferWidthBits        = 128
+   */
 
   def estimateCyclesAndEnergy(
       currentOp: Int,
@@ -105,8 +108,8 @@ class Estimator(arch: Architecture) {
             (size.get + 1) * transfersPerVector * transferCycles + setupCycles
           val energy = (size.get + 1) * transfersPerVector * DRAMTransferEnergy*/
 
-          val cycles = (size.get + 1) * 1
-          val energy = (size.get + 1) * 1
+          val cycles = (size.get + 1) * DRAMTransferCycles
+          val energy = (size.get + 1) * DRAMTransferEnergy
 
           new Estimate(cycles, energy)
         } else {

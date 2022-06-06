@@ -192,8 +192,7 @@ class Scheduler(
     }
   }
 
-  def emitSIMDOp(
-      op: Int,
+  def emitSub(
       input0Obj: MemoryObject,
       input1Obj: MemoryObject,
       outputObj: MemoryObject
@@ -203,8 +202,27 @@ class Scheduler(
     for (i <- 0 until outputObj.dims.sizeVectors) {
       val output = outputObj.mkAddress(i)
       require(!tempOutputNodes.contains(output))
-      tempOutputNodes(output) = new SIMDNode(
-        op,
+      tempOutputNodes(output) = new BinarySIMDNode(
+        SIMDOp.Subtract,
+        input0Obj.mkAddress(i),
+        input1Obj.mkAddress(i),
+        output
+      )
+    }
+  }
+
+  def emitMul(
+      input0Obj: MemoryObject,
+      input1Obj: MemoryObject,
+      outputObj: MemoryObject
+  ): Unit = {
+    require(input0Obj.dims.sizeVectors == outputObj.dims.sizeVectors)
+    require(input1Obj.dims.sizeVectors == outputObj.dims.sizeVectors)
+    for (i <- 0 until outputObj.dims.sizeVectors) {
+      val output = outputObj.mkAddress(i)
+      require(!tempOutputNodes.contains(output))
+      tempOutputNodes(output) = new BinarySIMDNode(
+        SIMDOp.Multiply,
         input0Obj.mkAddress(i),
         input1Obj.mkAddress(i),
         output
@@ -1279,15 +1297,15 @@ class Scheduler(
     addRollup.finalEmit()
 
     for (
-      subNode <-
+      binarySIMDNode <-
         nodes
-          .filter(_.isInstanceOf[SIMDNode])
-          .map(_.asInstanceOf[SIMDNode])
+          .filter(_.isInstanceOf[BinarySIMDNode])
+          .map(_.asInstanceOf[BinarySIMDNode])
           .sortBy(_.output)
     ) {
-      val outputAccAddress = allocateAccumulator(subNode.output)
-      val input0AccAddress = locateAccumulator(subNode.input0)
-      val input1AccAddress = locateAccumulator(subNode.input1)
+      val outputAccAddress = allocateAccumulator(binarySIMDNode.output)
+      val input0AccAddress = locateAccumulator(binarySIMDNode.input0)
+      val input1AccAddress = locateAccumulator(binarySIMDNode.input1)
 
       computeLir.emitSIMD(
         accumulate = false,
@@ -1301,7 +1319,7 @@ class Scheduler(
 
       computeLir.emitSIMD(
         accumulate = false,
-        subNode.op,
+        binarySIMDNode.op,
         SIMDSource.Register1,
         SIMDSource.Input,
         SIMDDestination.Output,

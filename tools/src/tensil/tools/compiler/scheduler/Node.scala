@@ -94,7 +94,7 @@ class AddNode(
     if (input1.tag == MemoryTag.Consts) Seq(input1) else Nil
 }
 
-class SIMDNode(
+class BinarySIMDNode(
     val op: Int,
     val input0: MemoryAddress,
     val input1: MemoryAddress,

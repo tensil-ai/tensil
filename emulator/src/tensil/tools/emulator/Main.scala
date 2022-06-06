@@ -31,6 +31,7 @@ case class Args(
     modelFile: File = new File("."),
     inputFiles: Seq[File] = Nil,
     outputFiles: Seq[File] = Nil,
+    numberOfRuns: Int = 1,
 )
 
 object Main extends App {
@@ -54,6 +55,11 @@ object Main extends App {
       .valueName("<file>, ...")
       .action((x, c) => c.copy(outputFiles = x))
       .text("Output (.csv) files")
+
+    opt[Int]('r', "number-of-runs")
+      .valueName("<integer>")
+      .action((x, c) => c.copy(numberOfRuns = x))
+      .text("Number of runs")
   }
 
   argParser.parse(args, Args()) match {
@@ -73,6 +79,7 @@ object Main extends App {
             model,
             args.inputFiles,
             args.outputFiles,
+            args.numberOfRuns,
             traceContext
           )
 
@@ -82,6 +89,7 @@ object Main extends App {
             model,
             args.inputFiles,
             args.outputFiles,
+            args.numberOfRuns,
             traceContext
           )
 
@@ -91,6 +99,7 @@ object Main extends App {
             model,
             args.inputFiles,
             args.outputFiles,
+            args.numberOfRuns,
             traceContext
           )
 
@@ -100,6 +109,7 @@ object Main extends App {
             model,
             args.inputFiles,
             args.outputFiles,
+            args.numberOfRuns,
             traceContext
           )
 
@@ -109,6 +119,7 @@ object Main extends App {
             model,
             args.inputFiles,
             args.outputFiles,
+            args.numberOfRuns,
             traceContext
           )
       }
@@ -122,8 +133,12 @@ object Main extends App {
       model: Model,
       inputFiles: Seq[File],
       outputFiles: Seq[File],
+      numberOfRuns: Int,
       traceContext: ExecutiveTraceContext
   ): Unit = {
+    require(model.inputs.size == inputFiles.size)
+    require(model.outputs.size == outputFiles.size)
+
     val emulator = new Emulator(
       dataType = dataType,
       arch = model.arch
@@ -138,52 +153,60 @@ object Main extends App {
 
     constsStream.close()
 
-    require(model.inputs.size == inputFiles.size)
+    val inputStreams =
+      for ((input, file) <- model.inputs.zip(inputFiles)) yield {
+        val inputPrep           = new ByteArrayOutputStream()
+        val inputPrepDataStream = new DataOutputStream(inputPrep)
 
-    for ((input, file) <- model.inputs.zip(inputFiles)) {
-      val inputPrep           = new ByteArrayOutputStream()
-      val inputPrepDataStream = new DataOutputStream(inputPrep)
+        ArchitectureDataTypeUtil.writeFromCsv(
+          dataType,
+          inputPrepDataStream,
+          model.arch.arraySize,
+          file.getAbsolutePath()
+        )
 
-      ArchitectureDataTypeUtil.writeFromCsv(
-        dataType,
-        inputPrepDataStream,
-        model.arch.arraySize,
-        file.getAbsolutePath()
-      )
+        require(
+          inputPrep
+            .size() == input.size * model.arch.arraySize * dataType.sizeBytes * numberOfRuns
+        )
 
-      require(
-        inputPrep
-          .size() == input.size * model.arch.arraySize * dataType.sizeBytes
-      )
+        (
+          input,
+          new DataInputStream(
+            new ByteArrayInputStream(inputPrep.toByteArray())
+          )
+        )
+      }
 
-      val inputStream = new DataInputStream(
-        new ByteArrayInputStream(inputPrep.toByteArray())
-      )
-      emulator.writeDRAM0(
-        input.base until input.base + input.size,
-        inputStream
-      )
+    val outputPreps =
+      for ((output, file) <- model.outputs.zip(outputFiles)) yield {
+        val outputPrep = new ByteArrayOutputStream()
+        (output, file, outputPrep, new DataOutputStream(outputPrep))
+      }
+
+    for (_ <- 0 until numberOfRuns) {
+      val trace         = new ExecutiveTrace(traceContext)
+      val programStream = new FileInputStream(model.program.fileName)
+
+      for ((input, inputStream) <- inputStreams)
+        emulator.writeDRAM0(
+          input.base until input.base + input.size,
+          inputStream
+        )
+
+      emulator.run(programStream, trace)
+
+      for ((output, _, _, outputPrepDataStream) <- outputPreps)
+        emulator.readDRAM0(
+          output.base until output.base + output.size,
+          outputPrepDataStream
+        )
+
+      programStream.close()
+      trace.printTrace()
     }
 
-    val trace         = new ExecutiveTrace(traceContext)
-    val programStream = new FileInputStream(model.program.fileName)
-
-    emulator.run(programStream, trace)
-
-    programStream.close()
-    trace.printTrace()
-
-    require(model.outputs.size == outputFiles.size)
-
-    for ((output, file) <- model.outputs.zip(outputFiles)) {
-      val outputPrep           = new ByteArrayOutputStream()
-      val outputPrepDataStream = new DataOutputStream(outputPrep)
-
-      emulator.readDRAM0(
-        output.base until output.base + output.size,
-        outputPrepDataStream
-      )
-
+    for ((output, file, outputPrep, _) <- outputPreps) {
       val outputStream = new DataInputStream(
         new ByteArrayInputStream(outputPrep.toByteArray())
       )
@@ -192,7 +215,7 @@ object Main extends App {
         dataType,
         outputStream,
         model.arch.arraySize,
-        output.size,
+        output.size * numberOfRuns,
         file.getAbsolutePath()
       )
     }

@@ -21,6 +21,18 @@ trait HIR {
       outputObj: MemoryObject
   ): Unit
 
+  def emitSub(
+      input0Obj: MemoryObject,
+      input1Obj: MemoryObject,
+      outputObj: MemoryObject
+  ): Unit
+
+  def emitMul(
+      input0Obj: MemoryObject,
+      input1Obj: MemoryObject,
+      outputObj: MemoryObject
+  ): Unit
+
   def emitRelu(
       inputObj: MemoryObject,
       outputObj: MemoryObject

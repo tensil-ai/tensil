@@ -258,6 +258,10 @@ class OnnxFrontend(
             rewriteSimple(remainingProtos, emitActivate(_, nodeProto), emitters)
           case "Add" =>
             rewriteSimple(remainingProtos, emitAdd(_, nodeProto), emitters)
+          case "Sub" =>
+            rewriteSimple(remainingProtos, emitSub(_, nodeProto), emitters)
+          case "Mul" =>
+            rewriteSimple(remainingProtos, emitMul(_, nodeProto), emitters)
           case "Transpose" =>
             rewriteSimple(
               remainingProtos,
@@ -1548,7 +1552,7 @@ class OnnxFrontend(
         getTensorData(tensorProtos(resizeProto.input(1)))
           .asInstanceOf[TensorData[Float]]
 
-    val (scaleWidth, scaleHeight) =
+    val (scaleHeight, scaleWidth) =
       if (scales.data.size == 4) (scales.data(2), scales.data(3))
       else
         throw new CompilerException(
@@ -1826,6 +1830,100 @@ class OnnxFrontend(
       outputTemp.name,
       outputTemp.dims,
       findInterLayerOutputs(context, addProto.output(0), None)
+    )
+
+    scheduler.emitSave(outputTemp, outputVars)
+
+    finishLayer(scheduler, context)
+  }
+
+  private def emitSub(
+      context: EmitContext,
+      nodeProto: NodeProto
+  ): EmitResult = {
+    val scheduler = startLayer(Seq(nodeProto))
+
+    val input0Vars =
+      context.mm.consumeObject(nodeProto.input(0), Seq(nodeProto.name.get))
+
+    val input0Temp = context.mm.allocateTempObject(
+      input0Vars.name,
+      input0Vars.dims
+    )
+
+    scheduler.emitLoad(input0Vars, input0Temp)
+
+    val input1VarsOrConst = if (tensorProtos.isDefinedAt(nodeProto.input(1))) {
+      context.mm.addPendingConst(
+        nodeProto.input(1),
+        getTensorData(tensorProtos(nodeProto.input(1)))
+      )
+
+      context.mm.getOrEmitConstObject(nodeProto.input(1), Some(input0Temp.dims))
+    } else
+      context.mm.consumeObject(nodeProto.input(1), Seq(nodeProto.name.get))
+
+    val input1Temp = context.mm.allocateTempObject(
+      input1VarsOrConst.name,
+      input1VarsOrConst.dims
+    )
+
+    scheduler.emitLoad(input1VarsOrConst, input1Temp)
+
+    val outputTemp =
+      emitLayerSub(context, scheduler, nodeProto, input0Temp, input1Temp)
+
+    val outputVars = context.mm.allocateVarsObject(
+      outputTemp.name,
+      outputTemp.dims,
+      findInterLayerOutputs(context, nodeProto.output(0), None)
+    )
+
+    scheduler.emitSave(outputTemp, outputVars)
+
+    finishLayer(scheduler, context)
+  }
+
+  private def emitMul(
+      context: EmitContext,
+      nodeProto: NodeProto
+  ): EmitResult = {
+    val scheduler = startLayer(Seq(nodeProto))
+
+    val input0Vars =
+      context.mm.consumeObject(nodeProto.input(0), Seq(nodeProto.name.get))
+
+    val input0Temp = context.mm.allocateTempObject(
+      input0Vars.name,
+      input0Vars.dims
+    )
+
+    scheduler.emitLoad(input0Vars, input0Temp)
+
+    val input1VarsOrConst = if (tensorProtos.isDefinedAt(nodeProto.input(1))) {
+      context.mm.addPendingConst(
+        nodeProto.input(1),
+        getTensorData(tensorProtos(nodeProto.input(1)))
+      )
+
+      context.mm.getOrEmitConstObject(nodeProto.input(1), Some(input0Temp.dims))
+    } else
+      context.mm.consumeObject(nodeProto.input(1), Seq(nodeProto.name.get))
+
+    val input1Temp = context.mm.allocateTempObject(
+      input1VarsOrConst.name,
+      input1VarsOrConst.dims
+    )
+
+    scheduler.emitLoad(input1VarsOrConst, input1Temp)
+
+    val outputTemp =
+      emitLayerMul(context, scheduler, nodeProto, input0Temp, input1Temp)
+
+    val outputVars = context.mm.allocateVarsObject(
+      outputTemp.name,
+      outputTemp.dims,
+      findInterLayerOutputs(context, nodeProto.output(0), None)
     )
 
     scheduler.emitSave(outputTemp, outputVars)
@@ -2499,19 +2597,19 @@ class OnnxFrontend(
       if (addProto.input(0) == input0Temp.name) addProto.input(1)
       else addProto.input(0)
 
-    val input1Vars = if (tensorProtos.isDefinedAt(input1Name)) {
+    val input1VarsOrConst = if (tensorProtos.isDefinedAt(input1Name)) {
       context.mm.addPendingConst(
         input1Name,
         getTensorData(tensorProtos(input1Name))
       )
 
-      context.mm.getOrEmitConstObject(input1Name)
+      context.mm.getOrEmitConstObject(input1Name, Some(input0Temp.dims))
     } else
       context.mm.consumeObject(input1Name, Seq(addProto.name.get))
 
     scheduler.emitAdd(
       input0Temp,
-      input1Vars,
+      input1VarsOrConst,
       outputTemp
     )
 
@@ -2519,7 +2617,63 @@ class OnnxFrontend(
       graphPrinter.get.printOp(
         addProto,
         Seq(outputTemp),
-        Seq(input1Vars, input0Temp)
+        Seq(input1VarsOrConst, input0Temp)
+      )
+
+    outputTemp
+  }
+
+  private def emitLayerSub(
+      context: EmitContext,
+      scheduler: Scheduler,
+      nodeProto: NodeProto,
+      input0Temp: MemoryObject,
+      input1Temp: MemoryObject,
+  ): MemoryObject = {
+    val outputTemp = context.mm.allocateTempObject(
+      nodeProto.output(0),
+      input0Temp.dims
+    )
+
+    scheduler.emitSub(
+      input0Temp,
+      input1Temp,
+      outputTemp
+    )
+
+    if (graphPrinter.isDefined)
+      graphPrinter.get.printOp(
+        nodeProto,
+        Seq(outputTemp),
+        Seq(input0Temp, input1Temp)
+      )
+
+    outputTemp
+  }
+
+  private def emitLayerMul(
+      context: EmitContext,
+      scheduler: Scheduler,
+      nodeProto: NodeProto,
+      input0Temp: MemoryObject,
+      input1Temp: MemoryObject,
+  ): MemoryObject = {
+    val outputTemp = context.mm.allocateTempObject(
+      nodeProto.output(0),
+      input0Temp.dims
+    )
+
+    scheduler.emitMul(
+      input0Temp,
+      input1Temp,
+      outputTemp
+    )
+
+    if (graphPrinter.isDefined)
+      graphPrinter.get.printOp(
+        nodeProto,
+        Seq(outputTemp),
+        Seq(input0Temp, input1Temp)
       )
 
     outputTemp

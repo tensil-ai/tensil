@@ -9,13 +9,13 @@ import scala.io.Source
 import tensil.tools.emulator.{Emulator, ExecutiveTraceContext}
 import tensil.ArchitectureDataType
 
-object ResNet50 {
+object SpeechCommands {
   def prepareInputStream(
       dataType: ArchitectureDataType,
       arraySize: Int,
       count: Int
   ): InputStream = {
-    val fileName = s"./models/data/resnet_input_${count}x224x224x${arraySize}.csv"
+    val fileName = s"./models/data/speech_commands_input_${count}x${arraySize}.csv"
 
     val inputPrep           = new ByteArrayOutputStream()
     val inputPrepDataStream = new DataOutputStream(inputPrep)
@@ -30,10 +30,9 @@ object ResNet50 {
     new ByteArrayInputStream(inputPrep.toByteArray())
   }
 
-  private val GoldenClasses: Array[Int] = Array(
-    386, // African_elephant
-    248, // Eskimo_dog
-    285  // Egyptian_cat
+  val ClassSize = 8
+  val GoldenClasses: Array[Int] = Array(
+    7, 2, 4, 6, 1, 6, 6, 5, 0, 5
   )
 
   def assertOutput(
@@ -46,11 +45,13 @@ object ResNet50 {
       new DataInputStream(new ByteArrayInputStream(bytes))
 
     for (i <- 0 until count) {
-      assert(
-        ArchitectureDataTypeUtil.argMax(
-          ArchitectureDataTypeUtil.readResult(dataType, output, arraySize, 1000)
-        ) == GoldenClasses(i)
+      val expected = GoldenClasses(i)
+      val actual = ArchitectureDataTypeUtil.argMax(
+        ArchitectureDataTypeUtil.readResult(dataType, output, arraySize, ClassSize)
       )
+
+      println(s"expected=$expected, actual=$actual")
+      assert(expected == actual)
     }
   }
 }

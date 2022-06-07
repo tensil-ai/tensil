@@ -24,6 +24,7 @@ object EmulatorHelper {
   ): Unit = {
     val modelStream = new FileInputStream(s"$modelName.tmodel")
     val model       = upickle.default.read[Model](modelStream)
+    modelStream.close()
 
     model.arch.dataType.name match {
       case ArchitectureDataType.FLOAT32.name =>
@@ -104,7 +105,9 @@ object EmulatorHelper {
           arraySize,
           count
         )
-    } else
+    } else if (modelName.startsWith("speech_commands"))
+      SpeechCommands.prepareInputStream(dataType, arraySize, count)
+    else
       throw new IllegalArgumentException()
 
   private def assertOutput(
@@ -181,7 +184,9 @@ object EmulatorHelper {
       val yoloPattern(yoloSize) = modelName
       TinyYolo(yoloSize.toInt, onnx = modelName.endsWith("onnx"))
         .assertOutput(outputName, dataType, arraySize, bytes)
-    } else
+    } else if (modelName.startsWith("speech_commands"))
+      SpeechCommands.assertOutput(dataType, arraySize, bytes, count)
+    else
       throw new IllegalArgumentException()
 
   private def minimumInputCount(modelName: String): Int =
@@ -189,7 +194,10 @@ object EmulatorHelper {
       4
     else if (modelName.startsWith("resnet50v2"))
       3
-    else if (modelName.startsWith("resnet20v2"))
+    else if (
+      modelName
+        .startsWith("resnet20v2") || modelName.startsWith("speech_commands")
+    )
       10
     else
       1
@@ -205,10 +213,14 @@ object EmulatorHelper {
       arch = model.arch
     )
 
+    val constsStream = new FileInputStream(model.consts(0).fileName)
+
     emulator.writeDRAM1(
       model.consts(0).size,
-      new FileInputStream(model.consts(0).fileName)
+      constsStream
     )
+
+    constsStream.close()
 
     val outputs = mutable.Map.empty[String, ByteArrayOutputStream]
     val count   = Math.max(inputBatchSize, minimumInputCount(model.name))
@@ -223,10 +235,12 @@ object EmulatorHelper {
         new DataInputStream(inputStream)
       )
 
-      var trace = new ExecutiveTrace(traceContext)
+      val trace         = new ExecutiveTrace(traceContext)
+      val programStream = new FileInputStream(model.program.fileName)
 
-      emulator.run(new FileInputStream(model.program.fileName), trace)
+      emulator.run(programStream, trace)
 
+      programStream.close()
       trace.printTrace()
 
       for (output <- model.outputs) {

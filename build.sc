@@ -31,20 +31,42 @@ object tools extends ScalaPBModule { m =>
   def scalaVersion   = common.scalaVersion
   def scalaPBVersion = "0.11.6"
 
-  def mainClass = Some("tensil.tools.Main")
-
-  override def ivyDeps =
-    common.ivyDeps() ++ super.ivyDeps() ++ Agg(
-      ivy"com.github.seratch::awscala-s3:0.8.5",
-      ivy"com.github.seratch::awscala-sqs:0.8.5",
-      ivy"com.github.seratch::awscala-dynamodb:0.8.5",
-    )
-
   object test extends Tests with TestModule.ScalaTest {
     def forkArgs = Seq("-Xmx12g", "-Xmx12g")
 
     def ivyDeps = m.ivyDeps() ++ Agg(ivy"org.scalatest::scalatest:3.0.4")
   }
+}
+
+object compiler extends ScalaModule { m =>
+  def moduleDeps = Seq(tools)
+
+  def scalaVersion = tools.scalaVersion
+
+  def mainClass = Some("tensil.tools.compiler.Main")
+}
+
+object emulator extends ScalaModule { m =>
+  def moduleDeps = Seq(tools)
+
+  def scalaVersion = tools.scalaVersion
+
+  def mainClass = Some("tensil.tools.emulator.Main")
+}
+
+object web extends ScalaModule { m =>
+  def moduleDeps = Seq(tools)
+
+  def scalaVersion = tools.scalaVersion
+
+  override def ivyDeps =
+    tools.ivyDeps() ++ super.ivyDeps() ++ Agg(
+      ivy"com.github.seratch::awscala-s3:0.8.5",
+      ivy"com.github.seratch::awscala-sqs:0.8.5",
+      ivy"com.github.seratch::awscala-dynamodb:0.8.5",
+    )
+
+  def mainClass = Some("tensil.tools.web.Main")
 }
 
 object rtl extends SbtModule { m =>

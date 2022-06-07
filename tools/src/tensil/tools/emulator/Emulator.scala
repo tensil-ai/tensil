@@ -574,6 +574,7 @@ class Emulator[T : NumericWithMAC : ClassTag](
             case SIMDOp.Zero     => zero
             case SIMDOp.Max      => if (left(i) > right(i)) left(i) else right(i)
             case SIMDOp.Add      => left(i) + right(i)
+            case SIMDOp.Subtract => left(i) - right(i)
             case SIMDOp.Multiply => left(i) * right(i)
             case SIMDOp.Move     => left(i)
           }

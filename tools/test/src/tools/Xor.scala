@@ -27,7 +27,7 @@ object Xor {
 
     for (i <- 0 until count) {
       val (x0, x1, _) = GoldenXor(i % GoldenXor.size)
-      Util.writeArgs(dataType, inputPrepDataStream, arraySize, x0, x1)
+      ArchitectureDataTypeUtil.writeArgs(dataType, inputPrepDataStream, arraySize, x0, x1)
     }
 
     inputPrep.toByteArray()
@@ -46,7 +46,7 @@ object Xor {
 
     for (i <- 0 until count) {
       val (_, _, y) = GoldenXor(i % GoldenXor.size)
-      rmse.addSample(Util.readResult(dataType, output, arraySize, 1)(0), y)
+      rmse.addSample(ArchitectureDataTypeUtil.readResult(dataType, output, arraySize, 1)(0), y)
     }
 
     assert(rmse.compute < dataType.error)

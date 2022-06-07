@@ -90,6 +90,8 @@ class Printer(
         s"${formatDestination(simdDestination)}=Max(${formatSource(simdSourceLeft)},${formatSource(simdSourceRight)})"
       case SIMDOp.Add =>
         s"${formatDestination(simdDestination)}=Add(${formatSource(simdSourceLeft)},${formatSource(simdSourceRight)})"
+      case SIMDOp.Subtract =>
+        s"${formatDestination(simdDestination)}=Subtract(${formatSource(simdSourceLeft)},${formatSource(simdSourceRight)})"
       case SIMDOp.Multiply =>
         s"${formatDestination(simdDestination)}=Multiply(${formatSource(simdSourceLeft)},${formatSource(simdSourceRight)})"
       case SIMDOp.Move =>

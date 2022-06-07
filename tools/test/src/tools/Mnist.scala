@@ -76,8 +76,8 @@ object Mnist {
 
     for (i <- 0 until count) {
       assert(
-        Util.argMax(
-          Util.readResult(dataType, output, arraySize, 10)
+        ArchitectureDataTypeUtil.argMax(
+          ArchitectureDataTypeUtil.readResult(dataType, output, arraySize, 10)
         ) == GoldenClasses(i)
       )
     }

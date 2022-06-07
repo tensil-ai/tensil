@@ -150,64 +150,6 @@ class MemoryDimensions private (
 
   def lastInLayout = at(layout.last)
 
-  def modelOffset(
-      width: Int
-  ): Int = {
-    require(order == 1)
-
-    require(numberIndex < 0)
-    require(heightIndex < 0)
-    require(widthIndex >= 0)
-    require(channelsIndex < 0)
-    require(channelsOutIndex < 0)
-
-    width
-  }
-
-  def modelOffset(
-      height: Int,
-      width: Int
-  ): Int = {
-    require(order == 2)
-
-    require(numberIndex < 0)
-    require(heightIndex >= 0)
-    require(widthIndex >= 0)
-    require(channelsIndex < 0)
-    require(channelsOutIndex < 0)
-
-    val pos = Array.fill(2)(0)
-    pos(heightIndex) = height
-    pos(widthIndex) = width
-
-    pos(0) * dimensions(1) + pos(1)
-  }
-
-  def modelOffset(
-      height: Int,
-      width: Int,
-      channelsIn: Int,
-      channelsOut: Int
-  ): Int = {
-    require(order == 4)
-
-    require(numberIndex < 0)
-    require(heightIndex >= 0)
-    require(widthIndex >= 0)
-    require(channelsIndex >= 0)
-    require(channelsOutIndex >= 0)
-
-    val pos = Array.fill(4)(0)
-    pos(heightIndex) = height
-    pos(widthIndex) = width
-    pos(channelsIndex) = channelsIn
-    pos(channelsOutIndex) = channelsOut
-
-    ((pos(0) * dimensions(1) + pos(1)) * dimensions(2) + pos(2)) * dimensions(
-      3
-    ) + pos(3)
-  }
-
   def modelDimensionsName =
     dimensionNames.toSeq.filter(_._1 >= 0).sortBy(_._1).map(_._2).mkString("")
   def layoutDimensionsName = layout.map(dimensionNames(_)).mkString("")
@@ -223,6 +165,57 @@ class MemoryDimensions private (
       (util.divCeil(dimension, arraySize) * arraySize)
     else
       dimension
+  }
+
+  def buildConsts(build: (Option[Int]) => Unit): Unit = {
+    def atLayout(i: Int) =
+      atVectors(layout(i)) * (if (i == order - 1) arraySize else 1)
+
+    def modelPos(layoutPos: Int*) =
+      (0 until layoutPos.size).map(i => layoutPos(layout.indexOf(i)))
+
+    def modelOffset(modelPos: Seq[Int]): Option[Int] =
+      if (
+        dimensions.zipWithIndex
+          .forall {
+            case (dim, i) => modelPos(i) < dim
+          }
+      )
+        Some(
+          if (order > 0)
+            modelPos(modelPos.size - 1) +
+              (if (order > 1)
+                 ((if (order > 2)
+                     ((if (order > 3)
+                         modelPos(modelPos.size - 4) * dimensions(
+                           modelPos.size - 3
+                         )
+                       else 0) + modelPos(modelPos.size - 3)) * dimensions(
+                       modelPos.size - 2
+                     )
+                   else 0) + modelPos(modelPos.size - 2)) * dimensions(
+                   modelPos.size - 1
+                 )
+               else 0)
+          else 0
+        )
+      else None
+
+    if (order > 0)
+      for (i0 <- 0 until atLayout(0))
+        if (order > 1)
+          for (i1 <- 0 until atLayout(1))
+            if (order > 2)
+              for (i2 <- 0 until atLayout(2))
+                if (order > 3)
+                  for (i3 <- 0 until atLayout(3))
+                    build(modelOffset(modelPos(i0, i1, i2, i3)))
+                else
+                  build(modelOffset(modelPos(i0, i1, i2)))
+            else
+              build(modelOffset(modelPos(i0, i1)))
+        else
+          build(modelOffset(modelPos(i0)))
   }
 
   def numberVectors      = atVectors(numberIndex)

@@ -58,7 +58,7 @@ tensil compile -a /demo/arch/pynqz1.tarch -m /demo/models/resnet20v2_cifar.pb -o
 ## Run bit accurate Tensil emulator
 
 ```
-tensil emulate -m resnet20v2_cifar_onnx_pynqz1.tmodel -i ./models/data/resnet_input_1x32x32x8.csv -o resnet_output.csv
+tensil emulate -m resnet20v2_cifar_onnx_pynqz1.tmodel -i ./models/data/resnet_input_1x32x32x8.csv
 ```
 
 ## Make Verilog RTL
@@ -111,7 +111,7 @@ rm main.tar.gz
 ### Run emulator from source code
 
 ```
-./mill emulator.run -m resnet20v2_cifar_onnx_pynqz1.tmodel -i ./models/data/resnet_input_1x32x32x8.csv -o resnet_output.csv
+./mill emulator.run -m resnet20v2_cifar_onnx_pynqz1.tmodel -i ./models/data/resnet_input_1x32x32x8.csv
 ```
 
 ### Run full test suite

@@ -22,7 +22,9 @@ import tensil.{
   ArchitectureDataTypeWithBase,
   InstructionLayout,
   FloatAsIfIntegralWithMAC,
-  NumericWithMAC
+  NumericWithMAC,
+  TablePrinter,
+  TableLine
 }
 import tensil.tools.ArchitectureDataTypeUtil
 import tensil.tools.model.Model
@@ -51,7 +53,6 @@ object Main extends App {
       .text("Input (.csv) files")
 
     opt[Seq[File]]('o', "outputs")
-      .required()
       .valueName("<file>, ...")
       .action((x, c) => c.copy(outputFiles = x))
       .text("Output (.csv) files")
@@ -137,7 +138,7 @@ object Main extends App {
       traceContext: ExecutiveTraceContext
   ): Unit = {
     require(model.inputs.size == inputFiles.size)
-    require(model.outputs.size == outputFiles.size)
+    require(outputFiles.size == 0 || model.outputs.size == outputFiles.size)
 
     val emulator = new Emulator(
       dataType = dataType,
@@ -179,10 +180,16 @@ object Main extends App {
       }
 
     val outputPreps =
-      for ((output, file) <- model.outputs.zip(outputFiles)) yield {
-        val outputPrep = new ByteArrayOutputStream()
-        (output, file, outputPrep, new DataOutputStream(outputPrep))
-      }
+      if (outputFiles.size != 0)
+        for ((output, file) <- model.outputs.zip(outputFiles)) yield {
+          val outputPrep = new ByteArrayOutputStream()
+          (output, Some(file), outputPrep, new DataOutputStream(outputPrep))
+        }
+      else
+        for (output <- model.outputs) yield {
+          val outputPrep = new ByteArrayOutputStream()
+          (output, None, outputPrep, new DataOutputStream(outputPrep))
+        }
 
     for (_ <- 0 until numberOfRuns) {
       val trace         = new ExecutiveTrace(traceContext)
@@ -211,13 +218,46 @@ object Main extends App {
         new ByteArrayInputStream(outputPrep.toByteArray())
       )
 
-      ArchitectureDataTypeUtil.readToCsv(
-        dataType,
-        outputStream,
-        model.arch.arraySize,
-        output.size * numberOfRuns,
-        file.getAbsolutePath()
-      )
+      if (file.isDefined)
+        ArchitectureDataTypeUtil.readToCsv(
+          dataType,
+          outputStream,
+          model.arch.arraySize,
+          output.size * numberOfRuns,
+          file.get.getAbsolutePath()
+        )
+      else {
+        val r = ArchitectureDataTypeUtil.readResult(
+          dataType,
+          outputStream,
+          model.arch.arraySize,
+          output.size.toInt * numberOfRuns * model.arch.arraySize
+        )
+
+        for (i <- 0 until numberOfRuns) {
+          val tb = new TablePrinter(Some(s"OUTPUT ${output.name}, RUN ${i}"))
+
+          for (j <- 0 until output.size.toInt) {
+            val offset = (i * output.size.toInt + j) * model.arch.arraySize
+            val vector = r.slice(offset, offset + model.arch.arraySize)
+
+            tb.addLine(
+              TableLine(
+                f"${j}%08d",
+                vector
+                  .grouped(8)
+                  .map(_.map(v => {
+                    val s = f"$v%.4f"
+                    " " * (12 - s.length()) + s
+                  }).mkString)
+                  .toIterable
+              )
+            )
+          }
+
+          print(tb.toString())
+        }
+      }
     }
   }
 }

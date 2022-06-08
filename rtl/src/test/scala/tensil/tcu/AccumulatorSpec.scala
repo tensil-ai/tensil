@@ -58,7 +58,7 @@ class AccumulatorSpec extends UnitSpec {
       }
 
       thread("count") {
-        m.clock.step(n)
+        m.clock.step(n + 1)
         m.count.expect(n.U)
       }
     }

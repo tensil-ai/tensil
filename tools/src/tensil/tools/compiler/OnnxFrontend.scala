@@ -193,15 +193,16 @@ class OnnxFrontend(
       .map(outputNodeNames(_))
       .flatten
       .distinct
-      .foldLeft(prev)((prev, nodeName) => {
-        recursiveTraverse(
-          nodeName +: prev,
-          nodeProtos(nodeName).input.toSet
-            .diff(tensorProtos.keySet ++ inputValueInfoProtos.keySet)
-            .toSeq
-        )
-      })
-      .distinct
+      .foldLeft(prev)((prev, nodeName) =>
+        if (!prev.contains(nodeName))
+          recursiveTraverse(
+            prev,
+            nodeProtos(nodeName).input.toSet
+              .diff(tensorProtos.keySet ++ inputValueInfoProtos.keySet)
+              .toSeq
+          ) :+ nodeName
+        else prev
+      )
   }
 
   /*

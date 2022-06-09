@@ -14,7 +14,7 @@ class TracepointsWriter(
   private val tracepoints =
     mutable.Map.empty[MemoryAddress, mutable.ArrayBuffer[MemoryObject]]
 
-  def emitWrite(address: MemoryAddress): Unit = {
+  def write(address: MemoryAddress): Unit = {
     if (address.ref != MemoryRef.Invalid) {
       val obj = resolveRefToObject(address.ref)
 
@@ -32,5 +32,6 @@ class TracepointsWriter(
     }
   }
 
-  def toMap(): TracepointsMap = tracepoints.mapValues(_.toList).toMap
+  def isEmpty = tracepoints.isEmpty
+  def toMap: TracepointsMap = tracepoints.mapValues(_.toList).toMap
 }

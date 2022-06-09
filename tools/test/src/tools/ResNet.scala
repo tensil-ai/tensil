@@ -6,7 +6,7 @@ package tensil.tools
 import java.io._
 import scala.reflect.ClassTag
 import scala.io.Source
-import tensil.tools.golden.{Processor, ExecutiveTraceContext}
+import tensil.tools.emulator.{Emulator, ExecutiveTraceContext}
 import tensil.ArchitectureDataType
 
 object ResNet {
@@ -20,7 +20,7 @@ object ResNet {
     val inputPrep           = new ByteArrayOutputStream()
     val inputPrepDataStream = new DataOutputStream(inputPrep)
 
-    Util.writeCsv(
+    ArchitectureDataTypeUtil.writeFromCsv(
       dataType,
       inputPrepDataStream,
       arraySize,
@@ -45,11 +45,13 @@ object ResNet {
       new DataInputStream(new ByteArrayInputStream(bytes))
 
     for (i <- 0 until count) {
-      assert(
-        Util.argMax(
-          Util.readResult(dataType, output, arraySize, ClassSize)
-        ) == GoldenClasses(i)
+      val expected = GoldenClasses(i)
+      val actual = ArchitectureDataTypeUtil.argMax(
+        ArchitectureDataTypeUtil.readResult(dataType, output, arraySize, ClassSize)
       )
+
+      println(s"expected=$expected, actual=$actual")
+      assert(expected == actual)
     }
   }
 }

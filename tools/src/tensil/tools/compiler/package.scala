@@ -12,6 +12,7 @@ package object compiler {
   type EmitResult         = Option[SchedulerResult]
   type Emitter            = EmitContext => EmitResult
   type InstructionAddress = Long
+  type BackendSegmentKey  = (Int, Int, Int, Int)
 
   implicit class MemoryAddressHelper(val address: MemoryAddress) {
     def tag: MemoryTag =
@@ -27,6 +28,26 @@ package object compiler {
         case MemoryTag.Invalid => "Invalid"
         case MemoryTag.Zeroes  => "Zeroes"
         case tag               => f"${MemoryTag.toString(tag)}(${raw})"
+      }
+  }
+
+  implicit class BackendSegmentKeyHelper(val key: BackendSegmentKey) {
+    def layer = key._1
+    def stage = key._2
+    def partition = key._3
+    def kind = key._4
+
+    override def toString() =
+      if (key._4 == BackendSegmentKey.Init)
+        s"LAYER ${key._1}, STAGE ${key._2}, INIT"
+      else {
+        def kindToString(kind: Int) =
+          kind match {
+            case BackendSegmentKey.Load    => "LOAD"
+            case BackendSegmentKey.Compute => "COMPUTE"
+            case BackendSegmentKey.Save    => "SAVE"
+          }
+        s"LAYER ${key._1}, STAGE ${key._2}, PARTITION ${key._3}, ${kindToString(key._4)}"
       }
   }
 }

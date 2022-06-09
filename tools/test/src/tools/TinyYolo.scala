@@ -5,7 +5,7 @@ package tensil.tools
 
 import java.io._
 import scala.reflect.ClassTag
-import tensil.tools.golden.{Processor, ExecutiveTraceContext}
+import tensil.tools.emulator.{Emulator, ExecutiveTraceContext}
 import scala.collection.mutable
 import scala.io.Source
 import tensil.ArchitectureDataType
@@ -37,7 +37,12 @@ case class TinyYolo(yoloSize: Int, onnx: Boolean) {
     for (line <- source.getLines()) {
       val goldenPixel = line.split(",").map(_.toFloat)
       val pixel =
-        Util.readResult(dataType, output, arraySize, goldenPixel.size)
+        ArchitectureDataTypeUtil.readResult(
+          dataType,
+          output,
+          arraySize,
+          goldenPixel.size
+        )
 
       for (i <- 0 until goldenPixel.size)
         rmse.addSample(pixel(i), goldenPixel(i))
@@ -58,7 +63,7 @@ case class TinyYolo(yoloSize: Int, onnx: Boolean) {
     val inputPrep           = new ByteArrayOutputStream()
     val inputPrepDataStream = new DataOutputStream(inputPrep)
 
-    Util.writeCsv(
+    ArchitectureDataTypeUtil.writeFromCsv(
       dataType,
       inputPrepDataStream,
       arraySize,

@@ -5,7 +5,7 @@ package tensil.tools
 
 import java.io._
 import scala.reflect.ClassTag
-import tensil.tools.golden.{Processor, ExecutiveTraceContext}
+import tensil.tools.emulator.{Emulator, ExecutiveTraceContext, ExecutiveTrace}
 import scala.collection.mutable
 import tensil.{
   Architecture,
@@ -15,9 +15,8 @@ import tensil.{
   FloatAsIfIntegralWithMAC
 }
 import tensil.tools.model.Model
-import tensil.tools.golden.ExecutiveTrace
 
-object GoldenProcessorHelper {
+object EmulatorHelper {
   def test(
       modelName: String,
       inputBatchSize: Int = 1,
@@ -25,6 +24,7 @@ object GoldenProcessorHelper {
   ): Unit = {
     val modelStream = new FileInputStream(s"$modelName.tmodel")
     val model       = upickle.default.read[Model](modelStream)
+    modelStream.close()
 
     model.arch.dataType.name match {
       case ArchitectureDataType.FLOAT32.name =>
@@ -105,7 +105,9 @@ object GoldenProcessorHelper {
           arraySize,
           count
         )
-    } else
+    } else if (modelName.startsWith("speech_commands"))
+      SpeechCommands.prepareInputStream(dataType, arraySize, count)
+    else
       throw new IllegalArgumentException()
 
   private def assertOutput(
@@ -182,7 +184,9 @@ object GoldenProcessorHelper {
       val yoloPattern(yoloSize) = modelName
       TinyYolo(yoloSize.toInt, onnx = modelName.endsWith("onnx"))
         .assertOutput(outputName, dataType, arraySize, bytes)
-    } else
+    } else if (modelName.startsWith("speech_commands"))
+      SpeechCommands.assertOutput(dataType, arraySize, bytes, count)
+    else
       throw new IllegalArgumentException()
 
   private def minimumInputCount(modelName: String): Int =
@@ -190,7 +194,10 @@ object GoldenProcessorHelper {
       4
     else if (modelName.startsWith("resnet50v2"))
       3
-    else if (modelName.startsWith("resnet20v2"))
+    else if (
+      modelName
+        .startsWith("resnet20v2") || modelName.startsWith("speech_commands")
+    )
       10
     else
       1
@@ -201,15 +208,19 @@ object GoldenProcessorHelper {
       inputBatchSize: Int,
       traceContext: ExecutiveTraceContext
   ): Unit = {
-    val processor = new Processor(
+    val emulator = new Emulator(
       dataType = dataType,
       arch = model.arch
     )
 
-    processor.writeDRAM1(
+    val constsStream = new FileInputStream(model.consts(0).fileName)
+
+    emulator.writeDRAM1(
       model.consts(0).size,
-      new FileInputStream(model.consts(0).fileName)
+      constsStream
     )
+
+    constsStream.close()
 
     val outputs = mutable.Map.empty[String, ByteArrayOutputStream]
     val count   = Math.max(inputBatchSize, minimumInputCount(model.name))
@@ -219,21 +230,23 @@ object GoldenProcessorHelper {
       prepareInputStream(model.name, dataType, model.arch.arraySize, count)
 
     for (_ <- 0 until count / inputBatchSize) {
-      processor.writeDRAM0(
+      emulator.writeDRAM0(
         input.base until input.base + input.size,
         new DataInputStream(inputStream)
       )
 
-      var trace = new ExecutiveTrace(traceContext)
+      val trace         = new ExecutiveTrace(traceContext)
+      val programStream = new FileInputStream(model.program.fileName)
 
-      processor.run(new FileInputStream(model.program.fileName), trace)
+      emulator.run(programStream, trace)
 
+      programStream.close()
       trace.printTrace()
 
       for (output <- model.outputs) {
         val outputStream =
           outputs.getOrElseUpdate(output.name, new ByteArrayOutputStream())
-        processor.readDRAM0(
+        emulator.readDRAM0(
           output.base until output.base + output.size,
           new DataOutputStream(outputStream)
         )

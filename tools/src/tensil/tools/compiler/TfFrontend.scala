@@ -351,15 +351,17 @@ class TfFrontend(
   ): Seq[Emitter] =
     recursiveRewrite(defs, emitter +: emitters)
 
-  private var layerIndex = 0
+  private var nextLayerIndex = 0
 
   private def startLayer(nodeDefs: Seq[NodeDef]): Scheduler = {
-    val name = s"LAYER $layerIndex (${nodeDefs.map(_.name).mkString(",")})"
+    if (graphPrinter.isDefined)
+      graphPrinter.get.startLayer(s"layer_$nextLayerIndex")
 
-    layerIndex += 1
+    val layerIndex = nextLayerIndex
+    nextLayerIndex += 1
 
     new Scheduler(
-      name,
+      layerIndex,
       arch,
       options
     )
@@ -370,13 +372,12 @@ class TfFrontend(
     None
   }*/
 
-  private def finishLayer(scheduler: Scheduler, context: EmitContext) =
-    Some(
-      scheduler.emit(
-        context.backend,
-        context.backendStats
-      )
-    )
+  private def finishLayer(scheduler: Scheduler, context: EmitContext) = {
+    if (graphPrinter.isDefined)
+      graphPrinter.get.endLayer()
+
+    Some(scheduler.emit(context.backend))
+  }
 
   private def doRewriteLayer(
       nodeDef: NodeDef,
@@ -387,9 +388,6 @@ class TfFrontend(
       poolDef: Option[NodeDef]
   ): Emitter =
     (context: EmitContext) => {
-      if (graphPrinter.isDefined)
-        graphPrinter.get.startLayer(s"layer_$layerIndex")
-
       val scheduler = startLayer(
         Seq(Some(nodeDef), biasDef, addDef, normDef, activateDef, poolDef)
           .filter(_.isDefined)
@@ -520,9 +518,6 @@ class TfFrontend(
         )
 
       }
-
-      if (graphPrinter.isDefined)
-        graphPrinter.get.endLayer()
 
       finishLayer(scheduler, context)
     }

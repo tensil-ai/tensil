@@ -230,13 +230,14 @@ class MemoryManager(
   }
 
   def getOrEmitConstObject(
-      name: String
+      name: String,
+      broadcastDims: Option[MemoryDimensions] = None
   ): MemoryObject = {
     val constObject =
       if (allocator.hasObject(name))
         allocator.consumeObject(name, Nil) // TODO: consume pinned object
       else
-        mkConstObject(name, constsDataStream)
+        mkConstObject(name, constsDataStream, broadcastDims)
 
     constObject
   }
@@ -258,64 +259,33 @@ class MemoryManager(
 
   private def mkConstObject(
       name: String,
-      stream: DataOutputStream
+      stream: DataOutputStream,
+      broadcastDims: Option[MemoryDimensions] = None
   ): MemoryObject = {
     val tensorData = pendingFloatConsts(name)
-    val dims       = mkConstsDimensions(tensorData.shape)
-
-    if (tensorData.shape.length == 1) {
-
-      for (i <- 0 until dims.widthVectors * arch.arraySize) {
-        if (i < tensorData.shape(0))
-          dataType.writeFloatConst(tensorData.data(dims.modelOffset(i)), stream)
-        else
-          dataType.writeFloatConst(0.0f, stream)
-      }
-
-      addConstSize(
-        dims.width,
-        dims.widthVectors
-      )
-    } else if (tensorData.shape.length == 2) {
-      for (j <- 0 until dims.heightVectors) {
-        for (i <- 0 until dims.widthVectors * arch.arraySize) {
-          if (i < dims.width && j < dims.height)
-            dataType.writeFloatConst(
-              tensorData.data(dims.modelOffset(j, i)),
-              stream
-            )
-          else
-            dataType.writeFloatConst(0.0f, stream)
-        }
-      }
-
-      addConstSize(
-        dims.height * dims.width,
-        dims.heightVectors * dims.widthVectors
-      )
-    } else if (tensorData.shape.length == 4) {
-      for (
-        l <- 0 until dims.heightVectors;
-        k <- 0 until dims.widthVectors
+    val tensorSize = tensorData.shape.product
+    val (dims, broadcastScalar) =
+      if (
+        broadcastDims.isDefined &&
+        broadcastDims.get.sizeScalars != tensorSize
       ) {
-        for (j <- 0 until dims.channelsInVectors) {
-          for (i <- 0 until dims.channelsOutVectors * arch.arraySize) {
-            if (i < dims.channelsOut && j < dims.channelsIn)
-              dataType.writeFloatConst(
-                tensorData.data(dims.modelOffset(l, k, j, i)),
-                stream
-              )
-            else
-              dataType.writeFloatConst(0.0f, stream)
-          }
-        }
-      }
+        if (tensorSize != 1)
+          throw new CompilerException("Only scalar broadcast is supported")
 
-      addConstSize(
-        dims.heightVectors * dims.widthVectors * dims.channelsIn * dims.channelsOut,
-        dims.heightVectors * dims.widthVectors * dims.channelsInVectors * dims.channelsOutVectors
+        (broadcastDims.get, true)
+      } else (mkConstsDimensions(tensorData.shape), false)
+
+    dims.buildConsts((offset: Option[Int]) =>
+      dataType.writeFloatConst(
+        if (offset.isDefined)
+          tensorData.data(if (broadcastScalar) 0 else offset.get)
+        else
+          0f,
+        stream
       )
-    }
+    )
+
+    addConstSize(dims.sizeScalars, dims.sizeVectors)
 
     val constObj = allocator.allocateObject(
       constsSpace,
@@ -330,9 +300,9 @@ class MemoryManager(
   }
 
   private def emitInitialTracepoints(obj: MemoryObject): Unit = {
-    val tracepointsWriter =
+    val writer =
       new TracepointsWriter(tracepointConditions, resolveRefToObject(_))
-    obj.span.foreach(tracepointsWriter.emitWrite(_))
-    traceContext.emitTracepoints(0L, tracepointsWriter.toMap())
+    obj.span.foreach(writer.write(_))
+    traceContext.emitTracepoints(-InstructionAddress.One, writer.toMap)
   }
 }

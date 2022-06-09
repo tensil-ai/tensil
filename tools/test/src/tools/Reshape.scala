@@ -5,7 +5,7 @@ package tensil.tools
 
 import java.io._
 import scala.reflect.ClassTag
-import tensil.tools.golden.{Processor, ExecutiveTraceContext}
+import tensil.tools.emulator.{Emulator, ExecutiveTraceContext}
 import scala.collection.mutable
 import tensil.ArchitectureDataType
 
@@ -27,7 +27,7 @@ object Reshape {
 
     val seq = (1 to 8).map(_.toFloat).toArray.grouped(arraySize)
     for (s <- seq)
-      Util.writeArgs(dataType, inputPrepDataStream, arraySize, s: _*)
+      ArchitectureDataTypeUtil.writeArgs(dataType, inputPrepDataStream, arraySize, s: _*)
 
     inputPrep.toByteArray()
   }
@@ -45,7 +45,7 @@ object Reshape {
 
     val outputSize = arraySize * 4
 
-    val result = Util
+    val result = ArchitectureDataTypeUtil
       .readResult(dataType, output, arraySize, outputSize)
       .toArray
 

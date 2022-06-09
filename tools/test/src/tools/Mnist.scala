@@ -5,7 +5,7 @@ package tensil.tools
 
 import java.io._
 import scala.reflect.ClassTag
-import tensil.tools.golden.{Processor, ExecutiveTraceContext}
+import tensil.tools.emulator.{Emulator, ExecutiveTraceContext}
 import tensil.ArchitectureDataType
 
 object Mnist {
@@ -76,8 +76,8 @@ object Mnist {
 
     for (i <- 0 until count) {
       assert(
-        Util.argMax(
-          Util.readResult(dataType, output, arraySize, 10)
+        ArchitectureDataTypeUtil.argMax(
+          ArchitectureDataTypeUtil.readResult(dataType, output, arraySize, 10)
         ) == GoldenClasses(i)
       )
     }

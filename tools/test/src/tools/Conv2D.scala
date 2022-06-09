@@ -5,7 +5,7 @@ package tensil.tools
 
 import java.io._
 import scala.reflect.ClassTag
-import tensil.tools.golden.{Processor, ExecutiveTraceContext}
+import tensil.tools.emulator.{Emulator, ExecutiveTraceContext}
 import tensil.ArchitectureDataType
 
 object Conv2D {
@@ -149,7 +149,7 @@ object Conv2D {
     for (
       k <- 0 until expectedPixels.length; l <- 0 until expectedPixels(0).length
     ) {
-      val pixel = Util.readResult(dataType, output, arraySize, 4)
+      val pixel = ArchitectureDataTypeUtil.readResult(dataType, output, arraySize, 4)
       for (i <- 0 until 4)
         rmse.addSample(pixel(i), expectedPixels(k)(l)(i))
     }

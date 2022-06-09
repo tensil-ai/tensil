@@ -34,9 +34,10 @@ class CompilerBackendSpec extends AnyFlatSpec {
   val Stride0Depth: Int       = 1 << 2
   val Stride1Depth: Int       = 1 << 2
 
-  def mk16BitBackend(out: OutputStream) = {
+  val SegmentKey = (0, 0, 0, 0)
+
+  def mk16BitBackend() = {
     new Backend(
-      out,
       new InstructionLayout(
         Architecture.mkWithDefaults(
           arraySize = 4,
@@ -48,14 +49,12 @@ class CompilerBackendSpec extends AnyFlatSpec {
           stride0Depth = Stride0Depth,
           stride1Depth = Stride1Depth
         )
-      ),
-      ArchitectureDataType.FLOAT32
+      )
     )
   }
 
-  def mk32BitBackend(out: OutputStream) = {
+  def mk32BitBackend() = {
     new Backend(
-      out,
       new InstructionLayout(
         Architecture.mkWithDefaults(
           4,
@@ -67,14 +66,12 @@ class CompilerBackendSpec extends AnyFlatSpec {
           stride0Depth = Stride0Depth,
           stride1Depth = Stride1Depth
         )
-      ),
-      ArchitectureDataType.FLOAT32
+      )
     )
   }
 
-  def mk64BitBackend(out: OutputStream) = {
+  def mk64BitBackend() = {
     new Backend(
-      out,
       new InstructionLayout(
         Architecture.mkWithDefaults(
           4,
@@ -86,20 +83,20 @@ class CompilerBackendSpec extends AnyFlatSpec {
           stride0Depth = Stride0Depth,
           stride1Depth = Stride1Depth
         )
-      ),
-      ArchitectureDataType.FLOAT32
+      )
     )
   }
 
   it should "emit 16-bit NoOp" in {
     val out     = new ByteArrayOutputStream()
-    val backend = mk16BitBackend(out)
+    val backend = mk16BitBackend()
 
-    val stream = backend.mkStream("")
-    stream.emitNoOp()
-    stream.emitNoOp()
-    stream.emitNoOp()
-    backend.writeStream(stream)
+    val segment = backend.mkSegment(SegmentKey)
+    segment.segmentLir.emitNoOp()
+    segment.segmentLir.emitNoOp()
+    segment.segmentLir.emitNoOp()
+    backend.emitSegment(segment)
+    backend.writeSegments(out)
 
     assert(
       out.toByteArray() === Array(
@@ -121,13 +118,14 @@ class CompilerBackendSpec extends AnyFlatSpec {
 
   it should "emit 32-bit NoOp" in {
     val out     = new ByteArrayOutputStream()
-    val backend = mk32BitBackend(out)
+    val backend = mk32BitBackend()
 
-    val stream = backend.mkStream("")
-    stream.emitNoOp()
-    stream.emitNoOp()
-    stream.emitNoOp()
-    backend.writeStream(stream)
+    val segment = backend.mkSegment(SegmentKey)
+    segment.segmentLir.emitNoOp()
+    segment.segmentLir.emitNoOp()
+    segment.segmentLir.emitNoOp()
+    backend.emitSegment(segment)
+    backend.writeSegments(out)
 
     assert(
       out.toByteArray() === Array(
@@ -149,13 +147,14 @@ class CompilerBackendSpec extends AnyFlatSpec {
 
   it should "emit 64-bit NoOp" in {
     val out     = new ByteArrayOutputStream()
-    val backend = mk64BitBackend(out)
+    val backend = mk64BitBackend()
 
-    val stream = backend.mkStream("")
-    stream.emitNoOp()
-    stream.emitNoOp()
-    stream.emitNoOp()
-    backend.writeStream(stream)
+    val segment = backend.mkSegment(SegmentKey)
+    segment.segmentLir.emitNoOp()
+    segment.segmentLir.emitNoOp()
+    segment.segmentLir.emitNoOp()
+    backend.emitSegment(segment)
+    backend.writeSegments(out)
 
     assert(
       out.toByteArray() === Array(
@@ -177,10 +176,10 @@ class CompilerBackendSpec extends AnyFlatSpec {
 
   it should "emit 32-bit MatMul" in {
     val out     = new ByteArrayOutputStream()
-    val backend = mk32BitBackend(out)
+    val backend = mk32BitBackend()
 
-    val stream = backend.mkStream("")
-    stream.emitMatMul(
+    val segment = backend.mkSegment(SegmentKey)
+    segment.segmentLir.emitMatMul(
       accumulate = false,
       0,
       MemoryAddress(MemoryTag.Local, MemoryRef.Invalid, 0x00012345L),
@@ -188,7 +187,7 @@ class CompilerBackendSpec extends AnyFlatSpec {
       MemoryAddress(MemoryTag.Accumulators, MemoryRef.Invalid, 0x0089abcdL),
       0x543210L
     )
-    stream.emitMatMul(
+    segment.segmentLir.emitMatMul(
       accumulate = true,
       2,
       MemoryAddress(MemoryTag.Local, MemoryRef.Invalid, 0x00012345L),
@@ -196,7 +195,7 @@ class CompilerBackendSpec extends AnyFlatSpec {
       MemoryAddress(MemoryTag.Accumulators, MemoryRef.Invalid, 0x0089abcdL),
       0x543210L
     )
-    stream.emitMatMul(
+    segment.segmentLir.emitMatMul(
       accumulate = false,
       0,
       MemoryAddress(MemoryTag.Zeroes, MemoryRef.Invalid, 0x00012345L),
@@ -204,7 +203,7 @@ class CompilerBackendSpec extends AnyFlatSpec {
       MemoryAddress(MemoryTag.Accumulators, MemoryRef.Invalid, 0x0089abcdL),
       0x543210L
     )
-    stream.emitMatMul(
+    segment.segmentLir.emitMatMul(
       accumulate = true,
       0,
       MemoryAddress(MemoryTag.Zeroes, MemoryRef.Invalid, 0x00012345L),
@@ -212,7 +211,8 @@ class CompilerBackendSpec extends AnyFlatSpec {
       MemoryAddress(MemoryTag.Accumulators, MemoryRef.Invalid, 0x0089abcdL),
       0x543210L
     )
-    backend.writeStream(stream)
+    backend.emitSegment(segment)
+    backend.writeSegments(out)
 
     assert(
       out.toByteArray() === Array(
@@ -254,10 +254,10 @@ class CompilerBackendSpec extends AnyFlatSpec {
 
   it should "emit 32-bit SIMD" in {
     val out     = new ByteArrayOutputStream()
-    val backend = mk32BitBackend(out)
+    val backend = mk32BitBackend()
 
-    val stream = backend.mkStream("")
-    stream.emitSIMD(
+    val segment = backend.mkSegment(SegmentKey)
+    segment.segmentLir.emitSIMD(
       accumulate = false,
       SIMDOp.Zero,
       0,
@@ -266,7 +266,7 @@ class CompilerBackendSpec extends AnyFlatSpec {
       MemoryAddress(MemoryTag.Invalid, MemoryRef.Invalid, 0x00012345L),
       MemoryAddress(MemoryTag.Invalid, MemoryRef.Invalid, 0x0089abcdL)
     )
-    stream.emitSIMD(
+    segment.segmentLir.emitSIMD(
       accumulate = false,
       SIMDOp.Max,
       SIMDSource.Input,
@@ -275,7 +275,8 @@ class CompilerBackendSpec extends AnyFlatSpec {
       MemoryAddress(MemoryTag.Accumulators, MemoryRef.Invalid, 0x00012345L),
       MemoryAddress(MemoryTag.Accumulators, MemoryRef.Invalid, 0x0089abcdL),
     )
-    backend.writeStream(stream)
+    backend.emitSegment(segment)
+    backend.writeSegments(out)
 
     assert(
       out.toByteArray() === Array(
@@ -305,11 +306,11 @@ class CompilerBackendSpec extends AnyFlatSpec {
 
   it should "emit 32-bit DataMove" in {
     val out     = new ByteArrayOutputStream()
-    val backend = mk32BitBackend(out)
+    val backend = mk32BitBackend()
 
-    val stream = backend.mkStream("")
+    val segment = backend.mkSegment(SegmentKey)
 
-    stream.emitDataMove(
+    segment.segmentLir.emitDataMove(
       toLocal = true,
       accumulate = false,
       0,
@@ -318,7 +319,7 @@ class CompilerBackendSpec extends AnyFlatSpec {
       MemoryAddress(MemoryTag.Vars, MemoryRef.Invalid, 0x0089abcdL),
       0x00543210L
     )
-    stream.emitDataMove(
+    segment.segmentLir.emitDataMove(
       toLocal = false,
       accumulate = false,
       2,
@@ -327,7 +328,7 @@ class CompilerBackendSpec extends AnyFlatSpec {
       MemoryAddress(MemoryTag.Vars, MemoryRef.Invalid, 0x0089abcdL),
       0x00543210L
     )
-    stream.emitDataMove(
+    segment.segmentLir.emitDataMove(
       toLocal = true,
       accumulate = false,
       3,
@@ -336,7 +337,7 @@ class CompilerBackendSpec extends AnyFlatSpec {
       MemoryAddress(MemoryTag.Consts, MemoryRef.Invalid, 0x0089abcdL),
       0x00543210L
     )
-    stream.emitDataMove(
+    segment.segmentLir.emitDataMove(
       toLocal = false,
       accumulate = false,
       1,
@@ -345,7 +346,7 @@ class CompilerBackendSpec extends AnyFlatSpec {
       MemoryAddress(MemoryTag.Consts, MemoryRef.Invalid, 0x0089abcdL),
       0x00543210L
     )
-    stream.emitDataMove(
+    segment.segmentLir.emitDataMove(
       toLocal = true,
       accumulate = true,
       1,
@@ -354,7 +355,7 @@ class CompilerBackendSpec extends AnyFlatSpec {
       MemoryAddress(MemoryTag.Accumulators, MemoryRef.Invalid, 0x0089abcdL),
       0x00543210L
     )
-    stream.emitDataMove(
+    segment.segmentLir.emitDataMove(
       toLocal = false,
       accumulate = false,
       2,
@@ -363,7 +364,7 @@ class CompilerBackendSpec extends AnyFlatSpec {
       MemoryAddress(MemoryTag.Accumulators, MemoryRef.Invalid, 0x0089abcdL),
       0x00543210L
     )
-    stream.emitDataMove(
+    segment.segmentLir.emitDataMove(
       toLocal = false,
       accumulate = true,
       3,
@@ -372,7 +373,8 @@ class CompilerBackendSpec extends AnyFlatSpec {
       MemoryAddress(MemoryTag.Accumulators, MemoryRef.Invalid, 0x0089abcdL),
       0x00543210L
     )
-    backend.writeStream(stream)
+    backend.emitSegment(segment)
+    backend.writeSegments(out)
 
     assert(
       out.toByteArray() === Array(
@@ -438,35 +440,36 @@ class CompilerBackendSpec extends AnyFlatSpec {
 
   it should "emit 32-bit LoadWeights" in {
     val out     = new ByteArrayOutputStream()
-    val backend = mk32BitBackend(out)
+    val backend = mk32BitBackend()
 
-    val stream = backend.mkStream("")
-    stream.emitLoadWeights(
+    val segment = backend.mkSegment(SegmentKey)
+    segment.segmentLir.emitLoadWeights(
       0,
       MemoryAddress(MemoryTag.Local, MemoryRef.Invalid, 0x00012345L),
       0x0089abcdL
     )
-    stream.emitLoadWeights(
+    segment.segmentLir.emitLoadWeights(
       1,
       MemoryAddress(MemoryTag.Local, MemoryRef.Invalid, 0x00012345L),
       0x0089abcdL
     )
-    stream.emitLoadWeights(
+    segment.segmentLir.emitLoadWeights(
       2,
       MemoryAddress(MemoryTag.Local, MemoryRef.Invalid, 0x00012345L),
       0x0089abcdL
     )
-    stream.emitLoadWeights(
+    segment.segmentLir.emitLoadWeights(
       3,
       MemoryAddress(MemoryTag.Local, MemoryRef.Invalid, 0x00012345L),
       0x0089abcdL
     )
-    stream.emitLoadWeights(
+    segment.segmentLir.emitLoadWeights(
       0,
       MemoryAddress.Zeroes,
       0x0089abcdL
     )
-    backend.writeStream(stream)
+    backend.emitSegment(segment)
+    backend.writeSegments(out)
 
     assert(
       out.toByteArray() === Array(

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /* Copyright © 2019-2022 Tensil AI Company */
 
-package tensil.tools.golden
+package tensil.tools.emulator
 
 import scala.collection.mutable
 import tensil.tools.{TraceContext, TracepointsMap}

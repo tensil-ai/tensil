@@ -36,7 +36,7 @@ import tensil.tcu.instruction.{
   Configure
 }
 import tensil.mem.MemKind
-import tensil.tools.{Util, ResNet}
+import tensil.tools.{ArchitectureDataTypeUtil, ResNet}
 import tensil.util.divCeil
 
 class AXIWrapperTCUSpec extends FunUnitSpec {
@@ -339,7 +339,7 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
                         )
 
                     assert(
-                      Util.argMax(
+                      ArchitectureDataTypeUtil.argMax(
                         result.flatten.take(ResNet.ClassSize).toArray
                       ) == ResNet.GoldenClasses(k * batchSize + l)
                     )

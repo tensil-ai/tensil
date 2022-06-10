@@ -14,16 +14,24 @@ case class TinyYolo(yoloSize: Int, onnx: Boolean) {
   def ConvFileName(n: Int, arraySize: Int) =
     s"./models/data/yolov4_tiny_output_${yoloSize}x${yoloSize}x${arraySize}_conv${n}.csv"
 
-  def GoldenOutputFileNames(arraySize: Int) =
+  val GoldenOutputFileNames =
     if (onnx)
       Map(
-        "model/conv2d_17/BiasAdd:0" -> ConvFileName(17, arraySize),
-        "model/conv2d_20/BiasAdd:0" -> ConvFileName(20, arraySize)
+        "model/conv2d_17/BiasAdd:0" -> ((arraySize: Int) =>
+          ConvFileName(17, arraySize)
+        ),
+        "model/conv2d_20/BiasAdd:0" -> ((arraySize: Int) =>
+          ConvFileName(20, arraySize)
+        )
       )
     else
       Map(
-        "model/conv2d_17/BiasAdd" -> ConvFileName(17, arraySize),
-        "model/conv2d_20/BiasAdd" -> ConvFileName(20, arraySize)
+        "model/conv2d_17/BiasAdd" -> ((arraySize: Int) =>
+          ConvFileName(17, arraySize)
+        ),
+        "model/conv2d_20/BiasAdd" -> ((arraySize: Int) =>
+          ConvFileName(20, arraySize)
+        )
       )
 
   def assertOutput(
@@ -33,7 +41,7 @@ case class TinyYolo(yoloSize: Int, onnx: Boolean) {
       bytes: Array[Byte],
   ): Unit = {
     val rmse   = new RMSE(printValues = false)
-    val source = Source.fromFile(GoldenOutputFileNames(arraySize)(outputName))
+    val source = Source.fromFile(GoldenOutputFileNames(outputName)(arraySize))
     val output =
       new DataInputStream(new ByteArrayInputStream(bytes))
 

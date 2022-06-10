@@ -23,10 +23,12 @@ RUN wget https://github.com/tensil-ai/tensil-models/archive/main.tar.gz && tar x
 FROM azul/zulu-openjdk:11
 
 RUN mkdir -p /demo/models
+RUN mkdir -p /demo/models/data
 COPY --from=models /work/tensil-models-main/resnet20v2_cifar.* /demo/models/
 COPY --from=models /work/tensil-models-main/resnet50v2_imagenet.* /demo/models/
 COPY --from=models /work/tensil-models-main/yolov4_tiny_192.* /demo/models/
 COPY --from=models /work/tensil-models-main/yolov4_tiny_416.* /demo/models/
+COPY --from=models /work/tensil-models-main/data/* /demo/models/data/
 
 RUN mkdir -p /demo/arch
 COPY ./arch/* /demo/arch/

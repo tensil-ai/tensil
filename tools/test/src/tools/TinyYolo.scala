@@ -11,16 +11,19 @@ import scala.io.Source
 import tensil.ArchitectureDataType
 
 case class TinyYolo(yoloSize: Int, onnx: Boolean) {
-  val GoldenOutputFileNames =
+  def ConvFileName(n: Int, arraySize: Int) =
+    s"./models/data/yolov4_tiny_output_${yoloSize}x${yoloSize}x${arraySize}_conv${n}.csv"
+
+  def GoldenOutputFileNames(arraySize: Int) =
     if (onnx)
       Map(
-        "model/conv2d_17/BiasAdd:0" -> s"./models/data/yolov4_tiny_output_${yoloSize}x${yoloSize}x${arraySize}_conv17.csv",
-        "model/conv2d_20/BiasAdd:0" -> s"./models/data/yolov4_tiny_output_${yoloSize}x${yoloSize}_conv20.csv"
+        "model/conv2d_17/BiasAdd:0" -> ConvFileName(17, arraySize),
+        "model/conv2d_20/BiasAdd:0" -> ConvFileName(20, arraySize)
       )
     else
       Map(
-        "model/conv2d_17/BiasAdd" -> s"./models/data/yolov4_tiny_output_${yoloSize}x${yoloSize}x${arraySize}_conv17.csv",
-        "model/conv2d_20/BiasAdd" -> s"./models/data/yolov4_tiny_output_${yoloSize}x${yoloSize}x${arraySize}_conv20.csv"
+        "model/conv2d_17/BiasAdd" -> ConvFileName(17, arraySize),
+        "model/conv2d_20/BiasAdd" -> ConvFileName(20, arraySize)
       )
 
   def assertOutput(
@@ -30,7 +33,7 @@ case class TinyYolo(yoloSize: Int, onnx: Boolean) {
       bytes: Array[Byte],
   ): Unit = {
     val rmse   = new RMSE(printValues = false)
-    val source = Source.fromFile(GoldenOutputFileNames(outputName))
+    val source = Source.fromFile(GoldenOutputFileNames(arraySize)(outputName))
     val output =
       new DataInputStream(new ByteArrayInputStream(bytes))
 

@@ -149,11 +149,9 @@ class DualPortMem[T <: Data](
         }
       }
       case ChiselSyncReadMem => {
-        // Assumes that the memory space for each port is completely separate.
-        // This is currently true because we only use portA for data and portB
-        // for weights.
+        val mem = SyncReadMem(depth, gen, SyncReadMem.ReadFirst)
+
         for (port <- Array(io.portA, io.portB)) {
-          val mem = SyncReadMem(depth, gen, SyncReadMem.ReadFirst)
           port.read.data <> mem.read(port.address, port.read.enable)
           when(port.write.enable) {
             mem.write(port.address, port.write.data)

@@ -16,6 +16,8 @@ Architecture = namedtuple(
         "simd_registers_depth",  # int
         "stride0_depth",  # int
         "stride1_depth",  # int
+        "number_of_threads", # int
+        "thread_queue_depth", # int
     ],
 )
 
@@ -29,6 +31,8 @@ pynqz1 = Architecture(
     simd_registers_depth=1,
     stride0_depth=8,
     stride1_depth=8,
+    number_of_threads=1,
+    thread_queue_depth=8,
 )
 
 
@@ -42,6 +46,8 @@ ultra96 = Architecture(
     simd_registers_depth=1,
     stride0_depth=8,
     stride1_depth=8,
+    number_of_threads=1,
+    thread_queue_depth=8,
 )
 
 zcu104 = Architecture(
@@ -54,4 +60,6 @@ zcu104 = Architecture(
     simd_registers_depth=1,
     stride0_depth=8,
     stride1_depth=8,
+    number_of_threads=1,
+    thread_queue_depth=8,
 )

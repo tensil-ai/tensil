@@ -149,11 +149,21 @@ class DualPortMem[T <: Data](
         }
       }
       case ChiselSyncReadMem => {
-        // Assumes that the memory space for each port is completely separate.
-        // This is currently true because we only use portA for data and portB
-        // for weights.
+
+        /**
+          * This approach will produce undefined behaviour
+          * when a read and write to the same address are
+          * requested on the same cycle.
+          *
+          * Yet this seems to be the recommened approach
+          * to dual-port memory in Chisel. See:
+          *
+          * https://github.com/chipsalliance/chisel3/issues/1788
+          */
+
+        val mem = SyncReadMem(depth, gen, SyncReadMem.ReadFirst)
+
         for (port <- Array(io.portA, io.portB)) {
-          val mem = SyncReadMem(depth, gen, SyncReadMem.ReadFirst)
           port.read.data <> mem.read(port.address, port.read.enable)
           when(port.write.enable) {
             mem.write(port.address, port.write.data)

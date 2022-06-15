@@ -11,16 +11,27 @@ import scala.io.Source
 import tensil.ArchitectureDataType
 
 case class TinyYolo(yoloSize: Int, onnx: Boolean) {
+  def ConvFileName(n: Int, arraySize: Int) =
+    s"./models/data/yolov4_tiny_output_${yoloSize}x${yoloSize}x${arraySize}_conv${n}.csv"
+
   val GoldenOutputFileNames =
     if (onnx)
       Map(
-        "model/conv2d_17/BiasAdd:0" -> s"./models/data/yolov4_tiny_${yoloSize}_conv17.csv",
-        "model/conv2d_20/BiasAdd:0" -> s"./models/data/yolov4_tiny_${yoloSize}_conv20.csv"
+        "model/conv2d_17/BiasAdd:0" -> ((arraySize: Int) =>
+          ConvFileName(17, arraySize)
+        ),
+        "model/conv2d_20/BiasAdd:0" -> ((arraySize: Int) =>
+          ConvFileName(20, arraySize)
+        )
       )
     else
       Map(
-        "model/conv2d_17/BiasAdd" -> s"./models/data/yolov4_tiny_${yoloSize}_conv17.csv",
-        "model/conv2d_20/BiasAdd" -> s"./models/data/yolov4_tiny_${yoloSize}_conv20.csv"
+        "model/conv2d_17/BiasAdd" -> ((arraySize: Int) =>
+          ConvFileName(17, arraySize)
+        ),
+        "model/conv2d_20/BiasAdd" -> ((arraySize: Int) =>
+          ConvFileName(20, arraySize)
+        )
       )
 
   def assertOutput(
@@ -30,7 +41,7 @@ case class TinyYolo(yoloSize: Int, onnx: Boolean) {
       bytes: Array[Byte],
   ): Unit = {
     val rmse   = new RMSE(printValues = false)
-    val source = Source.fromFile(GoldenOutputFileNames(outputName))
+    val source = Source.fromFile(GoldenOutputFileNames(outputName)(arraySize))
     val output =
       new DataInputStream(new ByteArrayInputStream(bytes))
 
@@ -58,7 +69,7 @@ case class TinyYolo(yoloSize: Int, onnx: Boolean) {
       count: Int
   ): InputStream = {
     val fileName =
-      s"./models/data/yolov4_tiny_${count}x${yoloSize}x${yoloSize}x${arraySize}.csv"
+      s"./models/data/yolo_input_${count}x${yoloSize}x${yoloSize}x${arraySize}.csv"
 
     val inputPrep           = new ByteArrayOutputStream()
     val inputPrepDataStream = new DataOutputStream(inputPrep)

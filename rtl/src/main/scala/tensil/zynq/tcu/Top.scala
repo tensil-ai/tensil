@@ -136,7 +136,7 @@ object Top extends App {
       .valueName("32|64|128|256")
       .validate(x =>
         if (Seq(32, 64, 128, 256).contains(x)) success
-        else failure("Value must be 64, 128 or 256")
+        else failure("Value must be 32, 64, 128 or 256")
       )
       .action((x, c) =>
         c.copy(dramAxiConfig = x match {

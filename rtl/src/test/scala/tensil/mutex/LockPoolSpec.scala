@@ -305,6 +305,63 @@ class LockPoolSpec extends FunUnitSpec {
         }
       }
 
+      it(
+        "should immediately release if the condition is met on the same cycle the lock is acquired"
+      ) {
+
+        decoupledTest(init()) { m =>
+          for (actor <- m.io.actor) {
+            actor.in.setSourceClock(m.clock)
+            actor.out.setSinkClock(m.clock)
+          }
+          m.io.lock.setSourceClock(m.clock)
+          m.io.locked.setSinkClock(m.clock)
+          m.io.deadlocked.setSinkClock(m.clock)
+
+          val a = m.io.actor(0)
+          val b = m.io.actor(1)
+
+          thread("lock") {
+            m.io.lock.enqueue(
+              ConditionalReleaseLockControl(
+                gen,
+                numActors,
+                numLocks,
+                m.maxDelay,
+                0.U,
+                true.B,
+                0.U,
+                0.U,
+                Request(depth, 1.U, true.B)
+              )
+            )
+          }
+
+          thread("a.in") {
+            a.in.enqueue(Request(depth, 1.U, true.B))
+          }
+
+          thread("a.out") {
+            a.out.expectDequeue(Request(depth, 1.U, true.B))
+          }
+
+          thread("b.in") {
+            b.in.enqueue(Request(depth, 1.U, false.B))
+          }
+
+          thread("b.out") {
+            var counter = 0
+            while (b.in.ready.peek().litValue == 0) {
+              // increment counter
+              counter += 1
+              m.clock.step()
+            }
+            // expect counter value to be less than 2
+            b.out.expectDequeue(Request(depth, 1.U, false.B))
+            assert(counter < 2)
+          }
+        }
+      }
     }
   }
 }

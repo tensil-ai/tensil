@@ -438,6 +438,23 @@ package object util {
     }
   }
 
+  def leastCommonMultiple(a: Int, b: Int): Int = {
+    val m  = a * b
+    var a_ = a
+    var b_ = b
+    while (a_ < m && b_ < m) {
+      if (a_ < b_) {
+        a_ += a
+      } else if (a_ > b_) {
+        b_ += b
+      } else {
+        // a_ == b_, found lcm
+        return a_
+      }
+    }
+    return m
+  }
+
   def allReady(ports: DecoupledIO[Data]*): Bool = {
     ports.map(_.ready).reduce(_ && _)
   }

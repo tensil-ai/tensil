@@ -4,6 +4,7 @@
 package tensil.tools
 
 import org.scalatest._
+import org.scalatest.flatspec.AnyFlatSpec
 import java.io._
 
 import org.tensorflow.framework.types.DataType
@@ -22,7 +23,7 @@ import tensil.tools.compiler.{
 }
 import tensil.{Architecture, ArchitectureDataType, InstructionLayout}
 
-class CompilerBackendSpec extends FlatSpec {
+class CompilerBackendSpec extends AnyFlatSpec {
   behavior of "CompilerBackend"
 
   val Depth16: Long = 1L << 14

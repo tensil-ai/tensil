@@ -3,9 +3,8 @@
 
 package tensil
 
-// import org.scalatest._
+import chisel3.Module
 import chiseltest.ChiselScalatestTester
-import chisel3.MultiIOModule
 import scala.collection.mutable
 import chiseltest.internal.TesterThreadList
 import chiseltest.fork
@@ -22,24 +21,22 @@ trait DecoupledTester { spec: ChiselScalatestTester =>
     threads(name) += (() => runnable)
   }
 
-  def decoupledTest[T <: MultiIOModule](dut: => T): DecoupledTestBuilder[T] =
-    new DecoupledTestBuilder(() => dut, Seq.empty, Array.empty)
+  def decoupledTest[T <: Module](dut: => T): DecoupledTestBuilder[T] =
+    new DecoupledTestBuilder(() => dut, Seq.empty)
 
-  class DecoupledTestBuilder[T <: MultiIOModule](
+  class DecoupledTestBuilder[T <: Module](
       val dutGen: () => T,
       val annotationSeq: AnnotationSeq,
-      val flags: Array[String]
   ) {
     def run(testFn: T => Unit): Unit = {
       val builder =
-        new TestBuilder(dutGen, annotationSeq, flags)
+        new TestBuilder(dutGen, annotationSeq)
       builder.apply(main(testFn))
     }
 
     private def main(testFn: T => Unit)(dut: T): Unit = {
       threads.clear()
       testFn(dut)
-      // println("DecoupledTester threads: " + threads.keys.mkString(", "))
       val forks = for ((name, segments) <- threads) yield {
         fork {
           for (segment <- segments) {
@@ -53,7 +50,7 @@ trait DecoupledTester { spec: ChiselScalatestTester =>
     def apply(testFn: T => Unit): Unit = run(testFn)
   }
 
-  implicit class DecoupledTestOptionBuilder[T <: MultiIOModule](
+  implicit class DecoupledTestOptionBuilder[T <: Module](
       x: DecoupledTestBuilder[T]
   ) {
     def withAnnotations(
@@ -62,15 +59,6 @@ trait DecoupledTester { spec: ChiselScalatestTester =>
       new DecoupledTestBuilder[T](
         x.dutGen,
         x.annotationSeq ++ annotationSeq,
-        x.flags
-      )
-    }
-
-    def withFlags(flags: Array[String]): DecoupledTestBuilder[T] = {
-      new DecoupledTestBuilder[T](
-        x.dutGen,
-        x.annotationSeq,
-        x.flags ++ flags
       )
     }
   }

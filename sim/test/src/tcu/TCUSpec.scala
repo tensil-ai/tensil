@@ -10,6 +10,7 @@ import tensil.{Architecture, UnitSpec}
 import tensil.data.{CartesianProduct, Index, Shape, Slice, Tensor, TensorReader}
 import tensil.tcu.instruction._
 import tensil.util.divCeil
+import tensil.util.zero
 import tensil.decoupled.{decoupledToDriver, decoupledVecToDriver}
 import tensil.mem.MemControl
 import tensil.tools.Xor
@@ -25,6 +26,63 @@ import tensil.mem.MemKind
 
 class TCUSpec extends UnitSpec {
   behavior of "TCU"
+
+  it should "process matmuls and accumulates simultaneously" in {
+    val gen = FixedPoint(16.W, 8.BP)
+    val arch = Architecture.mkWithDefaults(
+      arraySize = 8,
+      accumulatorDepth = 64,
+      localDepth = 64,
+      stride0Depth = 8,
+      stride1Depth = 8,
+    )
+    val layout = InstructionLayout(arch)
+    decoupledTest(new TCU(gen, layout)) { m =>
+      implicit val layout = m.setInstructionParameters()
+      m.setClocks()
+
+      val n    = 10
+      val size = 10
+
+      thread("instruction") {
+        for (_ <- 0 until n) {
+          m.io.instruction.enqueue(
+            Instruction(
+              Opcode.MatMul,
+              MatMulFlags(false, false),
+              MatMulArgs(0, 0, size - 1),
+            )
+          )
+        }
+        m.io.instruction.enqueue(
+          Instruction(
+            Opcode.DataMove,
+            DataMoveFlags(DataMoveKind.memoryToDram0),
+            DataMoveArgs(0, 0, 0),
+          )
+        )
+      }
+
+      thread("dram0.control") {
+        var count = 0
+        while (!m.io.dram0.control.valid.peek().litToBoolean) {
+          m.clock.step()
+          count += 1
+        }
+        m.io.dram0.control.expectDequeue(
+          MemControl(arch.dram0Depth, 0.U, 0.U, true.B)
+        )
+        assert(count < 110)
+      }
+
+      thread("dram0.data") {
+        m.io.dram0.dataOut
+          .expectDequeue(
+            Array.fill(arch.arraySize)(0.F(gen.getWidth.W, gen.binaryPoint))
+          )
+      }
+    }
+  }
 
   it should "handle matmul, datamove (local => acc) then SIMD" in {
     val gen = FixedPoint(16.W, 8.BP)

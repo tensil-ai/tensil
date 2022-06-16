@@ -21,7 +21,7 @@ object common extends ScalaModule { m =>
     )
 
   object test extends Tests with TestModule.ScalaTest {
-    def ivyDeps = m.ivyDeps() ++ Agg(ivy"org.scalatest::scalatest:3.0.4")
+    def ivyDeps = m.ivyDeps() ++ Agg(ivy"org.scalatest::scalatest:3.2.12")
   }
 }
 
@@ -34,7 +34,7 @@ object tools extends ScalaPBModule { m =>
   object test extends Tests with TestModule.ScalaTest {
     def forkArgs = Seq("-Xmx12g", "-Xmx12g")
 
-    def ivyDeps = m.ivyDeps() ++ Agg(ivy"org.scalatest::scalatest:3.0.4")
+    def ivyDeps = m.ivyDeps() ++ Agg(ivy"org.scalatest::scalatest:3.2.12")
   }
 }
 
@@ -66,6 +66,12 @@ object web extends ScalaModule { m =>
       ivy"com.github.seratch::awscala-dynamodb:0.8.5",
     )
 
+  object test extends Tests with TestModule.ScalaTest {
+    def forkArgs = Seq("-Xmx12g", "-Xmx12g")
+
+    def ivyDeps = m.ivyDeps() ++ Agg(ivy"org.scalatest::scalatest:3.2.12")
+  }
+
   def mainClass = Some("tensil.tools.web.Main")
 }
 
@@ -89,21 +95,20 @@ object rtl extends SbtModule { m =>
 
   override def ivyDeps =
     common.ivyDeps() ++ super.ivyDeps() ++ Agg(
-      ivy"edu.berkeley.cs::chisel3:3.4.3",
-      ivy"edu.berkeley.cs::chiseltest:0.3.3",
-      ivy"edu.berkeley.cs::chisel-iotesters:1.5.3",
-      ivy"edu.berkeley.cs::treadle:1.3.3",
+      ivy"edu.berkeley.cs::chisel3:3.5.3",
+      ivy"edu.berkeley.cs::chiseltest:0.5.3",
+      ivy"edu.berkeley.cs::treadle:1.5.3",
     )
   override def scalacPluginIvyDeps =
     Agg(
-      ivy"edu.berkeley.cs:::chisel3-plugin:3.4.3",
+      ivy"edu.berkeley.cs:::chisel3-plugin:3.5.3",
     )
 
   object test extends Tests with ScalaTest {
     def forkArgs = Seq("-Xmx12g", "-Xmx12g")
 
     override def ivyDeps =
-      m.ivyDeps() ++ Agg(ivy"org.scalatest::scalatest:3.0.4")
+      m.ivyDeps() ++ Agg(ivy"org.scalatest::scalatest:3.2.12")
   }
 }
 
@@ -121,6 +126,6 @@ object sim extends ScalaModule { m =>
     def forkArgs = Seq("-Xmx48g", "-Xmx48g")
 
     override def ivyDeps =
-      m.ivyDeps() ++ Agg(ivy"org.scalatest::scalatest:3.0.4")
+      m.ivyDeps() ++ Agg(ivy"org.scalatest::scalatest:3.2.12")
   }
 }

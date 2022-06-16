@@ -6,12 +6,13 @@ package tensil.tools
 import java.io._
 import org.scalatest._
 import org.scalatest.tagobjects.Slow
+import org.scalatest.flatspec.AnyFlatSpec
 import org.tensorflow.framework.types.DataType
 import tensil.{ArchitectureDataType, Architecture}
 import tensil.tools.emulator.ExecutiveTraceContext
 import tensil.tools.compiler.{MemoryDimensions, MemoryTag}
 
-class CompilerSpec extends FlatSpec {
+class CompilerSpec extends AnyFlatSpec {
   behavior of "Compiler"
 
   val Models = "./models"

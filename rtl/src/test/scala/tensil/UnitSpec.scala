@@ -5,15 +5,18 @@ package tensil
 
 import org.scalatest._
 import chiseltest.ChiselScalatestTester
+import org.scalatest.funspec.AnyFunSpec
+import org.scalatest.flatspec.AnyFlatSpec
+import matchers.should._
 
 class UnitSpec
-    extends FlatSpec
+    extends AnyFlatSpec
     with Matchers
     with ChiselScalatestTester
     with DecoupledTester
 
 class FunUnitSpec
-    extends FunSpec
+    extends AnyFunSpec
     with Matchers
     with ChiselScalatestTester
     with DecoupledTester

@@ -94,7 +94,7 @@ class VecDriverSpec extends UnitSpec {
       }
       val resultValue = result.join
       for (i <- 0 until 10)
-        assertSeqEqual(resultValue(i).map(_.litValue()), data(i))
+        assertSeqEqual(resultValue(i).map(_.litValue), data(i))
     }
   }
 }

@@ -12,8 +12,7 @@ import tensil.Architecture
 import scala.collection.mutable
 import tensil.mem.MemKind
 import chiseltest.internal.TesterThreadList
-import chiseltest.internal.VerilatorBackendAnnotation
-import chisel3.tester.experimental.TestOptionBuilder._
+import chiseltest.VerilatorBackendAnnotation
 import tensil.mem.MemControl
 import tensil.decoupled.decoupledVecToDriver
 import tensil.tcu.instruction.Instruction
@@ -36,7 +35,13 @@ class TCULargeSpec extends FunUnitSpec {
       val numBytesPerWord    = 8
 
       it("should not stall at 0xb4d #0", tensil.tags.Verilator) {
-        test(new AXIWrapperTCU(gen, layout, AXIWrapperTCUOptions(dramAxiConfig = axiConfig)))
+        test(
+          new AXIWrapperTCU(
+            gen,
+            layout,
+            AXIWrapperTCUOptions(dramAxiConfig = axiConfig)
+          )
+        )
           .withAnnotations(Seq(VerilatorBackendAnnotation)) { m =>
             m.instruction.setSourceClock(m.clock)
 

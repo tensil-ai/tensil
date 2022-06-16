@@ -13,7 +13,14 @@ class Port[T <: Data](gen: T, val depth: Long) extends Bundle {
   val wrote       = Decoupled(Bool())
   val status      = Decoupled(new MemControl(depth))
   val inputStatus = Decoupled(gen)
+}
 
-  override def cloneType =
-    (new Port(gen, depth)).asInstanceOf[this.type]
+class PortWithStride[T <: Data](gen: T, val depth: Long, strideDepth: Int)
+    extends Bundle {
+  val control     = Flipped(Decoupled(new MemControlWithStride(depth, strideDepth)))
+  val input       = Flipped(Decoupled(gen))
+  val output      = Decoupled(gen)
+  val wrote       = Decoupled(Bool())
+  val status      = Decoupled(new MemControl(depth))
+  val inputStatus = Decoupled(gen)
 }

@@ -62,7 +62,7 @@ object HostDataFlowControl {
   }
 
   def apply(kind: UInt): HostDataFlowControl = {
-    if (kind.isLit()) {
+    if (kind.isLit) {
       new HostDataFlowControl().Lit(
         _.kind -> kind,
       )
@@ -87,7 +87,7 @@ object HostDataFlowControlWithSize {
   def apply(
       depth: Long
   )(kind: UInt, size: UInt): HostDataFlowControlWithSize = {
-    if (kind.isLit() && size.isLit()) {
+    if (kind.isLit && size.isLit) {
       new HostDataFlowControlWithSize(depth).Lit(_.kind -> kind, _.size -> size)
     } else {
       val w = Wire(new HostDataFlowControlWithSize(depth))

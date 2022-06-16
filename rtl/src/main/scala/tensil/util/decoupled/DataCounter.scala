@@ -29,10 +29,10 @@ class DataCounter[T <: Data](gen: T, max: Int, numRequests: Int)
   when(counter.io.value.bits === len.bits) {
     io.last := in.valid && len.valid
     len.ready := in.valid && io.out.ready
-    counter.io.resetValue := io.out.fire()
+    counter.io.resetValue := io.out.fire
   }.otherwise {
     len.ready := false.B
     io.last := false.B
-    counter.io.value.ready := io.out.fire()
+    counter.io.value.ready := io.out.fire
   }
 }

@@ -39,7 +39,7 @@ class SystolicArray[T <: Data with Num[T]](
   val arrayPropagationDelay = height + width - 1
   val array                 = Module(new InnerSystolicArray(gen, height, width))
 
-  val input   = Queue(io.input, 2)
+  val input   = io.input
   val weight  = io.weight
   val control = io.control
   val output = Module(
@@ -87,12 +87,13 @@ class SystolicArray[T <: Data with Num[T]](
   val inputDone = arrayPropagationCountdown === 0.U
 
   array.io.load := inputDone && loading
-  array.io.input <> Mux(control.bits.zeroes, zero(array.io.input), input.bits)
-  array.io.weight <> Mux(
-    control.bits.zeroes,
-    zero(array.io.weight),
-    weight.bits
-  )
+  when(control.bits.zeroes) {
+    array.io.input <> zero(array.io.input)
+    array.io.weight <> zero(array.io.weight)
+  }.otherwise {
+    array.io.input <> input.bits
+    array.io.weight <> weight.bits
+  }
   output.io.enq.bits <> array.io.output
   io.output <> output.io.deq
 

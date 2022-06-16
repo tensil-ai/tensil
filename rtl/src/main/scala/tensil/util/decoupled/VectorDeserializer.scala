@@ -42,14 +42,14 @@ class VectorDeserializer[T <: Data, S <: Data](
     val valid = RegInit(false.B)
 
     val (ctr, wrap) =
-      chisel3.util.Counter(io.in.fire(), m)
+      chisel3.util.Counter(io.in.fire, m)
 
     io.out.valid := valid
     io.out.bits := bits
     // when valid is true, wait until out.ready goes true
     io.in.ready := !valid || io.out.ready
 
-    when(io.in.fire()) {
+    when(io.in.fire) {
       for (i <- 0 until numScalarsPerWord) {
         bits(ctr * numScalarsPerWord.U + i.U) := extend(
           io.in.bits.asUInt()(
@@ -60,7 +60,7 @@ class VectorDeserializer[T <: Data, S <: Data](
       }
       valid := wrap
     }
-    when(io.out.fire()) {
+    when(io.out.fire) {
       valid := false.B
     }
   } else {

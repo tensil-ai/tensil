@@ -19,13 +19,13 @@ class AccumulatorSpec extends UnitSpec {
     val height = 4
     val depth  = 16
 
-    class PacketCounter extends MultiIOModule {
+    class PacketCounter extends Module {
       val m  = Module(new Accumulator(gen, height, depth))
       val io = IO(m.io.cloneType)
       io <> m.io
       val count = IO(Output(UInt(32.W)))
       val (countValue, wrap) =
-        chisel3.util.Counter(Range(0, 1 << 30), m.io.input.fire())
+        chisel3.util.Counter(Range(0, 1 << 30), m.io.input.fire)
       count := countValue
     }
 
@@ -35,7 +35,6 @@ class AccumulatorSpec extends UnitSpec {
       m.io.output.setSinkClock(m.clock)
 
       val vec: Array[BigInt] = Array(1, 2, 3, 4)
-      val accResult          = vec.map(_ * 2)
       val data               = vec.map(_.S)
       val n                  = 100
 
@@ -43,7 +42,11 @@ class AccumulatorSpec extends UnitSpec {
         for (i <- 0 until n) {
           m.io.control.enqueue(
             chiselTypeOf(m.io.control.bits)
-              .Lit(_.address -> i.U, _.write -> true.B, _.accumulate -> true.B)
+              .Lit(
+                _.address    -> (i % depth).U,
+                _.write      -> true.B,
+                _.accumulate -> true.B
+              )
           )
         }
       }
@@ -55,7 +58,7 @@ class AccumulatorSpec extends UnitSpec {
       }
 
       thread("count") {
-        m.clock.step(n)
+        m.clock.step(n + 1)
         m.count.expect(n.U)
       }
     }

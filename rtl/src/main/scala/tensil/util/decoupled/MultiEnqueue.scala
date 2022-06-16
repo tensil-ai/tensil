@@ -154,6 +154,28 @@ class MultiEnqueue(n: Int) extends Module {
     out3 <> io.out(3).toDecoupled(out3Bits)
     io.in.ready
   }
+
+  def enqueue[T <: Data, S <: Data, R <: Data, Q <: Data, P <: Data](
+      valid: Bool,
+      out0: DecoupledIO[T],
+      out0Bits: T,
+      out1: DecoupledIO[S],
+      out1Bits: S,
+      out2: DecoupledIO[R],
+      out2Bits: R,
+      out3: DecoupledIO[Q],
+      out3Bits: Q,
+      out4: DecoupledIO[P],
+      out4Bits: P,
+  ): Bool = {
+    io.in.valid := valid
+    out0 <> io.out(0).toDecoupled(out0Bits)
+    out1 <> io.out(1).toDecoupled(out1Bits)
+    out2 <> io.out(2).toDecoupled(out2Bits)
+    out3 <> io.out(3).toDecoupled(out3Bits)
+    out4 <> io.out(4).toDecoupled(out4Bits)
+    io.in.ready
+  }
 }
 
 object MultiEnqueue {

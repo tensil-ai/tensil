@@ -8,7 +8,7 @@ import chisel3._
 import chisel3.experimental.FixedPoint
 import chisel3.util.{Decoupled, Queue}
 import chiseltest._
-import tensil.{FixedDriver, FixedPeekPokeTester, Scratch, Treadle, UnitSpec}
+import tensil.UnitSpec
 import tensil.Fixed16bp8
 
 import Numeric.Implicits._
@@ -222,37 +222,25 @@ class UtilPackageTests extends UnitSpec {
   }
 
   "signedMod" should "be correct" in {
-    FixedDriver(
-      () => new SignedModTest(4, 16),
-      generateVCD = true,
-      backend = Treadle
-    ) { dut =>
-      new FixedPeekPokeTester(dut) {
-        val tests = Array((5, 6, 15))
+    test(new SignedModTest(4, 16)) { dut =>
+      val tests = Array((5, 6, 15))
 
-        for ((a, b, c) <- tests) {
-          poke(dut.io.a, a)
-          poke(dut.io.b, b)
-          expect(dut.io.c, c)
-        }
+      for ((a, b, c) <- tests) {
+        dut.io.a.poke(a)
+        dut.io.b.poke(b)
+        dut.io.c.expect(c)
       }
-    } should be(true)
+    }
 
-    FixedDriver(
-      () => new SignedModTest(2, 3),
-      generateVCD = true,
-      backend = Treadle
-    ) { dut =>
-      new FixedPeekPokeTester(dut) {
-        val tests = Array((0, 1, 2), (1, 2, 2), (0, 2, 1))
+    test(new SignedModTest(2, 3)) { dut =>
+      val tests = Array((0, 1, 2), (1, 2, 2), (0, 2, 1))
 
-        for ((a, b, c) <- tests) {
-          poke(dut.io.a, a)
-          poke(dut.io.b, b)
-          expect(dut.io.c, c)
-        }
+      for ((a, b, c) <- tests) {
+        dut.io.a.poke(a)
+        dut.io.b.poke(b)
+        dut.io.c.expect(c)
       }
-    } should be(true)
+    }
   }
 
   "extractBitField" should "include low endpoint, exclude high endpoint" in {

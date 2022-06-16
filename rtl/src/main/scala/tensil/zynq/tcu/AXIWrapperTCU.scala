@@ -25,7 +25,7 @@ class AXIWrapperTCU[T <: Data with Num[T]](
     val layout: InstructionLayout,
     val options: AXIWrapperTCUOptions,
 )(implicit val platformConfig: PlatformConfig)
-    extends MultiIOModule {
+    extends Module {
   val numScalarsPerWord: Int =
     (options.dramAxiConfig.dataWidth / 8) / layout.arch.dataType.sizeBytes
 

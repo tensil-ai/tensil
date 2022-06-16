@@ -108,7 +108,8 @@ class LocalRouter[T <: Data](
       "accWriteDataMux",
       accWriteDataMuxModule.io.sel,
       arch.localDepth,
-      control.bits.size
+      control.bits.size,
+      bufferSize = arch.arraySize * 2,
     )
   memReadDataDemux.tieOff()
   memWriteDataMux.tieOff()

@@ -14,7 +14,7 @@ class MuxSelWithSize(n: Int, val depth: Long) extends MuxSel(n) with Size {
 
 object MuxSelWithSize {
   def apply(n: Int, depth: Long, sel: UInt, size: UInt): MuxSelWithSize =
-    if (sel.isLit() && size.isLit()) {
+    if (sel.isLit && size.isLit) {
       new MuxSelWithSize(n, depth).Lit(_.sel -> sel, _.size -> size)
     } else {
       val w = Wire(new MuxSelWithSize(n, depth))

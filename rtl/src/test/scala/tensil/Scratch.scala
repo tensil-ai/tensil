@@ -89,6 +89,14 @@ class WidthConverter(inWidth: Int, outWidth: Int) extends Module {
 
     io.in.ready := !full
     io.out.valid := !empty
+
+    // TODO handle pipe and flow for max throughput
+    // if (inWidth > outWidth) {
+    //   when(io.in.valid) { io.out.valid := true.B }
+    // } else {
+    //   // inWidth < outWidth
+    //   when(io.out.ready) { io.in.ready := true.B }
+    // }
   }
 
   def count(reg: UInt, step: Int, max: Int): Unit = {

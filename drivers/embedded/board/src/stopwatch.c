@@ -5,7 +5,7 @@
 
 #include <math.h>
 
-error_t stopwatch_start(struct stopwatch *stopwatch) {
+tensil_error_t stopwatch_start(struct stopwatch *stopwatch) {
 #if defined(STOPWATCH_XTIME)
     XTime_GetTime(&stopwatch->start);
 #elif defined(STOPWATCH_TIMER_DEVICE_ID)
@@ -14,7 +14,7 @@ error_t stopwatch_start(struct stopwatch *stopwatch) {
     int status = XTmrCtr_Initialize(&stopwatch->timer_counter,
                                     STOPWATCH_TIMER_DEVICE_ID);
     if (status != XST_SUCCESS)
-        return XILINX_ERROR(status);
+        return TENSIL_XILINX_ERROR(status);
 
     XTmrCtr_Reset(&stopwatch->timer_counter, 0);
     XTmrCtr_Reset(&stopwatch->timer_counter, 1);
@@ -22,7 +22,7 @@ error_t stopwatch_start(struct stopwatch *stopwatch) {
     XTmrCtr_SetOptions(&stopwatch->timer_counter, 0, XTC_CASCADE_MODE_OPTION);
     XTmrCtr_Start(&stopwatch->timer_counter, 0);
 #endif
-    return ERROR_NONE;
+    return TENSIL_ERROR_NONE;
 }
 
 void stopwatch_stop(struct stopwatch *stopwatch) {

@@ -16,6 +16,7 @@
 #endif
 
 #define FP16BP8_SIZE 2
+
 static const float fp16bp8_ratio = (1 << 8);
 static const float fp16bp8_max = (float)INT16_MAX / fp16bp8_ratio;
 static const float fp16bp8_min = (float)INT16_MIN / fp16bp8_ratio;
@@ -47,7 +48,7 @@ static void write_fp16bp8(uint8_t *bank_ptr, size_t offset, size_t size,
     Xil_DCacheFlushRange((UINTPTR)base_ptr, size * FP16BP8_SIZE);
 }
 
-size_t dram_sizeof_scalar(enum data_type type) {
+size_t tensil_dram_sizeof_scalar(enum tensil_data_type type) {
     switch (type) {
     case TENSIL_DATA_TYPE_FP16BP8:
     default:
@@ -55,7 +56,7 @@ size_t dram_sizeof_scalar(enum data_type type) {
     }
 }
 
-float dram_max_scalar(enum data_type type) {
+float tensil_dram_max_scalar(enum tensil_data_type type) {
     switch (type) {
     case TENSIL_DATA_TYPE_FP16BP8:
     default:
@@ -63,7 +64,7 @@ float dram_max_scalar(enum data_type type) {
     }
 }
 
-float dram_min_scalar(enum data_type type) {
+float tensil_dram_min_scalar(enum tensil_data_type type) {
     switch (type) {
     case TENSIL_DATA_TYPE_FP16BP8:
     default:
@@ -71,7 +72,7 @@ float dram_min_scalar(enum data_type type) {
     }
 }
 
-float dram_max_error_scalar(enum data_type type) {
+float tensil_dram_max_error_scalar(enum tensil_data_type type) {
     switch (type) {
     case TENSIL_DATA_TYPE_FP16BP8:
     default:
@@ -79,8 +80,9 @@ float dram_max_error_scalar(enum data_type type) {
     }
 }
 
-void dram_read_scalars(const uint8_t *bank_ptr, enum data_type type,
-                       size_t offset, size_t size, float *buffer) {
+void tensil_dram_read_scalars(const uint8_t *bank_ptr,
+                              enum tensil_data_type type, size_t offset,
+                              size_t size, float *buffer) {
     switch (type) {
     case TENSIL_DATA_TYPE_FP16BP8:
     default:
@@ -89,8 +91,9 @@ void dram_read_scalars(const uint8_t *bank_ptr, enum data_type type,
     }
 }
 
-void dram_write_scalars(uint8_t *bank_ptr, enum data_type type, size_t offset,
-                        size_t size, const float *buffer) {
+void tensil_dram_write_scalars(uint8_t *bank_ptr, enum tensil_data_type type,
+                               size_t offset, size_t size,
+                               const float *buffer) {
     switch (type) {
     case TENSIL_DATA_TYPE_FP16BP8:
     default:
@@ -99,10 +102,10 @@ void dram_write_scalars(uint8_t *bank_ptr, enum data_type type, size_t offset,
     }
 }
 
-void dram_write_random_scalars(uint8_t *bank_ptr, enum data_type type,
-                               size_t offset, size_t size) {
-    uint8_t *base_ptr = bank_ptr + offset * dram_sizeof_scalar(type);
-    size_t size_bytes = size * dram_sizeof_scalar(type);
+void tensil_dram_fill_random(uint8_t *bank_ptr, enum tensil_data_type type,
+                             size_t offset, size_t size) {
+    uint8_t *base_ptr = bank_ptr + offset * tensil_dram_sizeof_scalar(type);
+    size_t size_bytes = size * tensil_dram_sizeof_scalar(type);
 
     for (size_t i = 0; i < size_bytes; i++) {
         *(base_ptr + i) = rand() & 0xff;
@@ -111,21 +114,21 @@ void dram_write_random_scalars(uint8_t *bank_ptr, enum data_type type,
     Xil_DCacheFlushRange((UINTPTR)base_ptr, size_bytes);
 }
 
-void dram_fill_scalars(uint8_t *bank_ptr, enum data_type type, size_t offset,
-                       int byte, size_t size) {
-    uint8_t *base_ptr = bank_ptr + offset * dram_sizeof_scalar(type);
-    size_t size_bytes = size * dram_sizeof_scalar(type);
+void tensil_dram_fill_bytes(uint8_t *bank_ptr, enum tensil_data_type type,
+                            size_t offset, int byte, size_t size) {
+    uint8_t *base_ptr = bank_ptr + offset * tensil_dram_sizeof_scalar(type);
+    size_t size_bytes = size * tensil_dram_sizeof_scalar(type);
 
     memset((void *)base_ptr, byte, size_bytes);
 
     Xil_DCacheFlushRange((UINTPTR)base_ptr, size_bytes);
 }
 
-int dram_compare_scalars(uint8_t *bank_ptr, enum data_type type, size_t offset0,
-                         size_t offset1, size_t size) {
-    uint8_t *base_ptr0 = bank_ptr + offset0 * dram_sizeof_scalar(type);
-    uint8_t *base_ptr1 = bank_ptr + offset1 * dram_sizeof_scalar(type);
-    size_t size_bytes = size * dram_sizeof_scalar(type);
+int tensil_dram_compare_bytes(uint8_t *bank_ptr, enum tensil_data_type type,
+                              size_t offset0, size_t offset1, size_t size) {
+    uint8_t *base_ptr0 = bank_ptr + offset0 * tensil_dram_sizeof_scalar(type);
+    uint8_t *base_ptr1 = bank_ptr + offset1 * tensil_dram_sizeof_scalar(type);
+    size_t size_bytes = size * tensil_dram_sizeof_scalar(type);
 
     Xil_DCacheFlushRange((UINTPTR)base_ptr0, size_bytes);
     Xil_DCacheFlushRange((UINTPTR)base_ptr1, size_bytes);
@@ -135,65 +138,40 @@ int dram_compare_scalars(uint8_t *bank_ptr, enum data_type type, size_t offset0,
 
 #ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
 
-error_t dram_write_scalars_from_file(uint8_t *bank_ptr, enum data_type type,
-                                     size_t offset, size_t size,
-                                     const char *file_name) {
+tensil_error_t tensil_dram_write_scalars_from_file(uint8_t *bank_ptr,
+                                                   enum tensil_data_type type,
+                                                   size_t offset, size_t size,
+                                                   const char *file_name) {
     FIL fil;
     FILINFO fno;
     FRESULT res;
     UINT bytes_read;
-    size_t sizeof_scalar = dram_sizeof_scalar(type);
+    size_t sizeof_scalar = tensil_dram_sizeof_scalar(type);
     uint8_t *base_ptr = bank_ptr + offset * sizeof_scalar;
 
     memset(&fno, 0, sizeof(FILINFO));
     res = f_stat(file_name, &fno);
     if (res)
-        return FS_ERROR(res);
+        return TENSIL_FS_ERROR(res);
 
     if (fno.fsize != size * sizeof_scalar)
-        return DRIVER_ERROR(ERROR_DRIVER_UNEXPECTED_CONSTS_SIZE,
-                            "Unexpected consts size in %s", file_name);
+        return TENSIL_DRIVER_ERROR(TENSIL_ERROR_DRIVER_UNEXPECTED_CONSTS_SIZE,
+                                   "Unexpected consts size in %s", file_name);
 
     memset(&fil, 0, sizeof(FIL));
     res = f_open(&fil, file_name, FA_READ);
     if (res)
-        return FS_ERROR(res);
+        return TENSIL_FS_ERROR(res);
 
     res = f_read(&fil, (void *)base_ptr, fno.fsize, &bytes_read);
     f_close(&fil);
 
     if (res)
-        return FS_ERROR(res);
+        return TENSIL_FS_ERROR(res);
 
     Xil_DCacheFlushRange((UINTPTR)base_ptr, fno.fsize);
 
-    return ERROR_NONE;
-}
-
-#endif
-
-#ifdef TENSIL_PLATFORM_FLASH_READ
-
-error_t dram_write_scalars_from_flash(uint8_t *bank_ptr, enum data_type type,
-                                      size_t offset, size_t size,
-                                      TENSIL_PLATFORM_FLASH_TYPE flash) {
-    size_t sizeof_scalar = dram_sizeof_scalar(type);
-    uint8_t *current_ptr = bank_ptr + offset * sizeof_scalar;
-    size_t size_bytes = size * sizeof_scalar;
-
-    while (size_bytes) {
-        size_t flash_read_size = 0;
-        int status = TENSIL_PLATFORM_FLASH_READ(flash, current_ptr, size_bytes,
-                                                &flash_read_size);
-
-        if (status != XST_SUCCESS)
-            return XILINX_ERROR(status);
-
-        size_bytes -= flash_read_size;
-        current_ptr += flash_read_size;
-    }
-
-    return ERROR_NONE;
+    return TENSIL_ERROR_NONE;
 }
 
 #endif

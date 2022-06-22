@@ -8,49 +8,43 @@
 
 #include "error.h"
 
-struct instruction_buffer {
+struct tensil_instruction_buffer {
     uint8_t *ptr;
     size_t offset;
     size_t size;
 };
 
-struct instruction_layout;
+struct tensil_instruction_layout;
 
-error_t buffer_append_instruction(struct instruction_buffer *buffer,
-                                  const struct instruction_layout *layout,
-                                  uint8_t opcode, uint8_t flags,
-                                  uint64_t operand0, uint64_t operand1,
-                                  uint64_t operand2);
+tensil_error_t tensil_buffer_append_instruction(
+    struct tensil_instruction_buffer *buffer,
+    const struct tensil_instruction_layout *layout, uint8_t opcode,
+    uint8_t flags, uint64_t operand0, uint64_t operand1, uint64_t operand2);
 
-error_t
-buffer_append_config_instruction(struct instruction_buffer *buffer,
-                                 const struct instruction_layout *layout,
-                                 uint8_t reg, uint64_t value);
+tensil_error_t tensil_buffer_append_config_instruction(
+    struct tensil_instruction_buffer *buffer,
+    const struct tensil_instruction_layout *layout, uint8_t reg,
+    uint64_t value);
 
-error_t buffer_append_noop_instructions(struct instruction_buffer *buffer,
-                                        const struct instruction_layout *layout,
-                                        size_t count);
+tensil_error_t tensil_buffer_append_noop_instructions(
+    struct tensil_instruction_buffer *buffer,
+    const struct tensil_instruction_layout *layout, size_t count);
 
-error_t buffer_append_program(struct instruction_buffer *buffer,
-                              const uint8_t *ptr, size_t size);
+tensil_error_t
+tensil_buffer_append_program(struct tensil_instruction_buffer *buffer,
+                             const uint8_t *ptr, size_t size);
 
 #ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
 
-error_t buffer_append_program_from_file(struct instruction_buffer *buffer,
-                                        size_t size, const char *file_name);
+tensil_error_t
+tensil_buffer_append_program_from_file(struct tensil_instruction_buffer *buffer,
+                                       size_t size, const char *file_name);
 
 #endif
 
-#ifdef TENSIL_PLATFORM_FLASH_READ
+tensil_error_t
+tensil_buffer_pad_to_alignment(struct tensil_instruction_buffer *buffer,
+                               const struct tensil_instruction_layout *layout,
+                               int alignment_bytes);
 
-error_t buffer_append_program_from_flash(struct instruction_buffer *buffer,
-                                         size_t size,
-                                         TENSIL_PLATFORM_FLASH_TYPE flash);
-
-#endif
-
-error_t buffer_pad_to_alignment(struct instruction_buffer *buffer,
-                                const struct instruction_layout *layout,
-                                int alignment_bytes);
-
-void buffer_reset(struct instruction_buffer *buffer);
+void tensil_buffer_reset(struct tensil_instruction_buffer *buffer);

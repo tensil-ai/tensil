@@ -13,46 +13,45 @@
 
 #include "error.h"
 
-#define SAMPLE_SIZE_BYTES 8
-#define SAMPLE_INTERVAL_CYCLES 1000
+#define TENSIL_SAMPLE_SIZE_BYTES 8
+#define TENSIL_SAMPLE_INTERVAL_CYCLES 1000
 
-struct sample_buffer {
+struct tensil_sample_buffer {
     uint8_t *ptr;
     size_t size;
     size_t offset;
 };
 
-struct instruction_buffer;
-struct instruction_layout;
+struct tensil_instruction_buffer;
+struct tensil_instruction_layout;
 
-void sample_buffer_reset(struct sample_buffer *sample_buffer);
+void tensil_sample_buffer_reset(struct tensil_sample_buffer *sample_buffer);
 
-const uint8_t *
-sample_buffer_find_valid_samples_ptr(const struct sample_buffer *sample_buffer);
+const uint8_t *tensil_sample_buffer_find_valid_samples_ptr(
+    const struct tensil_sample_buffer *sample_buffer);
 
-bool sample_buffer_get_next_samples_ptr(
-    const struct sample_buffer *sample_buffer,
-    const struct instruction_buffer *instruction_buffer,
-    const struct instruction_layout *layout, const uint8_t **ptr,
+bool tensil_sample_buffer_get_next_samples_ptr(
+    const struct tensil_sample_buffer *sample_buffer,
+    const struct tensil_instruction_buffer *instruction_buffer,
+    const struct tensil_instruction_layout *layout, const uint8_t **ptr,
     uint32_t *program_counter, uint32_t *instruction_offset);
 
-#ifdef TENSIL_PLATFORM_ENABLE_PRINTF
+#ifdef TENSIL_PLATFORM_ENABLE_STDIO
 
-error_t sample_buffer_print_analysis(
-    const struct sample_buffer *sample_buffer,
-    const struct instruction_buffer *instruction_buffer,
-    const struct instruction_layout *layout, bool print_summary,
+tensil_error_t tensil_sample_buffer_print_analysis(
+    const struct tensil_sample_buffer *sample_buffer,
+    const struct tensil_instruction_buffer *instruction_buffer,
+    const struct tensil_instruction_layout *layout, bool print_summary,
     bool print_aggregates, bool print_listing, uint32_t program_counter_shift);
 
 #endif
 
 #ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
 
-error_t
-sample_buffer_to_file(const struct sample_buffer *sample_buffer,
-                      const struct instruction_buffer *instruction_buffer,
-                      const struct instruction_layout *layout,
-                      const char *file_name);
+tensil_error_t tensil_sample_buffer_to_file(
+    const struct tensil_sample_buffer *sample_buffer,
+    const struct tensil_instruction_buffer *instruction_buffer,
+    const struct tensil_instruction_layout *layout, const char *file_name);
 
 #endif
 

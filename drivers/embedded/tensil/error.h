@@ -9,34 +9,40 @@
 #include "ff.h"
 #endif
 
-#define ERROR_MAX_MESSAGE_SIZE 256
-#define ERROR_NONE NULL
+#define TENSIL_ERROR_MAX_MESSAGE_SIZE 256
+#define TENSIL_ERROR_NONE NULL
 
-enum error_type { ERROR_DRIVER, ERROR_FS, ERROR_XILINX };
-
-enum error_code {
-    ERROR_DRIVER_NONE = 0,
-    ERROR_DRIVER_AXI_DMA_DEVICE_NOT_FOUND,
-    ERROR_DRIVER_INSUFFICIENT_BUFFER,
-    ERROR_DRIVER_UNEXPECTED_CONSTS_SIZE,
-    ERROR_DRIVER_UNEXPECTED_PROGRAM_SIZE,
-    ERROR_DRIVER_INVALID_JSON,
-    ERROR_DRIVER_INVALID_MODEL,
-    ERROR_DRIVER_INVALID_ARCH,
-    ERROR_DRIVER_INVALID_PLATFORM,
-    ERROR_DRIVER_INCOMPATIBLE_MODEL,
-    ERROR_DRIVER_UNEXPECTED_INPUT_NAME,
-    ERROR_DRIVER_UNEXPECTED_OUTPUT_NAME,
-    ERROR_DRIVER_OUT_OF_HEAP_MEMORY,
-    ERROR_DRIVER_OUT_OF_SAMPLE_BUFFER
+enum tensil_error_type {
+    TENSIL_ERROR_DRIVER,
+    TENSIL_ERROR_FS,
+    TENSIL_ERROR_XILINX
 };
 
-struct error {
-    char message[ERROR_MAX_MESSAGE_SIZE];
-    enum error_type type;
+enum tensil_error_code {
+    TENSIL_ERROR_DRIVER_NONE = 0,
+    TENSIL_ERROR_DRIVER_AXI_DMA_DEVICE_NOT_FOUND,
+    TENSIL_ERROR_DRIVER_INSUFFICIENT_BUFFER,
+    TENSIL_ERROR_DRIVER_UNEXPECTED_CONSTS_SIZE,
+    TENSIL_ERROR_DRIVER_UNEXPECTED_PROGRAM_SIZE,
+    TENSIL_ERROR_DRIVER_INVALID_JSON,
+    TENSIL_ERROR_DRIVER_INVALID_MODEL,
+    TENSIL_ERROR_DRIVER_INVALID_ARCH,
+    TENSIL_ERROR_DRIVER_INVALID_PLATFORM,
+    TENSIL_ERROR_DRIVER_INCOMPATIBLE_MODEL,
+    TENSIL_ERROR_DRIVER_UNEXPECTED_INPUT_NAME,
+    TENSIL_ERROR_DRIVER_UNEXPECTED_OUTPUT_NAME,
+    TENSIL_ERROR_DRIVER_OUT_OF_HEAP_MEMORY,
+    TENSIL_ERROR_DRIVER_OUT_OF_SAMPLE_BUFFER
+};
+
+struct tensil_error {
+#ifdef TENSIL_PLATFORM_ENABLE_STDIO
+    char message[TENSIL_ERROR_MAX_MESSAGE_SIZE];
+#endif
+    enum tensil_error_type type;
 
     union {
-        enum error_code code;
+        enum tensil_error_code code;
 #ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
         FRESULT fresult;
 #endif
@@ -44,34 +50,37 @@ struct error {
     } code;
 };
 
-typedef const struct error *error_t;
+typedef const struct tensil_error *tensil_error_t;
 
-extern struct error last_error;
+extern struct tensil_error tensil_last_error;
 
-#define DRIVER_ERROR(code, ...)                                                \
-    error_set_driver(&last_error, code, ##__VA_ARGS__)
-
-#ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
-#define FS_ERROR(fresult)                                                      \
-    error_set_fs(&last_error, fresult, "%s:%d file system result %d",          \
-                 __FILE__, __LINE__, fresult)
-#endif
-
-#define XILINX_ERROR(xstatus)                                                  \
-    error_set_xilinx(&last_error, xstatus, "%s:%d Xilinx status %d", __FILE__, \
-                     __LINE__, xstatus)
-
-error_t error_set_driver(struct error *error, enum error_code code,
-                         const char *format, ...);
+#define TENSIL_DRIVER_ERROR(code, ...)                                         \
+    tensil_error_set_driver(&tensil_last_error, code, ##__VA_ARGS__)
 
 #ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
-error_t error_set_fs(struct error *error, FRESULT fresult, const char *format,
-                     ...);
+#define TENSIL_FS_ERROR(fresult)                                               \
+    tensil_error_set_fs(&tensil_last_error, fresult,                           \
+                        "%s:%d file system result %d", __FILE__, __LINE__,     \
+                        fresult)
 #endif
 
-error_t error_set_xilinx(struct error *error, int xstatus, const char *format,
-                         ...);
+#define TENSIL_XILINX_ERROR(xstatus)                                           \
+    tensil_error_set_xilinx(&tensil_last_error, xstatus,                       \
+                            "%s:%d Xilinx status %d", __FILE__, __LINE__,      \
+                            xstatus)
 
-#ifdef TENSIL_PLATFORM_ENABLE_PRINTF
-void error_print(error_t error);
+tensil_error_t tensil_error_set_driver(struct tensil_error *error,
+                                       enum tensil_error_code code,
+                                       const char *format, ...);
+
+#ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
+tensil_error_t tensil_error_set_fs(struct tensil_error *error, FRESULT fresult,
+                                   const char *format, ...);
+#endif
+
+tensil_error_t tensil_error_set_xilinx(struct tensil_error *error, int xstatus,
+                                       const char *format, ...);
+
+#ifdef TENSIL_PLATFORM_ENABLE_STDIO
+void tensil_error_print(tensil_error_t error);
 #endif

@@ -377,11 +377,11 @@ int main() {
     printf("DRAM0 size (bytes):                %zu\n", driver.dram0_size);
     printf("DRAM1 size (bytes):                %zu\n", driver.dram1_size);
 
-    /*printf("Testing sampling...\n");
+    printf("Testing sampling...\n");
     error = tensil_driver_run_sampling_test(&driver, false);
 
     if (error)
-        goto cleanup;*/
+        goto cleanup;
 
     printf("Testing memory (DRAM0 -> DRAM0)...\n");
     error = tensil_driver_run_memory_test(&driver, TENSIL_DRAM0, TENSIL_DRAM0,

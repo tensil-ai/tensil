@@ -4,6 +4,7 @@
 #pragma once
 
 #include "platform.h"
+#include "xstatus.h"
 
 #ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
 #include "ff.h"
@@ -62,12 +63,25 @@ extern struct tensil_error tensil_last_error;
     tensil_error_set_fs(&tensil_last_error, fresult,                           \
                         "%s:%d file system result %d", __FILE__, __LINE__,     \
                         fresult)
+
+#define TENSIL_FS_RESULT_FRAME FRESULT fresult = FR_OK;
+
+#define TENSIL_FS_RESULT(call)                                                 \
+    ((fresult = call) == FR_OK) ? TENSIL_ERROR_NONE : TENSIL_FS_ERROR(fresult)
+
 #endif
 
 #define TENSIL_XILINX_ERROR(xstatus)                                           \
     tensil_error_set_xilinx(&tensil_last_error, xstatus,                       \
                             "%s:%d Xilinx status %d", __FILE__, __LINE__,      \
                             xstatus)
+
+#define TENSIL_XILINX_RESULT_FRAME int xilinx_status = XST_SUCCESS;
+
+#define TENSIL_XILINX_RESULT(call)                                             \
+    ((xilinx_status = call) == XST_SUCCESS)                                    \
+        ? TENSIL_ERROR_NONE                                                    \
+        : TENSIL_XILINX_ERROR(xilinx_status)
 
 tensil_error_t tensil_error_set_driver(struct tensil_error *error,
                                        enum tensil_error_code code,

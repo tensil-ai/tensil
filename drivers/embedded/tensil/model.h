@@ -13,51 +13,57 @@
 #include "config.h"
 #include "error.h"
 
-#define MAX_CONSTS 1
-#define MAX_INPUTS 4
-#define MAX_OUTPUTS 4
+#define TENSIL_MAX_CONSTS 1
+#define TENSIL_MAX_INPUTS 4
+#define TENSIL_MAX_OUTPUTS 4
 
-struct program {
+struct tensil_program {
 #ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
-    char file_name[MAX_STRING_SIZE];
+    char file_name[TENSIL_MAX_STRING_SIZE];
 #endif
     size_t size;
 };
 
-struct consts_entry {
+struct tensil_consts_entry {
 #ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
-    char file_name[MAX_STRING_SIZE];
+    char file_name[TENSIL_MAX_STRING_SIZE];
 #endif
     size_t base;
     size_t size;
 };
 
-struct input_output_entry {
-    char name[MAX_STRING_SIZE];
+struct tensil_input_output_entry {
+    char name[TENSIL_MAX_STRING_SIZE];
     size_t base;
     size_t size;
 };
 
-struct model {
-    struct consts_entry consts[MAX_CONSTS];
+struct tensil_model {
+    struct tensil_consts_entry consts[TENSIL_MAX_CONSTS];
     size_t consts_size;
 
-    struct input_output_entry inputs[MAX_INPUTS];
+    struct tensil_input_output_entry inputs[TENSIL_MAX_INPUTS];
     size_t inputs_size;
 
-    struct input_output_entry outputs[MAX_OUTPUTS];
+    struct tensil_input_output_entry outputs[TENSIL_MAX_OUTPUTS];
     size_t outputs_size;
 
-    struct program prog;
-    struct architecture arch;
+    struct tensil_program prog;
+    struct tensil_architecture arch;
 };
 
-bool model_is_valid(const struct model *model);
+bool tensil_model_is_valid(const struct tensil_model *model);
 
-void model_parse(struct model *model, const cJSON *json);
+#ifdef TENSIL_PLATFORM_ENABLE_STDIO
 
-#ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
+void tensil_model_parse(struct tensil_model *model, const cJSON *json);
 
-error_t model_from_file(struct model *model, const char *file_name);
+#endif
+
+#if (defined(TENSIL_PLATFORM_ENABLE_FILE_SYSTEM) &&                            \
+     defined(TENSIL_PLATFORM_ENABLE_STDIO))
+
+tensil_error_t tensil_model_from_file(struct tensil_model *model,
+                                      const char *file_name);
 
 #endif

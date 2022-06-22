@@ -16,7 +16,7 @@
 
 #include "error.h"
 
-struct tcu {
+struct tensil_compute_unit {
 #ifdef TENSIL_PLATFORM_INSTRUCTION_AXI_DMA_DEVICE_ID
     XAxiDma instruction_axi_dma;
 #endif
@@ -26,31 +26,37 @@ struct tcu {
 #endif
 };
 
-struct sample_buffer;
-struct instruction_buffer;
+struct tensil_sample_buffer;
+struct tensil_instruction_buffer;
 
 #ifdef TENSIL_PLATFORM_INSTRUCTION_AXI_DMA_DEVICE_ID
 
-error_t tcu_init(struct tcu *tcu);
+tensil_error_t tensil_compute_unit_init(struct tensil_compute_unit *tcu);
 
-error_t tcu_start_instructions(struct tcu *tcu,
-                               const struct instruction_buffer *buffer,
-                               size_t *run_offset);
+tensil_error_t tensil_compute_unit_start_instructions(
+    struct tensil_compute_unit *tcu,
+    const struct tensil_instruction_buffer *buffer, size_t *run_offset);
 
-bool tcu_is_instructions_busy(struct tcu *tcu);
+bool tensil_compute_unit_is_instructions_busy(struct tensil_compute_unit *tcu);
 
-int tcu_get_instructions_data_width_bytes(struct tcu *tcu);
+int tensil_compute_unit_get_instructions_data_width_bytes(
+    struct tensil_compute_unit *tcu);
 
 #endif
 
 #ifdef TENSIL_PLATFORM_SAMPLE_AXI_DMA_DEVICE_ID
 
-error_t tcu_init_sampling(struct tcu *tcu, size_t sample_block_size);
+tensil_error_t
+tensil_compute_unit_init_sampling(struct tensil_compute_unit *tcu,
+                                  size_t sample_block_size);
 
-error_t tcu_start_sampling(struct tcu *tcu, struct sample_buffer *buffer);
+tensil_error_t
+tensil_compute_unit_start_sampling(struct tensil_compute_unit *tcu,
+                                   struct tensil_sample_buffer *buffer);
 
-void tcu_complete_sampling(struct tcu *tcu, struct sample_buffer *buffer);
+void tensil_compute_unit_complete_sampling(struct tensil_compute_unit *tcu,
+                                           struct tensil_sample_buffer *buffer);
 
-bool tcu_is_sample_busy(struct tcu *tcu);
+bool tensil_compute_unit_is_sample_busy(struct tensil_compute_unit *tcu);
 
 #endif

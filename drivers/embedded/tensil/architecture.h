@@ -11,11 +11,14 @@
 #include "error.h"
 #include "platform.h"
 
-enum data_type { TENSIL_DATA_TYPE_INVALID = 0, TENSIL_DATA_TYPE_FP16BP8 = 1 };
+enum tensil_data_type {
+    TENSIL_DATA_TYPE_INVALID = 0,
+    TENSIL_DATA_TYPE_FP16BP8 = 1
+};
 
-struct architecture {
+struct tensil_architecture {
     size_t array_size;
-    enum data_type data_type;
+    enum tensil_data_type data_type;
 
     size_t local_depth;
     size_t accumulator_depth;
@@ -26,9 +29,15 @@ struct architecture {
     size_t simd_registers_depth;
 };
 
-bool architecture_is_valid(const struct architecture *arch);
+bool tensil_architecture_is_valid(const struct tensil_architecture *arch);
 
-bool architecture_is_compatible(const struct architecture *driver_arch,
-                                const struct architecture *model_arch);
+bool tensil_architecture_is_compatible(
+    const struct tensil_architecture *driver_arch,
+    const struct tensil_architecture *model_arch);
 
-void architecture_parse(struct architecture *arch, const cJSON *json);
+#ifdef TENSIL_PLATFORM_ENABLE_STDIO
+
+void tensil_architecture_parse(struct tensil_architecture *arch,
+                               const cJSON *json);
+
+#endif

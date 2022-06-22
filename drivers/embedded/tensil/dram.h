@@ -9,41 +9,35 @@
 #include "architecture.h"
 #include "error.h"
 
-size_t dram_sizeof_scalar(enum data_type type);
+size_t tensil_dram_sizeof_scalar(enum tensil_data_type type);
 
-float dram_max_scalar(enum data_type type);
+float tensil_dram_max_scalar(enum tensil_data_type type);
 
-float dram_min_scalar(enum data_type type);
+float tensil_dram_min_scalar(enum tensil_data_type type);
 
-float dram_max_error_scalar(enum data_type type);
+float tensil_dram_max_error_scalar(enum tensil_data_type type);
 
-void dram_read_scalars(const uint8_t *bank_ptr, enum data_type type,
-                       size_t offset, size_t size, float *buffer);
+void tensil_dram_read_scalars(const uint8_t *bank_ptr,
+                              enum tensil_data_type type, size_t offset,
+                              size_t size, float *buffer);
 
-void dram_write_scalars(uint8_t *bank_ptr, enum data_type type, size_t offset,
-                        size_t size, const float *buffer);
+void tensil_dram_write_scalars(uint8_t *bank_ptr, enum tensil_data_type type,
+                               size_t offset, size_t size, const float *buffer);
 
-void dram_write_random_scalars(uint8_t *bank_ptr, enum data_type type,
-                               size_t offset, size_t size);
+void tensil_dram_fill_random(uint8_t *bank_ptr, enum tensil_data_type type,
+                             size_t offset, size_t size);
 
-void dram_fill_scalars(uint8_t *bank_ptr, enum data_type type, size_t offset,
-                       int byte, size_t size);
+void tensil_dram_fill_bytes(uint8_t *bank_ptr, enum tensil_data_type type,
+                            size_t offset, int byte, size_t size);
 
-int dram_compare_scalars(uint8_t *bank_ptr, enum data_type type, size_t offset0,
-                         size_t offset1, size_t size);
+int tensil_dram_compare_bytes(uint8_t *bank_ptr, enum tensil_data_type type,
+                              size_t offset0, size_t offset1, size_t size);
 
 #ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
 
-error_t dram_write_scalars_from_file(uint8_t *bank_ptr, enum data_type type,
-                                     size_t offset, size_t size,
-                                     const char *file_name);
-
-#endif
-
-#ifdef TENSIL_PLATFORM_FLASH_READ
-
-error_t dram_write_scalars_from_flash(uint8_t *bank_ptr, enum data_type type,
-                                      size_t offset, size_t size,
-                                      TENSIL_PLATFORM_FLASH_TYPE flash);
+tensil_error_t tensil_dram_write_scalars_from_file(uint8_t *bank_ptr,
+                                                   enum tensil_data_type type,
+                                                   size_t offset, size_t size,
+                                                   const char *file_name);
 
 #endif

@@ -64,7 +64,7 @@ class WidthConverter(inWidth: Int, outWidth: Int) extends Module {
 
     when(doEnq) {
       for (i <- 0 until blocksPerInput) {
-        arr(enqPtr + (blocksPerInput - (i + 1)).U) := io.in.bits(
+        arr(enqPtr + i.U) := io.in.bits(
           (i + 1) * gcd - 1,
           i * gcd
         )
@@ -80,8 +80,8 @@ class WidthConverter(inWidth: Int, outWidth: Int) extends Module {
     io.out.valid := !empty
 
     io.out.bits := Cat(
-      for (i <- 0 until blocksPerOutput)
-        yield arr(deqPtr + i.U)
+      (for (i <- 0 until blocksPerOutput)
+        yield arr(deqPtr + i.U)).reverse
     )
 
     // TODO handle pipe and flow for max throughput

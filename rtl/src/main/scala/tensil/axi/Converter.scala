@@ -10,7 +10,6 @@ import tensil.mem.MemControl
 import tensil.util.decoupled.{Deserializer, Extend, Serializer, Sink}
 import tensil.util.decoupled.DataCounter
 import tensil.mem.RequestSplitter
-import tensil.util.decoupled.Transmission
 import tensil.util.decoupled.VectorSerializer
 import tensil.util.decoupled.VectorDeserializer
 import tensil.util.decoupled.QueueWithReporting

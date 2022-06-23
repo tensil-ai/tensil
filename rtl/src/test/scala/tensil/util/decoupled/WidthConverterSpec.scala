@@ -14,13 +14,13 @@ class WidthConverterSpec extends FunUnitSpec {
         m.io.out.setSinkClock(m.clock)
 
         thread("in") {
-          m.io.in.enqueue("h0102030405060708".U)
-          m.io.in.enqueue("h090a0b0c0d0e0f10".U)
-          m.io.in.enqueue("h1112131415161718".U)
+          m.io.in.enqueue("h0807060504030201".U)
+          m.io.in.enqueue("h100f0e0d0c0b0a09".U)
+          m.io.in.enqueue("h1817161514131211".U)
         }
         thread("out") {
-          m.io.out.expectDequeue("h010203040506070809".U)
-          m.io.out.expectDequeue("h0a0b0c0d0e0f101112".U)
+          m.io.out.expectDequeue("h090807060504030201".U)
+          m.io.out.expectDequeue("h1211100f0e0d0c0b0a".U)
         }
       }
     }

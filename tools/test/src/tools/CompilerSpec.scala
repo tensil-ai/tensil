@@ -88,9 +88,9 @@ class CompilerSpec extends AnyFlatSpec {
     val options = CompilerOptions(
       arch = Tiny2x2Architecure,
       printSummary = true,
-      printProgramFileName = Some(s"${name}.tasm"),
+      printProgramAssembly = true,
       printProgramWithComments = true,
-      printGraphFileName = Some(s"${name}.dot"),
+      printGraph = true,
       tracepointConditions = List(
         TracepointCondition(MemoryTag.Vars, "x"),
         TracepointCondition(MemoryTag.Local, "x"),
@@ -210,7 +210,7 @@ class CompilerSpec extends AnyFlatSpec {
     val options = CompilerOptions(
       arch = Tiny2x2Architecure,
       inputShapes = CompilerInputShapes.mkWithBatchSize(4),
-      printProgramFileName = Some(s"${name}.tasm")
+      printProgramAssembly = true
     )
 
     Compiler.compile(
@@ -286,7 +286,7 @@ class CompilerSpec extends AnyFlatSpec {
     val options = CompilerOptions(
       arch = Tiny2x2Architecure,
       inputShapes = CompilerInputShapes.mkWithBatchSize(16),
-      printProgramFileName = Some(s"${name}.tasm")
+      printProgramAssembly = true
     )
 
     Compiler.compile(
@@ -373,7 +373,7 @@ class CompilerSpec extends AnyFlatSpec {
     val name = "xor_4x4_memory256"
     val options = CompilerOptions(
       arch = Tiny4x4Architecure,
-      printProgramFileName = Some(s"${name}.tasm")
+      printProgramAssembly = true
     )
 
     Compiler.compile(
@@ -501,7 +501,7 @@ class CompilerSpec extends AnyFlatSpec {
     val name = "xor_2x2_memory64K"
     val options = CompilerOptions(
       arch = Large2x2Architecure,
-      printProgramFileName = Some(s"${name}.tasm")
+      printProgramAssembly = true
     )
 
     Compiler.compile(
@@ -584,7 +584,7 @@ class CompilerSpec extends AnyFlatSpec {
     val name = "xor4_4x4_memory256"
     val options = CompilerOptions(
       arch = Tiny4x4Architecure,
-      printProgramFileName = Some(s"${name}.tasm")
+      printProgramAssembly = true
     )
 
     Compiler.compile(
@@ -712,7 +712,7 @@ class CompilerSpec extends AnyFlatSpec {
     val name = "xor4_2x2_memory128_stride2"
     val options = CompilerOptions(
       arch = Large2x2WithStridesArchitecure,
-      printProgramFileName = Some(s"${name}.tasm")
+      printProgramAssembly = true
     )
 
     Compiler.compile(
@@ -815,9 +815,9 @@ class CompilerSpec extends AnyFlatSpec {
       arch = Large2x2WithStridesArchitecure,
       inputShapes = CompilerInputShapes.mkWithBatchSize(4),
       printSummary = true,
-      printProgramFileName = Some(s"${name}.tasm"),
+      printProgramAssembly = true,
       printProgramWithComments = true,
-      printGraphFileName = Some(s"${name}.dot"),
+      printGraph = true,
       tracepointConditions = List(
         TracepointCondition(MemoryTag.Vars, "x"),
         TracepointCondition(MemoryTag.Local, "x"),
@@ -965,7 +965,7 @@ class CompilerSpec extends AnyFlatSpec {
     val options = CompilerOptions(
       arch = Large2x2WithStridesArchitecure,
       inputShapes = CompilerInputShapes.mkWithBatchSize(16),
-      printProgramFileName = Some(s"${name}.tasm")
+      printProgramAssembly = true
     )
 
     Compiler.compile(
@@ -1253,7 +1253,7 @@ class CompilerSpec extends AnyFlatSpec {
       arch = MNIST128x128Architecture,
       inputShapes = CompilerInputShapes.mkWithBatchSize(10),
       printSummary = true,
-      printGraphFileName = Some(s"${name}.dot")
+      printGraph = true
     )
 
     Compiler.compile(
@@ -1880,7 +1880,7 @@ class CompilerSpec extends AnyFlatSpec {
       arch = MNIST16x16With128KArchitecture,
       inputShapes = CompilerInputShapes.mkWithBatchSize(10),
       printSummary = true,
-      printGraphFileName = Some(s"${name}.dot")
+      printGraph = true
     )
 
     Compiler.compile(
@@ -1975,8 +1975,8 @@ class CompilerSpec extends AnyFlatSpec {
       arch = ResNetFp16bp8Architecture,
       printSummary = true,
       printLayersSummary = true,
-      printGraphFileName = Some(s"${name}.dot"),
-      //printProgramFileName = Some(s"${name}.tasm"),
+      printGraph = true,
+      //printProgramAssembly = true,
       tracepointConditions = List(
         TracepointCondition(MemoryTag.Vars, "model/dense/Softmax")
       )
@@ -2004,8 +2004,8 @@ class CompilerSpec extends AnyFlatSpec {
       arch = ResNetFp16bp8MtArchitecture,
       printSummary = true,
       printLayersSummary = true,
-      printGraphFileName = Some(s"${name}.dot"),
-      //printProgramFileName = Some(s"${name}.tasm"),
+      printGraph = true,
+      //printProgramAssembly = true,
       tracepointConditions = List(
         TracepointCondition(MemoryTag.Vars, "model/dense/Softmax")
       )
@@ -2058,8 +2058,8 @@ class CompilerSpec extends AnyFlatSpec {
       inputShapes = CompilerInputShapes.mkWithBatchSize(10),
       printSummary = true,
       printLayersSummary = true,
-      printGraphFileName = Some(s"${name}.dot"),
-      //printProgramFileName = Some(s"${name}.tasm"),
+      printGraph = true,
+      //printProgramAssembly = true,
       tracepointConditions = List(
         TracepointCondition(MemoryTag.Vars, "model/dense/Softmax")
       )
@@ -2088,8 +2088,8 @@ class CompilerSpec extends AnyFlatSpec {
       inputShapes = CompilerInputShapes.mkWithBatchSize(10),
       printSummary = true,
       printLayersSummary = true,
-      printGraphFileName = Some(s"${name}.dot"),
-      //printProgramFileName = Some(s"${name}.tasm"),
+      printGraph = true,
+      //printProgramAssembly = true,
       tracepointConditions = List(
         TracepointCondition(MemoryTag.Vars, "model/dense/Softmax")
       )
@@ -2140,7 +2140,7 @@ class CompilerSpec extends AnyFlatSpec {
       arch = ResNetFp16bp8Architecture,
       printSummary = true,
       printLayersSummary = true,
-      printGraphFileName = Some(s"${name}.dot"),
+      printGraph = true,
       tracepointConditions = List(
         TracepointCondition(MemoryTag.Vars, "Identity:0")
       )
@@ -2285,7 +2285,7 @@ class CompilerSpec extends AnyFlatSpec {
       arch = YoloTinyFp16bp8Architecture,
       printSummary = true,
       printLayersSummary = true,
-      printGraphFileName = Some(s"${name}.dot"),
+      printGraph = true,
       /*tracepointConditions = List(
         TracepointCondition(MemoryTag.Vars, "model/conv2d_17/BiasAdd"),
         TracepointCondition(MemoryTag.Vars, "model/conv2d_20/BiasAdd")
@@ -2314,7 +2314,7 @@ class CompilerSpec extends AnyFlatSpec {
       arch = YoloTinyFp16bp8MtArchitecture,
       printSummary = true,
       printLayersSummary = true,
-      printGraphFileName = Some(s"${name}.dot"),
+      printGraph = true,
       /*tracepointConditions = List(
         TracepointCondition(MemoryTag.Vars, "model/conv2d_17/BiasAdd"),
         TracepointCondition(MemoryTag.Vars, "model/conv2d_20/BiasAdd")
@@ -2366,7 +2366,7 @@ class CompilerSpec extends AnyFlatSpec {
       arch = YoloTinyFp16bp8Architecture,
       printSummary = true,
       printLayersSummary = true,
-      printGraphFileName = Some(s"${name}.dot")
+      printGraph = true
     )
 
     Compiler.compile(
@@ -2517,7 +2517,7 @@ class CompilerSpec extends AnyFlatSpec {
       arch = ResNet50Fp16bp8Architecture,
       printSummary = true,
       printLayersSummary = true,
-      printGraphFileName = Some(s"${name}.dot"),
+      printGraph = true,
       tracepointConditions = List(
         TracepointCondition(MemoryTag.Vars, "Identity:0")
       )
@@ -2563,7 +2563,7 @@ class CompilerSpec extends AnyFlatSpec {
       arch = SpeechCommandsFp16bp8Architecture,
       printSummary = true,
       printLayersSummary = true,
-      printGraphFileName = Some(s"${name}.dot"),
+      printGraph = true,
       tracepointConditions = List(
         TracepointCondition(MemoryTag.Vars, "dense_3")
       )
@@ -2591,7 +2591,7 @@ class CompilerSpec extends AnyFlatSpec {
       arch = SpeechCommandsFloatArchitecture,
       printSummary = true,
       printLayersSummary = true,
-      printGraphFileName = Some(s"${name}.dot"),
+      printGraph = true,
       tracepointConditions = List(
         TracepointCondition(MemoryTag.Vars, "dense_3")
       )

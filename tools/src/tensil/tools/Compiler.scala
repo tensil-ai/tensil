@@ -234,8 +234,8 @@ object Compiler {
       constsStream: OutputStream,
       options: CompilerOptions,
       traceContext: TraceContext = TraceContext.empty,
-      programAssemblyFileName: Option[String],
-      graphFileName: Option[String]
+      programAssemblyFileName: Option[String] = None,
+      graphFileName: Option[String] = None
   ): CompilerResult = {
     val startTime = System.nanoTime()
 

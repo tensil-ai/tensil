@@ -5,33 +5,37 @@
 
 #include <malloc.h>
 #include <math.h>
-#include <stdio.h>
 #include <string.h>
+
+#ifdef TENSIL_PLATFORM_ENABLE_STDIO
+#include <stdio.h>
+#endif
 
 #include "dram.h"
 #include "instruction_buffer.h"
 #include "sample_buffer.h"
 
-#ifdef TENSIL_PLATFORM_ENABLE_PRINTF
+#ifdef TENSIL_PLATFORM_ENABLE_STDIO
 
 static const char *ok = "\033[38;2;0;255;00mOK\033[39m";
 static const char *failed = "\033[38;2;255;0;00mFAILED\033[39m";
 
-static void write_dram_random_vectors(struct driver *driver,
-                                      enum dram_bank dram_bank, size_t offset,
-                                      size_t stride, size_t size) {
-    uint8_t *bank_ptr = driver_get_dram_bank_base_ptr(driver, dram_bank);
+static void fill_dram_with_random_vectors(struct tensil_driver *driver,
+                                          enum tensil_dram_bank dram_bank,
+                                          size_t offset, size_t stride,
+                                          size_t size) {
+    uint8_t *bank_ptr = tensil_driver_get_dram_bank_base_ptr(driver, dram_bank);
 
     if (stride == 0)
-        dram_write_random_scalars(bank_ptr, driver->arch.data_type,
-                                  offset * driver->arch.array_size,
-                                  size * driver->arch.array_size);
+        tensil_dram_fill_random(bank_ptr, driver->arch.data_type,
+                                offset * driver->arch.array_size,
+                                size * driver->arch.array_size);
     else
         for (size_t i = 0; i < size; i++)
-            dram_write_random_scalars(bank_ptr, driver->arch.data_type,
-                                      (offset + i * (1 << stride)) *
-                                          driver->arch.array_size,
-                                      driver->arch.array_size);
+            tensil_dram_fill_random(bank_ptr, driver->arch.data_type,
+                                    (offset + i * (1 << stride)) *
+                                        driver->arch.array_size,
+                                    driver->arch.array_size);
 }
 
 #define TEST_MAX_BAD_INDEXES_SIZE 32
@@ -39,103 +43,104 @@ static void write_dram_random_vectors(struct driver *driver,
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
-static error_t do_memory_test(struct driver *driver, enum dram_bank from_bank,
-                              size_t from_offset, float *from_buffer,
-                              enum dram_bank to_bank, size_t to_offset,
-                              float *to_buffer, size_t size, size_t stride0,
-                              size_t stride1, size_t *failure_count,
-                              size_t *test_count, bool verbose) {
+static tensil_error_t
+do_memory_test(struct tensil_driver *driver, enum tensil_dram_bank from_bank,
+               size_t from_offset, float *from_buffer,
+               enum tensil_dram_bank to_bank, size_t to_offset,
+               float *to_buffer, size_t size, size_t stride0, size_t stride1,
+               size_t *failure_count, size_t *test_count, bool verbose) {
     if (from_offset + size * (1 << MAX(stride0, stride1)) >
             driver->arch.local_depth ||
         to_offset + size * (1 << MAX(stride0, stride1)) >
             driver->arch.local_depth ||
         to_offset + size * (1 << MAX(stride0, stride1)) >
             driver->arch.accumulator_depth)
-        return ERROR_NONE;
+        return TENSIL_ERROR_NONE;
 
     uint8_t from_flags;
     switch (from_bank) {
-    case DRAM0:
+    case TENSIL_DRAM0:
     default:
-        from_flags = DATA_MOVE_FLAG_DRAM0_TO_LOCAL;
+        from_flags = TENSIL_DATA_MOVE_FLAG_DRAM0_TO_LOCAL;
         break;
 
-    case DRAM1:
-        from_flags = DATA_MOVE_FLAG_DRAM1_TO_LOCAL;
+    case TENSIL_DRAM1:
+        from_flags = TENSIL_DATA_MOVE_FLAG_DRAM1_TO_LOCAL;
         break;
     }
 
     uint8_t to_flags;
     switch (to_bank) {
-    case DRAM0:
+    case TENSIL_DRAM0:
     default:
-        to_flags = DATA_MOVE_FLAG_LOCAL_TO_DRAM0;
+        to_flags = TENSIL_DATA_MOVE_FLAG_LOCAL_TO_DRAM0;
         break;
 
-    case DRAM1:
-        to_flags = DATA_MOVE_FLAG_LOCAL_TO_DRAM1;
+    case TENSIL_DRAM1:
+        to_flags = TENSIL_DATA_MOVE_FLAG_LOCAL_TO_DRAM1;
         break;
     }
 
-    write_dram_random_vectors(driver, from_bank, from_offset, stride1, size);
-    driver_read_dram_vectors(driver, from_bank, from_offset, stride1, size,
-                             from_buffer);
+    fill_dram_with_random_vectors(driver, from_bank, from_offset, stride1,
+                                  size);
+    tensil_driver_read_dram_vectors(driver, from_bank, from_offset, stride1,
+                                    size, from_buffer);
 
-    error_t error = driver_setup_buffer_preamble(driver);
+    tensil_error_t error = tensil_driver_setup_buffer_preamble(driver);
 
     if (error)
         return error;
 
-    error = buffer_append_instruction(
-        &driver->buffer, &driver->layout, OPCODE_DATA_MOVE, from_flags,
-        instruction_make_operand0(&driver->layout, from_offset, stride0),
-        instruction_make_operand1(&driver->layout, from_offset, stride1),
+    error = tensil_buffer_append_instruction(
+        &driver->buffer, &driver->layout, TENSIL_OPCODE_DATA_MOVE, from_flags,
+        tensil_instruction_make_operand0(&driver->layout, from_offset, stride0),
+        tensil_instruction_make_operand1(&driver->layout, from_offset, stride1),
         size - 1);
 
     if (error)
         return error;
 
-    error = buffer_append_instruction(
-        &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
-        DATA_MOVE_FLAG_LOCAL_TO_ACC,
-        instruction_make_operand0(&driver->layout, from_offset, stride0),
-        instruction_make_operand1(&driver->layout, from_offset, stride1),
+    error = tensil_buffer_append_instruction(
+        &driver->buffer, &driver->layout, TENSIL_OPCODE_DATA_MOVE,
+        TENSIL_DATA_MOVE_FLAG_LOCAL_TO_ACC,
+        tensil_instruction_make_operand0(&driver->layout, from_offset, stride0),
+        tensil_instruction_make_operand1(&driver->layout, from_offset, stride1),
         size - 1);
 
     if (error)
         return error;
 
-    error = buffer_append_instruction(
-        &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
-        DATA_MOVE_FLAG_ACC_TO_LOCAL,
-        instruction_make_operand0(&driver->layout, to_offset, stride0),
-        instruction_make_operand1(&driver->layout, from_offset, stride1),
+    error = tensil_buffer_append_instruction(
+        &driver->buffer, &driver->layout, TENSIL_OPCODE_DATA_MOVE,
+        TENSIL_DATA_MOVE_FLAG_ACC_TO_LOCAL,
+        tensil_instruction_make_operand0(&driver->layout, to_offset, stride0),
+        tensil_instruction_make_operand1(&driver->layout, from_offset, stride1),
         size - 1);
 
     if (error)
         return error;
 
-    error = buffer_append_instruction(
-        &driver->buffer, &driver->layout, OPCODE_DATA_MOVE, to_flags,
-        instruction_make_operand0(&driver->layout, to_offset, stride0),
-        instruction_make_operand1(&driver->layout, to_offset, stride1),
+    error = tensil_buffer_append_instruction(
+        &driver->buffer, &driver->layout, TENSIL_OPCODE_DATA_MOVE, to_flags,
+        tensil_instruction_make_operand0(&driver->layout, to_offset, stride0),
+        tensil_instruction_make_operand1(&driver->layout, to_offset, stride1),
         size - 1);
 
     if (error)
         return error;
 
-    error = driver_setup_buffer_postamble(driver);
+    error = tensil_driver_setup_buffer_postamble(driver);
 
     if (error)
         return error;
 
-    error = driver_run(driver, NULL);
+    error = tensil_driver_run(driver, NULL);
 
     if (error)
         return error;
 
-    driver_read_dram_vectors(driver, to_bank, to_offset, stride1, size,
-                             to_buffer);
+    tensil_driver_read_dram_vectors(driver, to_bank, to_offset, stride1, size,
+                                    to_buffer);
 
     size_t bad_indexes[TEST_MAX_BAD_INDEXES_SIZE];
     size_t bad_indexes_size = 0;
@@ -169,7 +174,7 @@ static error_t do_memory_test(struct driver *driver, enum dram_bank from_bank,
 
     (*test_count)++;
 
-    return ERROR_NONE;
+    return TENSIL_ERROR_NONE;
 }
 
 #define MEMORY_TEST_MIN_SIZE 8
@@ -179,17 +184,19 @@ static error_t do_memory_test(struct driver *driver, enum dram_bank from_bank,
 #define MEMORY_TEST_UNTIL_STRIDE0 (driver->arch.stride0_depth)
 #define MEMORY_TEST_UNTIL_STRIDE1 (driver->arch.stride1_depth)
 
-error_t driver_run_memory_test(struct driver *driver, enum dram_bank from_bank,
-                               enum dram_bank to_bank, bool verbose) {
-    error_t error = ERROR_NONE;
+tensil_error_t tensil_driver_run_memory_test(struct tensil_driver *driver,
+                                             enum tensil_dram_bank from_bank,
+                                             enum tensil_dram_bank to_bank,
+                                             bool verbose) {
+    tensil_error_t error = TENSIL_ERROR_NONE;
     float *from_buffer = (float *)malloc(
         MEMORY_TEST_MAX_SIZE * driver->arch.array_size * sizeof(float));
     float *to_buffer = (float *)malloc(MEMORY_TEST_MAX_SIZE *
                                        driver->arch.array_size * sizeof(float));
 
     if (!from_buffer || !to_buffer) {
-        error =
-            DRIVER_ERROR(ERROR_DRIVER_OUT_OF_HEAP_MEMORY, "Out of heap memory");
+        error = TENSIL_DRIVER_ERROR(TENSIL_ERROR_DRIVER_OUT_OF_HEAP_MEMORY,
+                                    "Out of heap memory");
         goto cleanup;
     }
 
@@ -261,15 +268,16 @@ cleanup:
     return error;
 }
 
-static float saturate(enum data_type type, float x) {
-    float max = dram_max_scalar(type);
-    float min = dram_min_scalar(type);
+static float saturate(enum tensil_data_type type, float x) {
+    float max = tensil_dram_max_scalar(type);
+    float min = tensil_dram_min_scalar(type);
 
     return x > max ? max : x < min ? min : x;
 }
 
-static bool compare_scalars(enum data_type type, float expected, float actual) {
-    float max_error = dram_max_error_scalar(type);
+static bool compare_scalars(enum tensil_data_type type, float expected,
+                            float actual) {
+    float max_error = tensil_dram_max_error_scalar(type);
 
     return fabs(expected - actual) > max_error;
 }
@@ -288,8 +296,9 @@ static bool compare_scalars(enum data_type type, float expected, float actual) {
 #define ARRAY_TEST_WEIGHTS_DRAM1_ADDRESS 0
 #define ARRAY_TEST_WEIGHTS_LOCAL_ADDRESS (ARRAY_TEST_SIZE * 2)
 
-error_t driver_run_array_test(struct driver *driver, bool verbose) {
-    error_t error = ERROR_NONE;
+tensil_error_t tensil_driver_run_array_test(struct tensil_driver *driver,
+                                            bool verbose) {
+    tensil_error_t error = TENSIL_ERROR_NONE;
     size_t bad_indexes[TEST_MAX_BAD_INDEXES_SIZE];
     size_t bad_indexes_size = 0;
 
@@ -301,23 +310,26 @@ error_t driver_run_array_test(struct driver *driver, bool verbose) {
         (float *)malloc(driver->arch.array_size * sizeof(float));
 
     if (!from_buffer || !to_buffer || !weights_buffer) {
-        error =
-            DRIVER_ERROR(ERROR_DRIVER_OUT_OF_HEAP_MEMORY, "Out of heap memory");
+        error = TENSIL_DRIVER_ERROR(TENSIL_ERROR_DRIVER_OUT_OF_HEAP_MEMORY,
+                                    "Out of heap memory");
         goto cleanup;
     }
 
-    write_dram_random_vectors(driver, DRAM0, ARRAY_TEST_INPUT_DRAM0_ADDRESS, 0,
-                              ARRAY_TEST_SIZE);
-    driver_read_dram_vectors(driver, DRAM0, ARRAY_TEST_INPUT_DRAM0_ADDRESS, 0,
-                             ARRAY_TEST_SIZE, from_buffer);
+    fill_dram_with_random_vectors(driver, TENSIL_DRAM0,
+                                  ARRAY_TEST_INPUT_DRAM0_ADDRESS, 0,
+                                  ARRAY_TEST_SIZE);
+    tensil_driver_read_dram_vectors(driver, TENSIL_DRAM0,
+                                    ARRAY_TEST_INPUT_DRAM0_ADDRESS, 0,
+                                    ARRAY_TEST_SIZE, from_buffer);
 
     for (size_t j = 0; j < driver->arch.array_size; j++)
         weights_buffer[j] = ARRAY_TEST_BIAS;
 
     // TODO: Use non-identity weights to test all MAC units
 
-    driver_write_dram_vectors(driver, DRAM1, ARRAY_TEST_WEIGHTS_DRAM1_ADDRESS,
-                              0, 1, weights_buffer);
+    tensil_driver_write_dram_vectors(driver, TENSIL_DRAM1,
+                                     ARRAY_TEST_WEIGHTS_DRAM1_ADDRESS, 0, 1,
+                                     weights_buffer);
 
     for (size_t i = 0; i < driver->arch.array_size; i++) {
         for (size_t j = 0; j < driver->arch.array_size; j++)
@@ -326,75 +338,76 @@ error_t driver_run_array_test(struct driver *driver, bool verbose) {
             else
                 weights_buffer[j] = 0.0;
 
-        driver_write_dram_vectors(driver, DRAM1,
-                                  ARRAY_TEST_WEIGHTS_DRAM1_ADDRESS + 1 + i, 0,
-                                  1, weights_buffer);
+        tensil_driver_write_dram_vectors(
+            driver, TENSIL_DRAM1, ARRAY_TEST_WEIGHTS_DRAM1_ADDRESS + 1 + i, 0,
+            1, weights_buffer);
     }
 
-    error = driver_setup_buffer_preamble(driver);
+    error = tensil_driver_setup_buffer_preamble(driver);
 
     if (error)
         goto cleanup;
 
-    error = buffer_append_instruction(
-        &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
-        DATA_MOVE_FLAG_DRAM1_TO_LOCAL, ARRAY_TEST_WEIGHTS_LOCAL_ADDRESS,
+    error = tensil_buffer_append_instruction(
+        &driver->buffer, &driver->layout, TENSIL_OPCODE_DATA_MOVE,
+        TENSIL_DATA_MOVE_FLAG_DRAM1_TO_LOCAL, ARRAY_TEST_WEIGHTS_LOCAL_ADDRESS,
         ARRAY_TEST_WEIGHTS_DRAM1_ADDRESS, driver->arch.array_size);
 
     if (error)
         goto cleanup;
 
-    error = buffer_append_instruction(
-        &driver->buffer, &driver->layout, OPCODE_LOAD_WEIGHT, 0,
+    error = tensil_buffer_append_instruction(
+        &driver->buffer, &driver->layout, TENSIL_OPCODE_LOAD_WEIGHT, 0,
         ARRAY_TEST_WEIGHTS_LOCAL_ADDRESS, driver->arch.array_size, 0);
 
     if (error)
         goto cleanup;
 
-    error = buffer_append_instruction(
-        &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
-        DATA_MOVE_FLAG_DRAM0_TO_LOCAL, ARRAY_TEST_INPUT_LOCAL_ADDRESS,
+    error = tensil_buffer_append_instruction(
+        &driver->buffer, &driver->layout, TENSIL_OPCODE_DATA_MOVE,
+        TENSIL_DATA_MOVE_FLAG_DRAM0_TO_LOCAL, ARRAY_TEST_INPUT_LOCAL_ADDRESS,
         ARRAY_TEST_INPUT_DRAM0_ADDRESS, ARRAY_TEST_SIZE - 1);
 
     if (error)
         goto cleanup;
 
-    error = buffer_append_instruction(
-        &driver->buffer, &driver->layout, OPCODE_MAT_MUL, 0,
+    error = tensil_buffer_append_instruction(
+        &driver->buffer, &driver->layout, TENSIL_OPCODE_MAT_MUL, 0,
         ARRAY_TEST_INPUT_LOCAL_ADDRESS, ARRAY_TEST_OUTPUT_ACC_ADDRESS,
         ARRAY_TEST_SIZE - 1);
 
     if (error)
         goto cleanup;
 
-    error = buffer_append_instruction(
-        &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
-        DATA_MOVE_FLAG_ACC_TO_LOCAL, ARRAY_TEST_OUTPUT_LOCAL_ADDRESS,
+    error = tensil_buffer_append_instruction(
+        &driver->buffer, &driver->layout, TENSIL_OPCODE_DATA_MOVE,
+        TENSIL_DATA_MOVE_FLAG_ACC_TO_LOCAL, ARRAY_TEST_OUTPUT_LOCAL_ADDRESS,
         ARRAY_TEST_OUTPUT_ACC_ADDRESS, ARRAY_TEST_SIZE - 1);
 
     if (error)
         goto cleanup;
 
-    error = buffer_append_instruction(
-        &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
-        DATA_MOVE_FLAG_LOCAL_TO_DRAM0, ARRAY_TEST_OUTPUT_LOCAL_ADDRESS,
+    error = tensil_buffer_append_instruction(
+        &driver->buffer, &driver->layout, TENSIL_OPCODE_DATA_MOVE,
+        TENSIL_DATA_MOVE_FLAG_LOCAL_TO_DRAM0, ARRAY_TEST_OUTPUT_LOCAL_ADDRESS,
         ARRAY_TEST_OUTPUT_DRAM0_ADDRESS, ARRAY_TEST_SIZE - 1);
 
     if (error)
         goto cleanup;
 
-    error = driver_setup_buffer_postamble(driver);
+    error = tensil_driver_setup_buffer_postamble(driver);
 
     if (error)
         goto cleanup;
 
-    error = driver_run(driver, NULL);
+    error = tensil_driver_run(driver, NULL);
 
     if (error)
         goto cleanup;
 
-    driver_read_dram_vectors(driver, DRAM0, ARRAY_TEST_OUTPUT_DRAM0_ADDRESS, 0,
-                             ARRAY_TEST_SIZE, to_buffer);
+    tensil_driver_read_dram_vectors(driver, TENSIL_DRAM0,
+                                    ARRAY_TEST_OUTPUT_DRAM0_ADDRESS, 0,
+                                    ARRAY_TEST_SIZE, to_buffer);
 
     for (size_t k = 0; k < ARRAY_TEST_SIZE * driver->arch.array_size; k++) {
         from_buffer[k] = saturate(
@@ -449,8 +462,9 @@ cleanup:
 #define SIMD_TEST_OUTPUT_LOCAL_ADDRESS (SIMD_TEST_SIZE * 3)
 #define SIMD_TEST_OUTPUT_DRAM0_ADDRESS SIMD_TEST_SIZE
 
-error_t driver_run_simd_test(struct driver *driver, bool verbose) {
-    error_t error = ERROR_NONE;
+tensil_error_t tensil_driver_run_simd_test(struct tensil_driver *driver,
+                                           bool verbose) {
+    tensil_error_t error = TENSIL_ERROR_NONE;
     size_t bad_indexes[TEST_MAX_BAD_INDEXES_SIZE];
     size_t bad_indexes_size = 0;
 
@@ -462,82 +476,83 @@ error_t driver_run_simd_test(struct driver *driver, bool verbose) {
         (float *)malloc(driver->arch.array_size * sizeof(float));
 
     if (!from_buffer || !to_buffer || !consts_buffer) {
-        error =
-            DRIVER_ERROR(ERROR_DRIVER_OUT_OF_HEAP_MEMORY, "Out of heap memory");
+        error = TENSIL_DRIVER_ERROR(TENSIL_ERROR_DRIVER_OUT_OF_HEAP_MEMORY,
+                                    "Out of heap memory");
         goto cleanup;
     }
 
-    write_dram_random_vectors(driver, DRAM0, SIMD_TEST_INPUT_DRAM0_ADDRESS, 0,
-                              SIMD_TEST_SIZE);
-    driver_read_dram_vectors(driver, DRAM0, SIMD_TEST_INPUT_DRAM0_ADDRESS, 0,
-                             SIMD_TEST_SIZE, from_buffer);
+    fill_dram_with_random_vectors(
+        driver, TENSIL_DRAM0, SIMD_TEST_INPUT_DRAM0_ADDRESS, 0, SIMD_TEST_SIZE);
+    tensil_driver_read_dram_vectors(driver, TENSIL_DRAM0,
+                                    SIMD_TEST_INPUT_DRAM0_ADDRESS, 0,
+                                    SIMD_TEST_SIZE, from_buffer);
 
     for (size_t j = 0; j < driver->arch.array_size; j++)
         consts_buffer[j] = SIMD_TEST_MUL;
 
     for (size_t i = 0; i < SIMD_TEST_SIZE; i++) {
-        driver_write_dram_vectors(driver, DRAM1,
-                                  SIMD_TEST_MULS_DRAM1_ADDRESS + i, 0, 1,
-                                  consts_buffer);
+        tensil_driver_write_dram_vectors(driver, TENSIL_DRAM1,
+                                         SIMD_TEST_MULS_DRAM1_ADDRESS + i, 0, 1,
+                                         consts_buffer);
     }
 
     for (size_t j = 0; j < driver->arch.array_size; j++)
         consts_buffer[j] = SIMD_TEST_ADD;
 
     for (size_t i = 0; i < SIMD_TEST_SIZE; i++) {
-        driver_write_dram_vectors(driver, DRAM1,
-                                  SIMD_TEST_ADDS_DRAM1_ADDRESS + i, 0, 1,
-                                  consts_buffer);
+        tensil_driver_write_dram_vectors(driver, TENSIL_DRAM1,
+                                         SIMD_TEST_ADDS_DRAM1_ADDRESS + i, 0, 1,
+                                         consts_buffer);
     }
 
-    error = driver_setup_buffer_preamble(driver);
+    error = tensil_driver_setup_buffer_preamble(driver);
 
     if (error)
         goto cleanup;
 
-    error = buffer_append_instruction(
-        &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
-        DATA_MOVE_FLAG_DRAM1_TO_LOCAL, SIMD_TEST_MULS_LOCAL_ADDRESS,
+    error = tensil_buffer_append_instruction(
+        &driver->buffer, &driver->layout, TENSIL_OPCODE_DATA_MOVE,
+        TENSIL_DATA_MOVE_FLAG_DRAM1_TO_LOCAL, SIMD_TEST_MULS_LOCAL_ADDRESS,
         SIMD_TEST_MULS_DRAM1_ADDRESS, SIMD_TEST_SIZE - 1);
 
     if (error)
         goto cleanup;
 
-    error = buffer_append_instruction(
-        &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
-        DATA_MOVE_FLAG_DRAM1_TO_LOCAL, SIMD_TEST_ADDS_LOCAL_ADDRESS,
+    error = tensil_buffer_append_instruction(
+        &driver->buffer, &driver->layout, TENSIL_OPCODE_DATA_MOVE,
+        TENSIL_DATA_MOVE_FLAG_DRAM1_TO_LOCAL, SIMD_TEST_ADDS_LOCAL_ADDRESS,
         SIMD_TEST_ADDS_DRAM1_ADDRESS, SIMD_TEST_SIZE - 1);
 
     if (error)
         goto cleanup;
 
-    error = buffer_append_instruction(
-        &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
-        DATA_MOVE_FLAG_LOCAL_TO_ACC, SIMD_TEST_MULS_LOCAL_ADDRESS,
+    error = tensil_buffer_append_instruction(
+        &driver->buffer, &driver->layout, TENSIL_OPCODE_DATA_MOVE,
+        TENSIL_DATA_MOVE_FLAG_LOCAL_TO_ACC, SIMD_TEST_MULS_LOCAL_ADDRESS,
         SIMD_TEST_MULS_ACC_ADDRESS, SIMD_TEST_SIZE - 1);
 
     if (error)
         goto cleanup;
 
-    error = buffer_append_instruction(
-        &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
-        DATA_MOVE_FLAG_LOCAL_TO_ACC, SIMD_TEST_ADDS_LOCAL_ADDRESS,
+    error = tensil_buffer_append_instruction(
+        &driver->buffer, &driver->layout, TENSIL_OPCODE_DATA_MOVE,
+        TENSIL_DATA_MOVE_FLAG_LOCAL_TO_ACC, SIMD_TEST_ADDS_LOCAL_ADDRESS,
         SIMD_TEST_ADDS_ACC_ADDRESS, SIMD_TEST_SIZE - 1);
 
     if (error)
         goto cleanup;
 
-    error = buffer_append_instruction(
-        &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
-        DATA_MOVE_FLAG_DRAM0_TO_LOCAL, SIMD_TEST_INPUT_LOCAL_ADDRESS,
+    error = tensil_buffer_append_instruction(
+        &driver->buffer, &driver->layout, TENSIL_OPCODE_DATA_MOVE,
+        TENSIL_DATA_MOVE_FLAG_DRAM0_TO_LOCAL, SIMD_TEST_INPUT_LOCAL_ADDRESS,
         SIMD_TEST_INPUT_DRAM0_ADDRESS, SIMD_TEST_SIZE - 1);
 
     if (error)
         goto cleanup;
 
-    error = buffer_append_instruction(
-        &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
-        DATA_MOVE_FLAG_LOCAL_TO_ACC, SIMD_TEST_INPUT_LOCAL_ADDRESS,
+    error = tensil_buffer_append_instruction(
+        &driver->buffer, &driver->layout, TENSIL_OPCODE_DATA_MOVE,
+        TENSIL_DATA_MOVE_FLAG_LOCAL_TO_ACC, SIMD_TEST_INPUT_LOCAL_ADDRESS,
         SIMD_TEST_INPUT_ACC_ADDRESS, SIMD_TEST_SIZE - 1);
 
     if (error)
@@ -549,57 +564,61 @@ error_t driver_run_simd_test(struct driver *driver, bool verbose) {
         // TODO: need to specialize the test when >1 SIMD registers are
         // available
 
-        error = buffer_append_instruction(
-            &driver->buffer, &driver->layout, OPCODE_SIMD, SIMD_FLAG_READ, 0,
-            SIMD_TEST_INPUT_ACC_ADDRESS + i, (SIMD_OPCODE_MOVE << 3) | 0b001);
+        error = tensil_buffer_append_instruction(
+            &driver->buffer, &driver->layout, TENSIL_OPCODE_SIMD,
+            TENSIL_SIMD_FLAG_READ, 0, SIMD_TEST_INPUT_ACC_ADDRESS + i,
+            (TENSIL_SIMD_OPCODE_MOVE << 3) | 0b001);
 
         if (error)
             goto cleanup;
 
-        error = buffer_append_instruction(
-            &driver->buffer, &driver->layout, OPCODE_SIMD, SIMD_FLAG_READ, 0,
-            SIMD_TEST_MULS_ACC_ADDRESS + i, (SIMD_OPCODE_MUL << 3) | 0b101);
+        error = tensil_buffer_append_instruction(
+            &driver->buffer, &driver->layout, TENSIL_OPCODE_SIMD,
+            TENSIL_SIMD_FLAG_READ, 0, SIMD_TEST_MULS_ACC_ADDRESS + i,
+            (TENSIL_SIMD_OPCODE_MUL << 3) | 0b101);
 
         if (error)
             goto cleanup;
 
-        error = buffer_append_instruction(
-            &driver->buffer, &driver->layout, OPCODE_SIMD,
-            SIMD_FLAG_READ | SIMD_FLAG_WRITE, SIMD_TEST_OUTPUT_ACC_ADDRESS + i,
-            SIMD_TEST_ADDS_ACC_ADDRESS + i, (SIMD_OPCODE_ADD << 3) | 0b100);
+        error = tensil_buffer_append_instruction(
+            &driver->buffer, &driver->layout, TENSIL_OPCODE_SIMD,
+            TENSIL_SIMD_FLAG_READ | TENSIL_SIMD_FLAG_WRITE,
+            SIMD_TEST_OUTPUT_ACC_ADDRESS + i, SIMD_TEST_ADDS_ACC_ADDRESS + i,
+            (TENSIL_SIMD_OPCODE_ADD << 3) | 0b100);
 
         if (error)
             goto cleanup;
     }
 
-    error = buffer_append_instruction(
-        &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
-        DATA_MOVE_FLAG_ACC_TO_LOCAL, SIMD_TEST_OUTPUT_LOCAL_ADDRESS,
+    error = tensil_buffer_append_instruction(
+        &driver->buffer, &driver->layout, TENSIL_OPCODE_DATA_MOVE,
+        TENSIL_DATA_MOVE_FLAG_ACC_TO_LOCAL, SIMD_TEST_OUTPUT_LOCAL_ADDRESS,
         SIMD_TEST_OUTPUT_ACC_ADDRESS, SIMD_TEST_SIZE - 1);
 
     if (error)
         goto cleanup;
 
-    error = buffer_append_instruction(
-        &driver->buffer, &driver->layout, OPCODE_DATA_MOVE,
-        DATA_MOVE_FLAG_LOCAL_TO_DRAM0, SIMD_TEST_OUTPUT_LOCAL_ADDRESS,
+    error = tensil_buffer_append_instruction(
+        &driver->buffer, &driver->layout, TENSIL_OPCODE_DATA_MOVE,
+        TENSIL_DATA_MOVE_FLAG_LOCAL_TO_DRAM0, SIMD_TEST_OUTPUT_LOCAL_ADDRESS,
         SIMD_TEST_OUTPUT_DRAM0_ADDRESS, SIMD_TEST_SIZE - 1);
 
     if (error)
         goto cleanup;
 
-    error = driver_setup_buffer_postamble(driver);
+    error = tensil_driver_setup_buffer_postamble(driver);
 
     if (error)
         goto cleanup;
 
-    error = driver_run(driver, NULL);
+    error = tensil_driver_run(driver, NULL);
 
     if (error)
         goto cleanup;
 
-    driver_read_dram_vectors(driver, DRAM0, SIMD_TEST_OUTPUT_DRAM0_ADDRESS, 0,
-                             SIMD_TEST_SIZE, to_buffer);
+    tensil_driver_read_dram_vectors(driver, TENSIL_DRAM0,
+                                    SIMD_TEST_OUTPUT_DRAM0_ADDRESS, 0,
+                                    SIMD_TEST_SIZE, to_buffer);
 
     for (size_t k = 0; k < SIMD_TEST_SIZE * driver->arch.array_size; k++) {
         from_buffer[k] = saturate(
@@ -638,29 +657,31 @@ cleanup:
 
 #define SAMPLING_TEST_SIZE (64 * 1024 * 1024)
 
-error_t driver_run_sampling_test(struct driver *driver, bool verbose) {
-    error_t error = driver_setup_buffer_preamble(driver);
+tensil_error_t tensil_driver_run_sampling_test(struct tensil_driver *driver,
+                                               bool verbose) {
+    tensil_error_t error = tensil_driver_setup_buffer_preamble(driver);
 
     if (error)
         return error;
 
-    error = buffer_append_noop_instructions(&driver->buffer, &driver->layout,
-                                            SAMPLING_TEST_SIZE);
+    error = tensil_buffer_append_noop_instructions(
+        &driver->buffer, &driver->layout, SAMPLING_TEST_SIZE);
 
     if (error)
         return error;
 
-    error = driver_setup_buffer_postamble(driver);
+    error = tensil_driver_setup_buffer_postamble(driver);
 
     if (error)
         return error;
 
-    error = driver_run(driver, NULL);
+    error = tensil_driver_run(driver, NULL);
 
     if (error)
         return error;
 
-    size_t samples_count = driver->sample_buffer.offset / SAMPLE_SIZE_BYTES;
+    size_t samples_count =
+        driver->sample_buffer.offset / TENSIL_SAMPLE_SIZE_BYTES;
 
     size_t valid_samples_count = 0;
     size_t valid_samples_base = 0;
@@ -669,13 +690,13 @@ error_t driver_run_sampling_test(struct driver *driver, bool verbose) {
     size_t missing_samples_count = 0;
 
     const uint8_t *sample_ptr =
-        sample_buffer_find_valid_samples_ptr(&driver->sample_buffer);
+        tensil_sample_buffer_find_valid_samples_ptr(&driver->sample_buffer);
 
     uint32_t prev_program_counter = 0;
     uint32_t next_program_counter = 0;
     uint32_t instruction_offset = 0;
 
-    while (sample_buffer_get_next_samples_ptr(
+    while (tensil_sample_buffer_get_next_samples_ptr(
         &driver->sample_buffer, &driver->buffer, &driver->layout, &sample_ptr,
         &next_program_counter, &instruction_offset)) {
         valid_samples_count++;
@@ -687,7 +708,7 @@ error_t driver_run_sampling_test(struct driver *driver, bool verbose) {
                 stalling_samples_count++;
             else {
                 if (next_program_counter >
-                    prev_program_counter + SAMPLE_INTERVAL_CYCLES) {
+                    prev_program_counter + TENSIL_SAMPLE_INTERVAL_CYCLES) {
                     if (verbose)
                         printf("Offset %u -> %u\n",
                                (unsigned int)prev_program_counter,
@@ -708,7 +729,7 @@ error_t driver_run_sampling_test(struct driver *driver, bool verbose) {
            valid_samples_base,
            samples_count - valid_samples_base - valid_samples_count);
 
-    return ERROR_NONE;
+    return TENSIL_ERROR_NONE;
 }
 
 #endif

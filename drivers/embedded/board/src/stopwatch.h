@@ -22,7 +22,7 @@ struct stopwatch {
 #endif
 };
 
-error_t stopwatch_start(struct stopwatch *stopwatch);
+tensil_error_t stopwatch_start(struct stopwatch *stopwatch);
 
 void stopwatch_stop(struct stopwatch *stopwatch);
 

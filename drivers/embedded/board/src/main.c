@@ -18,16 +18,17 @@
 #include "console.h"
 #include "stopwatch.h"
 
-static error_t driver_run_timed(struct driver *driver,
-                                const struct run_opts *run_opts) {
+static tensil_error_t
+tensil_driver_run_timed(struct tensil_driver *driver,
+                        const struct tensil_run_opts *run_opts) {
     struct stopwatch sw;
 
-    error_t error = stopwatch_start(&sw);
+    tensil_error_t error = stopwatch_start(&sw);
 
     if (error)
         return error;
 
-    error = driver_run(driver, run_opts);
+    error = tensil_driver_run(driver, run_opts);
 
     if (error)
         return error;
@@ -36,10 +37,10 @@ static error_t driver_run_timed(struct driver *driver,
 
     printf("Program run took %.2f us\n", stopwatch_elapsed_us(&sw));
 
-    return ERROR_NONE;
+    return TENSIL_ERROR_NONE;
 }
 
-static const char *data_type_to_string(enum data_type type) {
+static const char *data_type_to_string(enum tensil_data_type type) {
     switch (type) {
     case TENSIL_DATA_TYPE_FP16BP8:
     default:
@@ -87,21 +88,21 @@ static void leds_init_pin(struct leds *leds, uint32_t pin) {
 
 #define LEDS_COUNT (LEDS_PIN_LAST - LEDS_PIN_FIRST + 1)
 
-static error_t leds_init(struct leds *leds) {
+static tensil_error_t leds_init(struct leds *leds) {
     XGpioPs_Config *config;
     config = XGpioPs_LookupConfig(XPAR_XGPIOPS_0_DEVICE_ID);
     if (!config)
-        return DRIVER_ERROR(ERROR_DRIVER_AXI_DMA_DEVICE_NOT_FOUND,
-                            "Leds GPIO not found");
+        return TENSIL_DRIVER_ERROR(TENSIL_ERROR_DRIVER_AXI_DMA_DEVICE_NOT_FOUND,
+                                   "Leds GPIO not found");
 
     int status = XGpioPs_CfgInitialize(&leds->gpio, config, config->BaseAddr);
     if (status != XST_SUCCESS)
-        return XILINX_ERROR(status);
+        return TENSIL_XILINX_ERROR(status);
 
     for (uint32_t i = 0; i < LEDS_COUNT; i++)
         leds_init_pin(leds, LEDS_PIN_FIRST + i);
 
-    return ERROR_NONE;
+    return TENSIL_ERROR_NONE;
 }
 
 static void leds_show_bits(struct leds *leds, uint32_t bits) {
@@ -127,23 +128,23 @@ static const char *cifar_classes[] = {
 
 static const char progress[] = {'-', '\\', '|', '/'};
 
-static error_t test_resnet20v2_on_cifar(struct driver *driver,
-                                        const struct model *model,
-                                        const char *file_name,
-                                        bool print_images) {
+static tensil_error_t test_resnet20v2_on_cifar(struct tensil_driver *driver,
+                                               const struct tensil_model *model,
+                                               const char *file_name,
+                                               bool print_images) {
     FIL fil;
     FILINFO fno;
     UINT bytes_read;
-    error_t error = ERROR_NONE;
+    tensil_error_t error = TENSIL_ERROR_NONE;
 
     FRESULT res = f_stat(file_name, &fno);
     if (res)
-        return FS_ERROR(res);
+        return TENSIL_FS_ERROR(res);
 
     res = f_open(&fil, file_name, FA_READ);
 
     if (res)
-        return FS_ERROR(res);
+        return TENSIL_FS_ERROR(res);
 
     printf("Reading CIFAR test images from %s...\n", file_name);
 
@@ -151,7 +152,7 @@ static error_t test_resnet20v2_on_cifar(struct driver *driver,
     f_close(&fil);
 
     if (res)
-        return FS_ERROR(res);
+        return TENSIL_FS_ERROR(res);
 
     size_t total_count = fno.fsize / (CIFAR_PIXELS_SIZE * 3 + 1);
     size_t misclass_count = 0;
@@ -194,8 +195,8 @@ static error_t test_resnet20v2_on_cifar(struct driver *driver,
                              CHANNEL_TO_FLOAT(green[j]) - green_mean,
                              CHANNEL_TO_FLOAT(blue[j]) - blue_mean};
 
-            error = driver_load_model_input_vector_scalars(driver, model, "x",
-                                                           j, 3, pixel);
+            error = tensil_driver_load_model_input_vector_scalars(
+                driver, model, "x:0", j, 3, pixel);
 
             if (error)
                 goto cleanup;
@@ -207,7 +208,7 @@ static error_t test_resnet20v2_on_cifar(struct driver *driver,
         if (error)
             goto cleanup;
 
-        error = driver_run(driver, NULL);
+        error = tensil_driver_run(driver, NULL);
 
         if (error)
             goto cleanup;
@@ -218,8 +219,8 @@ static error_t test_resnet20v2_on_cifar(struct driver *driver,
         total_seconds += seconds;
 
         float result[CIFAR_CLASSES_SIZE];
-        error = driver_get_model_output_scalars(driver, model, "Identity",
-                                                CIFAR_CLASSES_SIZE, result);
+        error = tensil_driver_get_model_output_scalars(
+            driver, model, "Identity:0", CIFAR_CLASSES_SIZE, result);
 
         if (error)
             goto cleanup;
@@ -251,8 +252,8 @@ static error_t test_resnet20v2_on_cifar(struct driver *driver,
 
                 printf("\nResult:\n");
 
-                error = driver_print_model_output_vectors(driver, model,
-                                                          "Identity");
+                error = tensil_driver_print_model_output_vectors(driver, model,
+                                                                 "Identity:0");
 
                 if (error)
                     goto cleanup;
@@ -277,7 +278,7 @@ cleanup:
         console_set_cursor_position(1, 1);
     }
 
-    if (error == ERROR_NONE)
+    if (error == TENSIL_ERROR_NONE)
         printf("ResNet20V2 on CIFAR: %lu images %.2f accuracy at %.2f fps\n",
                total_count, (1.0 - (float)misclass_count / (float)total_count),
                (float)total_count / total_seconds);
@@ -293,7 +294,7 @@ static FATFS fatfs;
 static char imagenet_classes_buffer[IMAGENET_CLASSES_BUFFER_SIZE];
 static const char *imagenet_classes[IMAGENET_CLASSES_SIZE];
 
-static error_t load_imagenet_classes_from_file(const char *file_name) {
+static tensil_error_t load_imagenet_classes_from_file(const char *file_name) {
     FIL fil;
     FILINFO fno;
     FRESULT res;
@@ -302,21 +303,21 @@ static error_t load_imagenet_classes_from_file(const char *file_name) {
     memset(&fno, 0, sizeof(FILINFO));
     res = f_stat(file_name, &fno);
     if (res)
-        return FS_ERROR(res);
+        return TENSIL_FS_ERROR(res);
 
     if (fno.fsize > IMAGENET_CLASSES_BUFFER_SIZE)
-        return FS_ERROR(1000);
+        return TENSIL_FS_ERROR(1000);
 
     memset(&fil, 0, sizeof(FIL));
     res = f_open(&fil, file_name, FA_READ);
     if (res)
-        return FS_ERROR(res);
+        return TENSIL_FS_ERROR(res);
 
     res = f_read(&fil, (void *)imagenet_classes_buffer, fno.fsize, &bytes_read);
     f_close(&fil);
 
     if (res)
-        return FS_ERROR(res);
+        return TENSIL_FS_ERROR(res);
 
     char *curr_ptr = imagenet_classes_buffer;
 
@@ -330,7 +331,7 @@ static error_t load_imagenet_classes_from_file(const char *file_name) {
         curr_ptr++;
     }
 
-    return ERROR_NONE;
+    return TENSIL_ERROR_NONE;
 }
 
 #define FILE_NAME_BUFFER_SIZE 256
@@ -338,22 +339,22 @@ static error_t load_imagenet_classes_from_file(const char *file_name) {
 int main() {
     init_platform();
 
-    error_t error = ERROR_NONE;
+    tensil_error_t error = TENSIL_ERROR_NONE;
     FRESULT res;
     res = f_mount(&fatfs, "0:/", 0);
 
     if (res) {
-        error = FS_ERROR(res);
+        error = TENSIL_FS_ERROR(res);
         goto cleanup;
     }
 
-    struct driver driver;
-    error = driver_init(&driver);
+    struct tensil_driver driver;
+    error = tensil_driver_init(&driver);
 
     if (error)
         goto cleanup;
 
-    printf("Ultra96v2 ---------------------------------------\n");
+    printf("ZCU104 ---------------------------------------\n");
     printf("Array (vector) size:               %zu\n", driver.arch.array_size);
     printf("Data type:                         %s\n",
            data_type_to_string(driver.arch.data_type));
@@ -377,44 +378,46 @@ int main() {
     printf("DRAM1 size (bytes):                %zu\n", driver.dram1_size);
 
     printf("Testing sampling...\n");
-    error = driver_run_sampling_test(&driver, false);
+    error = tensil_driver_run_sampling_test(&driver, false);
 
     if (error)
         goto cleanup;
 
     printf("Testing memory (DRAM0 -> DRAM0)...\n");
-    error = driver_run_memory_test(&driver, DRAM0, DRAM0, false);
+    error = tensil_driver_run_memory_test(&driver, TENSIL_DRAM0, TENSIL_DRAM0,
+                                          false);
 
     if (error)
         goto cleanup;
 
     printf("Testing memory (DRAM1 -> DRAM0)...\n");
-    error = driver_run_memory_test(&driver, DRAM1, DRAM0, false);
+    error = tensil_driver_run_memory_test(&driver, TENSIL_DRAM1, TENSIL_DRAM0,
+                                          false);
 
     if (error)
         goto cleanup;
 
     printf("Testing systolic array...\n");
-    error = driver_run_array_test(&driver, true);
+    error = tensil_driver_run_array_test(&driver, true);
 
     if (error)
         goto cleanup;
 
     printf("Testing SIMD...\n");
-    error = driver_run_simd_test(&driver, true);
+    error = tensil_driver_run_simd_test(&driver, true);
 
     if (error)
         goto cleanup;
 
     printf("XOR4 ---------------------------------------\n");
 
-    struct model xor4_model;
-    error = model_from_file(&xor4_model, "xor4_ultra.tmodel");
+    struct tensil_model xor4_model;
+    error = tensil_model_from_file(&xor4_model, "xor4_ultra.tmodel");
 
     if (error)
         goto cleanup;
 
-    error = driver_load_model(&driver, &xor4_model);
+    error = tensil_driver_load_model(&driver, &xor4_model);
 
     if (error)
         goto cleanup;
@@ -422,19 +425,19 @@ int main() {
     for (int x0 = 0; x0 <= 1; x0++)
         for (int x1 = 0; x1 <= 1; x1++) {
             float x[] = {x0, x1};
-            error = driver_load_model_input_scalars(&driver, &xor4_model, "x",
-                                                    2, x);
+            error = tensil_driver_load_model_input_scalars(&driver, &xor4_model,
+                                                           "x", 2, x);
 
             if (error)
                 goto cleanup;
 
-            error = driver_run_timed(&driver, NULL);
+            error = tensil_driver_run_timed(&driver, NULL);
 
             if (error)
                 goto cleanup;
 
-            error = driver_print_model_output_vectors(&driver, &xor4_model,
-                                                      "Identity");
+            error = tensil_driver_print_model_output_vectors(
+                &driver, &xor4_model, "Identity");
 
             if (error)
                 goto cleanup;
@@ -442,44 +445,46 @@ int main() {
 
     printf("ResNet20V2 ---------------------------------------\n");
 
-    struct model resnet20v2_model;
-    error = model_from_file(&resnet20v2_model, "resnet20v2_cifar_ultra.tmodel");
+    struct tensil_model resnet20v2_model;
+    error = tensil_model_from_file(&resnet20v2_model,
+                                   "resnet20v2_cifar_onnx_zcu104.tmodel");
 
     if (error)
         goto cleanup;
 
-    error = driver_load_model(&driver, &resnet20v2_model);
+    error = tensil_driver_load_model(&driver, &resnet20v2_model);
 
     if (error)
         goto cleanup;
 
-    error = driver_load_model_input_from_file(&driver, &resnet20v2_model, "x",
-                                              "resnet_input_1x32x32x16.tdata");
+    error = tensil_driver_load_model_input_from_file(
+        &driver, &resnet20v2_model, "x:0", "resnet_input_1x32x32x32.tdata");
 
     if (error)
         goto cleanup;
 
-    struct run_opts resnet20v2_run_opts = {
-        .print_sampling_aggregates = true,
+    struct tensil_run_opts resnet20v2_run_opts = {
+        /*.print_sampling_aggregates = true,
         .print_sampling_listing = false,
         .print_sampling_summary = true,
-        .sample_file_name = "resnet20v2_cifar_ultra.tsample"};
+        .sample_file_name = "resnet20v2_cifar_ultra.tsample"*/
+    };
 
-    error = driver_run_timed(&driver, &resnet20v2_run_opts);
+    error = tensil_driver_run_timed(&driver, &resnet20v2_run_opts);
 
     if (error)
         goto cleanup;
 
-    error = driver_print_model_output_vectors(&driver, &resnet20v2_model,
-                                              "Identity");
+    error = tensil_driver_print_model_output_vectors(&driver, &resnet20v2_model,
+                                                     "Identity:0");
 
     if (error)
         goto cleanup;
 
     float cifar_result[CIFAR_CLASSES_SIZE];
-    error =
-        driver_get_model_output_scalars(&driver, &resnet20v2_model, "Identity",
-                                        CIFAR_CLASSES_SIZE, cifar_result);
+    error = tensil_driver_get_model_output_scalars(
+        &driver, &resnet20v2_model, "Identity:0", CIFAR_CLASSES_SIZE,
+        cifar_result);
 
     if (error)
         goto cleanup;
@@ -488,49 +493,50 @@ int main() {
     printf("%zu, (%s)\n", cifar_class, cifar_classes[cifar_class]);
 
     error = test_resnet20v2_on_cifar(&driver, &resnet20v2_model,
-                                     "test_batch.bin", false);
+                                     "test_batch.bin", true);
 
     if (error)
         goto cleanup;
 
     printf("YoloV4-tiny ---------------------------------------\n");
 
-    struct model yolov4_tiny_model;
-    error = model_from_file(&yolov4_tiny_model, "yolov4_tiny_192_ultra.tmodel");
+    struct tensil_model yolov4_tiny_model;
+    error = tensil_model_from_file(&yolov4_tiny_model,
+                                   "yolov4_tiny_416_onnx_zcu104.tmodel");
 
     if (error)
         goto cleanup;
 
-    error = driver_load_model(&driver, &yolov4_tiny_model);
+    error = tensil_driver_load_model(&driver, &yolov4_tiny_model);
 
     if (error)
         goto cleanup;
 
-    error = driver_load_model_input_from_file(&driver, &yolov4_tiny_model, "x",
-                                              "yolov4_tiny_1x192x192x16.tdata");
+    error = tensil_driver_load_model_input_from_file(
+        &driver, &yolov4_tiny_model, "x:0", "yolo_input_1x416x416x32.tdata");
 
     if (error)
         goto cleanup;
 
-    struct run_opts yolov4_tiny_run_opts = {
-        .print_sampling_aggregates = true,
+    struct tensil_run_opts yolov4_tiny_run_opts = {
+        /*.print_sampling_aggregates = true,
         .print_sampling_listing = false,
         .print_sampling_summary = true,
-        .sample_file_name = "yolov4_tiny_192_ultra.tsample"};
+        .sample_file_name = "yolov4_tiny_192_ultra.tsample"*/};
 
-    error = driver_run_timed(&driver, &yolov4_tiny_run_opts);
-
-    if (error)
-        goto cleanup;
-
-    error = driver_print_model_output_vectors(&driver, &yolov4_tiny_model,
-                                              "model/conv2d_17/BiasAdd");
+    error = tensil_driver_run_timed(&driver, &yolov4_tiny_run_opts);
 
     if (error)
         goto cleanup;
 
-    error = driver_print_model_output_vectors(&driver, &yolov4_tiny_model,
-                                              "model/conv2d_20/BiasAdd");
+    error = tensil_driver_print_model_output_vectors(
+        &driver, &yolov4_tiny_model, "model/conv2d_17/BiasAdd:0");
+
+    if (error)
+        goto cleanup;
+
+    error = tensil_driver_print_model_output_vectors(
+        &driver, &yolov4_tiny_model, "model/conv2d_20/BiasAdd:0");
 
     if (error)
         goto cleanup;
@@ -542,49 +548,49 @@ int main() {
     if (error)
         goto cleanup;
 
-    struct model resnet50v2_model;
-    error =
-        model_from_file(&resnet50v2_model, "resnet50v2_imagenet_ultra.tmodel");
+    struct tensil_model resnet50v2_model;
+    error = tensil_model_from_file(&resnet50v2_model,
+                                   "resnet50v2_imagenet_onnx_zcu104.tmodel");
 
     if (error)
         goto cleanup;
 
-    error = driver_load_model(&driver, &resnet50v2_model);
+    error = tensil_driver_load_model(&driver, &resnet50v2_model);
 
     if (error)
         goto cleanup;
 
-    struct run_opts resnet50v2_run_opts = {
-        .print_sampling_aggregates = true,
+    struct tensil_run_opts resnet50v2_run_opts = {
+        /*.print_sampling_aggregates = true,
         .print_sampling_listing = false,
         .print_sampling_summary = true,
-        .sample_file_name = "resnet50v2_imagenet_ultra.tsample"};
+        .sample_file_name = "resnet50v2_imagenet_ultra.tsample"*/};
 
     for (int i = 0; i < 3; i++) {
         char file_name_buffer[FILE_NAME_BUFFER_SIZE];
         snprintf(file_name_buffer, FILE_NAME_BUFFER_SIZE,
-                 "resnet_input_1x224x224x16_%d.tdata", i);
+                 "resnet_input_1x224x224x32_%d.tdata", i);
 
-        error = driver_load_model_input_from_file(&driver, &resnet50v2_model,
-                                                  "x", file_name_buffer);
-
-        if (error)
-            goto cleanup;
-
-        error = driver_run_timed(&driver, &resnet50v2_run_opts);
+        error = tensil_driver_load_model_input_from_file(
+            &driver, &resnet50v2_model, "x:0", file_name_buffer);
 
         if (error)
             goto cleanup;
 
-        error = driver_print_model_output_vectors(&driver, &resnet50v2_model,
-                                                  "Identity");
+        error = tensil_driver_run_timed(&driver, &resnet50v2_run_opts);
+
+        if (error)
+            goto cleanup;
+
+        error = tensil_driver_print_model_output_vectors(
+            &driver, &resnet50v2_model, "Identity:0");
 
         if (error)
             goto cleanup;
 
         float imagenet_result[IMAGENET_CLASSES_SIZE];
-        error = driver_get_model_output_scalars(
-            &driver, &resnet50v2_model, "Identity", IMAGENET_CLASSES_SIZE,
+        error = tensil_driver_get_model_output_scalars(
+            &driver, &resnet50v2_model, "Identity:0", IMAGENET_CLASSES_SIZE,
             imagenet_result);
 
         if (error)
@@ -596,7 +602,7 @@ int main() {
 
 cleanup:
     if (error)
-        error_print(error);
+        tensil_error_print(error);
 
     cleanup_platform();
 

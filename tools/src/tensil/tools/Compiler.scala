@@ -45,6 +45,16 @@ case class CompilerStats(
     macEfficiency: Float
 ) {}
 
+case class CompilerArtifact(
+    kind: String,
+    fileName: String
+) {}
+
+case class CompilerArtifactsAndResult(
+    result: CompilerResult,
+    artifacts: Seq[CompilerArtifact]
+) {}
+
 case class CompilerResult(
     arch: Architecture,
     inputObjects: Seq[MemoryObject],
@@ -73,7 +83,7 @@ object Compiler {
       outputNames: Seq[String],
       options: CompilerOptions,
       traceContext: TraceContext = TraceContext.empty
-  ): CompilerResult = {
+  ): CompilerArtifactsAndResult = {
     val modelStream     = new FileInputStream(modelFileName)
     val modelSourceType = getModelSourceType(modelFileName)
 
@@ -94,9 +104,23 @@ object Compiler {
       outputNames: Seq[String],
       options: CompilerOptions,
       traceContext: TraceContext = TraceContext.empty
-  ): CompilerResult = {
-    val constsFileName  = s"$modelName.tdata"
-    val programFileName = s"$modelName.tprog"
+  ): CompilerArtifactsAndResult = {
+    val prefix =
+      if (options.targetPath.isDefined && !options.targetPath.get.isEmpty())
+        options.targetPath.get + (if (options.targetPath.get.endsWith("/")) ""
+                                  else "/")
+      else ""
+
+    println(prefix)
+
+    val constsFileName   = s"${prefix}${modelName}.tdata"
+    val programFileName  = s"${prefix}${modelName}.tprog"
+    val manifestFileName = s"${prefix}${modelName}.tmodel"
+    val graphFileName =
+      if (options.printGraph) Some(s"${prefix}${modelName}.dot") else None
+    val programAssemblyFileName =
+      if (options.printProgramAssembly) Some(s"${prefix}${modelName}.tasm")
+      else None
 
     val constsStream  = new FileOutputStream(constsFileName)
     val programStream = new FileOutputStream(programFileName)
@@ -109,7 +133,9 @@ object Compiler {
       programStream,
       constsStream,
       options,
-      traceContext
+      traceContext,
+      programAssemblyFileName,
+      graphFileName
     )
 
     constsStream.close()
@@ -170,12 +196,33 @@ object Compiler {
       arch = options.arch
     )
 
-    val manifestStream = new FileOutputStream(s"$modelName.tmodel")
+    val manifestStream = new FileOutputStream(manifestFileName)
 
     upickle.default.writeToOutputStream(model, manifestStream)
     manifestStream.close()
 
-    result
+    CompilerArtifactsAndResult(
+      result = result,
+      artifacts = Seq(
+        CompilerArtifact("Manifest", manifestFileName),
+        CompilerArtifact("Program", programFileName),
+        CompilerArtifact("Constants", constsFileName)
+      ) ++ (if (graphFileName.isDefined)
+              Seq(
+                CompilerArtifact(
+                  "Graph",
+                  graphFileName.get
+                )
+              )
+            else Nil) ++ (if (programAssemblyFileName.isDefined)
+                            Seq(
+                              CompilerArtifact(
+                                "Program assembly",
+                                programAssemblyFileName.get
+                              )
+                            )
+                          else Nil)
+    )
   }
 
   def compileStreamToStreams(
@@ -186,11 +233,13 @@ object Compiler {
       programStream: OutputStream,
       constsStream: OutputStream,
       options: CompilerOptions,
-      traceContext: TraceContext = TraceContext.empty
+      traceContext: TraceContext = TraceContext.empty,
+      programAssemblyFileName: Option[String],
+      graphFileName: Option[String]
   ): CompilerResult = {
     val startTime = System.nanoTime()
 
-    val graphStream = options.printGraphFileName.map(new FileOutputStream(_))
+    val graphStream = graphFileName.map(new FileOutputStream(_))
 
     val frontend: Frontend =
       if (modelSourceType == CompilerSourceType.Tensorflow) {
@@ -264,7 +313,7 @@ object Compiler {
 
       backend.writeSegments(
         programStream,
-        options.printProgramFileName,
+        programAssemblyFileName,
         Some(backendStats)
       )
 

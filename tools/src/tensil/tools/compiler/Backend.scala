@@ -40,7 +40,7 @@ class Backend(
 
   def writeSegments(
       programStream: OutputStream,
-      printProgramFileName: Option[String] = None,
+      programAssemblyFileName: Option[String] = None,
       stats: Option[Stats] = None
   ): Unit = {
     var instructionOffset: Long = 0
@@ -49,10 +49,10 @@ class Backend(
         Seq(
           new lir.StreamGen(layout, programStream),
           new lir.TracepointEmitter(traceContext)
-        ) ++ (if (printProgramFileName.isDefined)
+        ) ++ (if (programAssemblyFileName.isDefined)
                 Seq(
                   new lir.Printer(
-                    printProgramFileName.get
+                    programAssemblyFileName.get
                   )
                 )
               else

@@ -21,7 +21,8 @@ case class CompilerOptions(
     printInstructionsSummary: Boolean = false,
     printProgress: Boolean = true,
     printProgramWithComments: Boolean = false,
-    printProgramFileName: Option[String] = None,
-    printGraphFileName: Option[String] = None,
-    tracepointConditions: Seq[TracepointCondition] = Nil
+    printProgramAssembly: Boolean = false,
+    printGraph: Boolean = false,
+    tracepointConditions: Seq[TracepointCondition] = Nil,
+    targetPath: Option[String] = None
 )

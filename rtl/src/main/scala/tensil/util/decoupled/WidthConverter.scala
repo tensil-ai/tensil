@@ -83,22 +83,6 @@ class WidthConverter(inWidth: Int, outWidth: Int) extends Module {
       (for (i <- 0 until blocksPerOutput)
         yield arr(deqPtr + i.U)).reverse
     )
-
-    // TODO handle pipe and flow for max throughput
-    // if (inWidth > outWidth) {
-    //   // flow
-    //   when(io.in.valid) { io.out.valid := true.B }
-    //   val canFlow = enqPtrNext > deqPtrNext
-    //   when(empty) {
-    //     // TODO transmit bits: need to select the correct blocks from arr and io.in.bits
-    //     doDeq := false.B
-    //     when(io.out.ready) { doEnq := false.B }
-    //   }
-    // } else {
-    //   // inWidth < outWidth
-    //   // pipe
-    //   when(io.out.ready) { io.in.ready := true.B }
-    // }
   }
 
   def count(reg: UInt, step: Int, max: Int): Unit = {

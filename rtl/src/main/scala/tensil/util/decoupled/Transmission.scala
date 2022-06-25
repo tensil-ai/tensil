@@ -16,15 +16,9 @@ class Transmission(inWidth: Int, outWidth: Int) extends Module {
   })
 
   if (inWidth % outWidth != 0 && outWidth % inWidth != 0) {
-    val gcd   = util.greatestCommonDivisor(inWidth, outWidth)
-    val left  = Module(new StrictDecoupledTransmission(inWidth, gcd))
-    val right = Module(new StrictDecoupledTransmission(gcd, outWidth))
-
-    left.io.in <> io.in
-    right.io.in <> left.io.out
-    io.out <> right.io.out
-    left.io.error := io.error
-    right.io.error := io.error
+    val widthConverter = Module(new WidthConverter(inWidth, outWidth))
+    widthConverter.io.in <> io.in
+    io.out <> widthConverter.io.out
   } else {
     val dt = Module(new StrictDecoupledTransmission(inWidth, outWidth))
     dt.io.in <> io.in

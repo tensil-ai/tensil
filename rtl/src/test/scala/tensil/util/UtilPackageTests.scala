@@ -151,6 +151,20 @@ class UtilPackageTests extends UnitSpec {
     }
   }
 
+  "leastCommonMultiple" should "work" in {
+    val testCases = Array(
+      (8, 9, 72),
+      (1, 4, 4),
+      (90, 342, 1710),
+      (7, 13, 91),
+    )
+
+    for (tc <- testCases) {
+      val lcm = leastCommonMultiple(tc._1, tc._2)
+      assert(lcm == tc._3, s"lcm(${tc._1}, ${tc._2}) == ${tc._3} but got $lcm")
+    }
+  }
+
   "splitWords" should "turn a bigger word into several smaller ones" in {
     val x        = BigInt("0102030405060708", 16)
     val expected = Array(BigInt("05060708", 16), BigInt("01020304", 16))

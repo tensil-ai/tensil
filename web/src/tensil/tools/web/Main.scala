@@ -82,9 +82,9 @@ object CompilerTask {
             task.ownerUserId,
             task.jobId,
             Seq(
-              "model_weights" -> result.stats.constsScalarSize,
-              "model_macs"    -> result.stats.macs,
-              "model_layers"  -> result.stats.layersNumber
+              "model_weights" -> result.result.stats.constsScalarSize,
+              "model_macs"    -> result.result.stats.macs,
+              "model_layers"  -> result.result.stats.layersNumber
             )
           )
 
@@ -106,11 +106,11 @@ object CompilerTask {
               "artifacts_consts"         -> constObjectName,
               "artifacts_program"        -> programObjectName,
               "artifacts_manifest"       -> manifestObjectName,
-              "stats_program_size_bytes" -> result.stats.programSizeBytes,
-              "stats_cycles"             -> result.stats.cycles,
-              "stats_energy"             -> result.stats.energy,
-              "stats_consts_utilization" -> result.stats.constsUtilization,
-              "stats_mac_efficiency"     -> result.stats.macEfficiency
+              "stats_program_size_bytes" -> result.result.stats.programSizeBytes,
+              "stats_cycles"             -> result.result.stats.cycles,
+              "stats_energy"             -> result.result.stats.energy,
+              "stats_consts_utilization" -> result.result.stats.constsUtilization,
+              "stats_mac_efficiency"     -> result.result.stats.macEfficiency
             )
           )
         } catch {

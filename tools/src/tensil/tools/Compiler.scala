@@ -111,19 +111,20 @@ object Compiler {
                                   else "/")
       else ""
 
-    println(prefix)
+    val constsFileName  = s"${modelName}.tdata"
+    val programFileName = s"${modelName}.tprog"
 
-    val constsFileName   = s"${prefix}${modelName}.tdata"
-    val programFileName  = s"${prefix}${modelName}.tprog"
-    val manifestFileName = s"${prefix}${modelName}.tmodel"
-    val graphFileName =
+    val constsFilePath   = s"${prefix}${constsFileName}"
+    val programFilePath  = s"${prefix}${programFileName}"
+    val manifestFilePath = s"${prefix}${modelName}.tmodel"
+    val graphFilePath =
       if (options.printGraph) Some(s"${prefix}${modelName}.dot") else None
-    val programAssemblyFileName =
+    val programAssemblyFilePath =
       if (options.printProgramAssembly) Some(s"${prefix}${modelName}.tasm")
       else None
 
-    val constsStream  = new FileOutputStream(constsFileName)
-    val programStream = new FileOutputStream(programFileName)
+    val constsStream  = new FileOutputStream(constsFilePath)
+    val programStream = new FileOutputStream(programFilePath)
 
     val result = compileStreamToStreams(
       modelName,
@@ -134,8 +135,8 @@ object Compiler {
       constsStream,
       options,
       traceContext,
-      programAssemblyFileName,
-      graphFileName
+      programAssemblyFilePath,
+      graphFilePath
     )
 
     constsStream.close()
@@ -196,7 +197,7 @@ object Compiler {
       arch = options.arch
     )
 
-    val manifestStream = new FileOutputStream(manifestFileName)
+    val manifestStream = new FileOutputStream(manifestFilePath)
 
     upickle.default.writeToOutputStream(model, manifestStream)
     manifestStream.close()
@@ -204,21 +205,21 @@ object Compiler {
     CompilerArtifactsAndResult(
       result = result,
       artifacts = Seq(
-        CompilerArtifact("Manifest", manifestFileName),
-        CompilerArtifact("Program", programFileName),
-        CompilerArtifact("Constants", constsFileName)
-      ) ++ (if (graphFileName.isDefined)
+        CompilerArtifact("Manifest", manifestFilePath),
+        CompilerArtifact("Program", programFilePath),
+        CompilerArtifact("Constants", constsFilePath)
+      ) ++ (if (graphFilePath.isDefined)
               Seq(
                 CompilerArtifact(
                   "Graph",
-                  graphFileName.get
+                  graphFilePath.get
                 )
               )
-            else Nil) ++ (if (programAssemblyFileName.isDefined)
+            else Nil) ++ (if (programAssemblyFilePath.isDefined)
                             Seq(
                               CompilerArtifact(
                                 "Program assembly",
-                                programAssemblyFileName.get
+                                programAssemblyFilePath.get
                               )
                             )
                           else Nil)
@@ -234,12 +235,12 @@ object Compiler {
       constsStream: OutputStream,
       options: CompilerOptions,
       traceContext: TraceContext = TraceContext.empty,
-      programAssemblyFileName: Option[String] = None,
-      graphFileName: Option[String] = None
+      programAssemblyFilePath: Option[String] = None,
+      graphFilePath: Option[String] = None
   ): CompilerResult = {
     val startTime = System.nanoTime()
 
-    val graphStream = graphFileName.map(new FileOutputStream(_))
+    val graphStream = graphFilePath.map(new FileOutputStream(_))
 
     val frontend: Frontend =
       if (modelSourceType == CompilerSourceType.Tensorflow) {
@@ -313,7 +314,7 @@ object Compiler {
 
       backend.writeSegments(
         programStream,
-        programAssemblyFileName,
+        programAssemblyFilePath,
         Some(backendStats)
       )
 

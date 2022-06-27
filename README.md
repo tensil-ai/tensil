@@ -14,6 +14,7 @@ For in-depth end-to-end instructions check our tutorials.
 - [Learn how to combine Tensil and TF-Lite to run YOLO on Ultra96](https://www.tensil.ai/docs/tutorials/yolo-ultra96v2/)
 - [Learn Tensil with ResNet and PYNQ Z1](https://www.tensil.ai/docs/tutorials/resnet20-pynqz1/)
 - [Learn Tensil with ResNet and Ultra96](https://www.tensil.ai/docs/tutorials/resnet20-ultra96v2/)
+- [Learn how to build speech controlled robot with Tensil and Arty A7 - Part I](https://www.tensil.ai/docs/tutorials/speech-robot-part1/)
 
 ## Documentation
 
@@ -30,7 +31,7 @@ For reference documentation see our [website](https://www.tensil.ai/docs/).
 
 ```
 docker pull tensilai/tensil
-docker run -v $(pwd):/work -w /work -it tensilai/tensil bash
+docker run -u $(id -u ${USER}):$(id -g ${USER}) -v $(pwd):/work -w /work -it tensilai/tensil bash
 ```
 
 ## Compile AI/ML model

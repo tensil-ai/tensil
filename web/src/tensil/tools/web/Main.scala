@@ -32,11 +32,11 @@ object CompilerTask {
   implicit val rw: ReadWriter[CompilerTask] = macroRW
 
   // TODO: these queue, table and bucket names to be configured from container environment
-  val queue          = sqs.queue("tensil-web-compiler-7af9ea2").get
-  val jobTable       = db.table("tensil-web-job-c9cb5e4").get
-  val taskTable      = db.table("tensil-web-task-731b0cb").get
-  val compilerBucket = s3.bucket("tensil-web-compiler-8681a04").get
-  val uploadsBucket  = s3.bucket("tensil-web-upload-7a8bd18").get
+  val queue          = sqs.queue("tf2rtl-web-compiler-7af9ea2").get
+  val jobTable       = db.table("tf2rtl-web-job-c9cb5e4").get
+  val taskTable      = db.table("tf2rtl-web-task-731b0cb").get
+  val compilerBucket = s3.bucket("tf2rtl-web-compiler-8681a04").get
+  val uploadsBucket  = s3.bucket("tf2rtl-web-upload-7a8bd18").get
 
   def process(count: Int = 1) = {
     val messages = sqs.receiveMessage(queue, count, 5)

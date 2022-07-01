@@ -252,10 +252,11 @@ class MemoryManager(
   private var constsUtilizations = mutable.ArrayBuffer.empty[Float]
   private var constsScalarSizes  = mutable.ArrayBuffer.empty[Long]
 
-  private def addConstSize(scalarSize: Long, vectorSize: Long): Unit = {
-    constsUtilizations += scalarSize.toFloat / (vectorSize * arch.arraySize).toFloat
-    constsScalarSizes += scalarSize
-  }
+  private def addConstSize(scalarSize: Long, vectorSize: Long): Unit =
+    if (scalarSize != 0 && vectorSize != 0) {
+      constsUtilizations += scalarSize.toFloat / (vectorSize * arch.arraySize).toFloat
+      constsScalarSizes += scalarSize
+    }
 
   private def mkConstObject(
       name: String,

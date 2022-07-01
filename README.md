@@ -141,6 +141,15 @@ To view a specific VCD file:
 ./scripts/gtkwave/display-vcd.sh <vcd_file>
 ```
 
+### Build and push AWS ECS image for web compiler (Tensil Explorer)
+
+```
+docker build -f docker/web/Dockerfile -t tensil-web-compiler .
+aws ecr get-login-password | docker login --username AWS --password-stdin <ACCOUNT ID>.dkr.ecr.<REGION>.amazonaws.com
+docker tag tensil-web-compiler <ACCOUNT ID>.dkr.ecr.<REGION>.amazonaws.com/tf2rtl-web-compiler
+docker push <ACCOUNT ID>.dkr.ecr.<REGION>.amazonaws.com/tf2rtl-web-compiler
+```
+
 ## Get help
 
 - Say hello and ask a question on our [Discord](https://discord.gg/TSw34H3PXr)

@@ -14,7 +14,7 @@ import tensil.util
 class DualPortMem[T <: Data](
     val gen: T,
     val depth: Long,
-    memKind: MemKind.Type,
+    memKind: MemKind.Type = MemKind.RegisterBank,
     debug: Boolean = false,
     name: String = "mem",
 ) extends Module {

@@ -44,7 +44,10 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
   val randomizeDrams = !debug
 
   implicit val platformConfig =
-    PlatformConfig.default.copy(memKind = MemKind.BlockRAM)
+    PlatformConfig.default.copy(
+      localMemKind = MemKind.BlockRAM,
+      accumulatorMemKind = MemKind.BlockRAM
+    )
 
   def varyArchAndAXI[T <: Data with Num[T]](gen: T, arch: Architecture)(implicit
       axiConfig: axi.Config

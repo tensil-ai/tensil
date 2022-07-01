@@ -27,7 +27,7 @@ class TCULargeSpec extends FunUnitSpec {
     describe("with tiny arch") {
 
       implicit val platformConfig =
-        PlatformConfig.default.copy(memKind = MemKind.XilinxBlockRAM)
+        PlatformConfig.default.copy(memKind = MemKind.BlockRAM)
       val gen                = FixedPoint(16.W, 8.BP)
       val arch               = Architecture.tiny
       implicit val axiConfig = axi.Config.Xilinx64
@@ -190,7 +190,7 @@ class TCULargeSpec extends FunUnitSpec {
       // implicit val platformConfig =
       //   PlatformConfig.default.copy(memKind = MemKind.ChiselSyncReadMem)
       implicit val platformConfig =
-        PlatformConfig.default.copy(memKind = MemKind.XilinxBlockRAM)
+        PlatformConfig.default.copy(memKind = MemKind.BlockRAM)
       val gen             = FixedPoint(16.W, 8.BP)
       val arch            = Architecture.tiny
       implicit val layout = new InstructionLayout(arch)

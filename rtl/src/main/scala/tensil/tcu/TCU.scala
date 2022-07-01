@@ -47,9 +47,11 @@ class TCU[T <: Data with Num[T]](
       val dataOut = Decoupled(Vec(layout.arch.arraySize, gen))
     }
     val config = new Bundle {
-      val dram0AddressOffset  = Output(UInt(platformConfig.axi.addrWidth.W))
+      val dram0AddressOffset =
+        Output(UInt(platformConfig.dramAxiConfig.addrWidth.W))
       val dram0CacheBehaviour = Output(UInt(4.W))
-      val dram1AddressOffset  = Output(UInt(platformConfig.axi.addrWidth.W))
+      val dram1AddressOffset =
+        Output(UInt(platformConfig.dramAxiConfig.addrWidth.W))
       val dram1CacheBehaviour = Output(UInt(4.W))
     }
     val timeout        = Output(Bool())
@@ -70,7 +72,8 @@ class TCU[T <: Data with Num[T]](
     new DualPortMem(
       Vec(layout.arch.arraySize, gen),
       layout.arch.localDepth.toInt,
-      name = "main",
+      platformConfig.localMemKind,
+      name = "local",
       debug = false,
     )
   )

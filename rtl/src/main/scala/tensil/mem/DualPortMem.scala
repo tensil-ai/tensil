@@ -5,20 +5,19 @@ package tensil.mem
 
 import chisel3._
 import chisel3.util.{Decoupled, Queue, log2Ceil}
-import tensil.mem.MemKind._
 import tensil.util.{Delay, reportThroughput}
 import tensil.util.decoupled.Counter
 import tensil.util.decoupled.QueueWithReporting
-import tensil.xilinx.DualPortBlockRAM
-import tensil.{PlatformConfig, util}
+import tensil.blackbox.{DualPortBlockRAM, xilinx}
+import tensil.util
 
 class DualPortMem[T <: Data](
     val gen: T,
     val depth: Long,
+    memKind: MemKind.Type,
     debug: Boolean = false,
     name: String = "mem",
-)(implicit val platformConfig: PlatformConfig)
-    extends Module {
+) extends Module {
   val addressType = UInt(log2Ceil(depth).W)
 
   val io = IO(new Bundle {
@@ -31,7 +30,7 @@ class DualPortMem[T <: Data](
   dontTouch(io.tracepoint)
   dontTouch(io.programCounter)
 
-  val mem = Module(new InnerDualPortMem(gen, depth, platformConfig.memKind))
+  val mem = Module(new InnerDualPortMem(gen, depth, memKind))
 
   connectPort(io.portA, mem.io.portA, "A")
   connectPort(io.portB, mem.io.portB, "B")
@@ -102,7 +101,7 @@ class DualPortMem[T <: Data](
   class InnerDualPortMem[T <: Data](
       gen: T,
       depth: Long,
-      kind: MemKind,
+      kind: MemKind.Type,
   ) extends Module {
     val io = IO(new Bundle {
       val portA = new InnerPort(gen, depth)
@@ -110,7 +109,7 @@ class DualPortMem[T <: Data](
     })
 
     kind match {
-      case RegisterBank => {
+      case MemKind.RegisterBank => {
         if (depth > Int.MaxValue) {
           throw new Exception(
             s"depth $depth is too large for register bank mem type"
@@ -148,7 +147,7 @@ class DualPortMem[T <: Data](
           }
         }
       }
-      case ChiselSyncReadMem => {
+      case MemKind.ChiselSyncReadMem => {
 
         /**
           * This approach will produce undefined behaviour
@@ -170,7 +169,7 @@ class DualPortMem[T <: Data](
           }
         }
       }
-      case XilinxBlockRAM => {
+      case MemKind.BlockRAM => {
         val mem = Module(new DualPortBlockRAM(gen.getWidth, depth))
 
         mem.io.clka := clock.asBool
@@ -187,9 +186,31 @@ class DualPortMem[T <: Data](
         mem.io.web := io.portB.write.enable
         mem.io.dib := io.portB.write.data.asTypeOf(mem.io.dib)
       }
-      case XilinxRAMMacro => {
-        // TODO implement Xilinx RAM Macro similar to the XPM_FIFO_* stuff
-        throw new NotImplementedError("TODO")
+      case MemKind.XilinxBRAMMacro | MemKind.XilinxURAMMacro => {
+        val mem = Module(
+          new xilinx.RAMMacro(
+            gen.getWidth,
+            depth,
+            kind match {
+              case MemKind.XilinxBRAMMacro => xilinx.RAMMacro.BlockPrimitive
+              case MemKind.XilinxURAMMacro => xilinx.RAMMacro.UltraPrimitive
+            }
+          )
+        )
+
+        mem.io.clka := clock.asBool
+        mem.io.ena := !reset.asBool
+        mem.io.addra := io.portA.address
+        io.portA.read.data := mem.io.doa.asTypeOf(io.portA.read.data)
+        mem.io.wea := io.portA.write.enable
+        mem.io.dia := io.portA.write.data.asTypeOf(mem.io.dia)
+
+        mem.io.clkb := clock.asBool
+        mem.io.enb := !reset.asBool
+        mem.io.addrb := io.portB.address
+        io.portB.read.data := mem.io.dob.asTypeOf(io.portB.read.data)
+        mem.io.web := io.portB.write.enable
+        mem.io.dib := io.portB.write.data.asTypeOf(mem.io.dib)
       }
     }
   }

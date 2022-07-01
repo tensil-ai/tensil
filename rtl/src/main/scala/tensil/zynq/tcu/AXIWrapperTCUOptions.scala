@@ -5,8 +5,12 @@ package tensil.zynq.tcu
 
 import tensil.tcu.TCUOptions
 import tensil.axi
+import tensil.mem.MemKind
 
 case class AXIWrapperTCUOptions(
     inner: TCUOptions = TCUOptions(),
     dramAxiConfig: axi.Config,
+    resetActiveLow: Boolean = true,
+    localMemKind: MemKind.Type = MemKind.BlockRAM,
+    accumulatorMemKind: MemKind.Type = MemKind.BlockRAM,
 )

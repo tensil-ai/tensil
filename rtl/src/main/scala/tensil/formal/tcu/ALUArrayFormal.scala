@@ -9,11 +9,11 @@ import tensil.tcu._
 import tensil.formal._
 import tensil.tcu.simd._
 import tensil.PlatformConfig
-import tensil.mem.MemKind.XilinxBlockRAM
+import tensil.mem.MemKind.BlockRAM
 
 class ALUArrayFormal extends Formal {
   implicit val platformConfig =
-    PlatformConfig.default.copy(memKind = XilinxBlockRAM)
+    PlatformConfig.default.copy(accumulatorMemKind = BlockRAM)
   val gen = tensil.Architecture.mkWithDefaults(
     arraySize = 2,
     localDepth = 8,

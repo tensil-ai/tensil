@@ -5,11 +5,10 @@ package tensil.mem
 
 import chisel3._
 import chisel3.util.{Decoupled, Queue, log2Ceil}
-import MemKind._
 import tensil.util.Delay
 import tensil.util.decoupled.QueueWithReporting
-import tensil.xilinx.BlockRAM
-import tensil.{PlatformConfig, util}
+import tensil.blackbox.BlockRAM
+import tensil.util
 import chisel3.util.DecoupledIO
 import chisel3.util.TransitName
 
@@ -29,17 +28,17 @@ object OutQueue {
 class Mem[T <: Data](
     val gen: T,
     val depth: Long,
+    memKind: MemKind.Type,
     debug: Boolean = false,
     name: String = "mem",
     controlQueueSize: Int = 2,
     inQueueFlow: Boolean = false,
-)(implicit val platformConfig: PlatformConfig)
-    extends Module {
+) extends Module {
   val addressType = UInt(log2Ceil(depth).W)
 
   val io = IO(new Port(gen, depth))
 
-  val mem = Module(new InnerMem(gen, depth, platformConfig.memKind))
+  val mem = Module(new InnerMem(gen, depth, memKind))
 
   val control = io.control
   val input   = io.input
@@ -94,7 +93,7 @@ class Mem[T <: Data](
   class InnerMem[T <: Data](
       gen: T,
       depth: Long,
-      kind: MemKind,
+      kind: MemKind.Type,
   ) extends Module {
     val io = IO(new Bundle {
       val address = Input(UInt(log2Ceil(depth).W))
@@ -109,7 +108,7 @@ class Mem[T <: Data](
     })
 
     kind match {
-      case RegisterBank => {
+      case MemKind.RegisterBank => {
         if (depth > Int.MaxValue) {
           throw new Exception(
             s"depth $depth is too large for register bank mem type"
@@ -134,14 +133,14 @@ class Mem[T <: Data](
           }
         }
       }
-      case ChiselSyncReadMem => {
+      case MemKind.ChiselSyncReadMem => {
         val mem = SyncReadMem(depth, gen, SyncReadMem.ReadFirst)
         io.read.data <> mem.read(io.address, io.read.enable)
         when(io.write.enable) {
           mem.write(io.address, io.write.data)
         }
       }
-      case XilinxBlockRAM => {
+      case MemKind.BlockRAM => {
         val mem = Module(new BlockRAM(gen.getWidth, depth))
         mem.io.clk := clock.asBool
         mem.io.en := !reset.asBool
@@ -150,9 +149,8 @@ class Mem[T <: Data](
         mem.io.we := io.write.enable
         mem.io.di := io.write.data.asTypeOf(mem.io.di)
       }
-      case XilinxRAMMacro => {
-        // TODO implement Xilinx RAM Macro similar to the XPM_FIFO_* stuff
-        throw new NotImplementedError("TODO")
+      case MemKind.XilinxBRAMMacro | MemKind.XilinxURAMMacro => {
+        throw new Exception("Only dual port Xilinx macros are supported")
       }
     }
   }

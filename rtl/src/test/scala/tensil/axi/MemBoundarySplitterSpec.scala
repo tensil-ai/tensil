@@ -20,10 +20,12 @@ class MemBoundarySplitterSpec extends FunUnitSpec {
 
     for (
       (configName, config) <- Map(
-        "Xilinx"    -> Config.Xilinx,
-        "Xilinx64"  -> Config.Xilinx64,
-        "Xilinx128" -> Config.Xilinx128,
-        "Xilinx256" -> Config.Xilinx256
+        "Xilinx"     -> Config.Xilinx,
+        "Xilinx64"   -> Config.Xilinx64,
+        "Xilinx128"  -> Config.Xilinx128,
+        "Xilinx256"  -> Config.Xilinx256,
+        "Xilinx512"  -> Config.Xilinx512,
+        "Xilinx1024" -> Config.Xilinx1024
       )
     ) {
 

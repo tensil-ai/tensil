@@ -10,11 +10,11 @@ import tensil.formal._
 import chisel3.util.Queue
 import tensil.mem.OutQueue
 import tensil.PlatformConfig
-import tensil.mem.MemKind.XilinxBlockRAM
+import tensil.mem.MemoryImplementation.BlockRAM
 
 class AccumulatorWithALUArrayFormal extends Formal {
   implicit val platformConfig =
-    PlatformConfig.default.copy(memKind = XilinxBlockRAM)
+    PlatformConfig.default.copy(accumulatorMemImpl = BlockRAM)
   val arch = tensil.Architecture.mkWithDefaults(
     arraySize = 2,
     localDepth = 8,

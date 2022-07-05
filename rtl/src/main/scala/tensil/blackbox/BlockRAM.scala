@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /* Copyright © 2019-2022 Tensil AI Company */
 
-package tensil.xilinx
+package tensil.blackbox
 
 import chisel3._
 import chisel3.util.HasBlackBoxInline

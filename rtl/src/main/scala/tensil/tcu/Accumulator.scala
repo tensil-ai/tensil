@@ -41,6 +41,7 @@ class Accumulator[T <: Data with Num[T]](
     new DualPortMem(
       Vec(height, gen),
       depth,
+      platformConfig.accumulatorMemImpl,
       name = "acc",
       debug = debug,
     )

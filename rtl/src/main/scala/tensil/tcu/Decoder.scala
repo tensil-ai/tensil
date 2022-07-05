@@ -53,9 +53,11 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
     )
     val array = Decoupled(new SystolicArrayControl)
     val config = new Bundle {
-      val dram0AddressOffset  = Output(UInt(platformConfig.axi.addrWidth.W))
+      val dram0AddressOffset =
+        Output(UInt(platformConfig.dramAxiConfig.addrWidth.W))
       val dram0CacheBehaviour = Output(UInt(4.W))
-      val dram1AddressOffset  = Output(UInt(platformConfig.axi.addrWidth.W))
+      val dram1AddressOffset =
+        Output(UInt(platformConfig.dramAxiConfig.addrWidth.W))
       val dram1CacheBehaviour = Output(UInt(4.W))
     }
     val status =
@@ -120,10 +122,14 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
   io.skipped.valid := false.B
 
   // configuration registers
-  val registerWidth       = 4
-  val dram0AddressOffset  = RegInit(0.U(platformConfig.axi.addrWidth.W))
+  val registerWidth = 4
+  val dram0AddressOffset = RegInit(
+    0.U(platformConfig.dramAxiConfig.addrWidth.W)
+  )
   val dram0CacheBehaviour = RegInit(0.U(4.W))
-  val dram1AddressOffset  = RegInit(0.U(platformConfig.axi.addrWidth.W))
+  val dram1AddressOffset = RegInit(
+    0.U(platformConfig.dramAxiConfig.addrWidth.W)
+  )
   val dram1CacheBehaviour = RegInit(0.U(4.W))
 
   io.config.dram0AddressOffset := dram0AddressOffset
@@ -594,7 +600,12 @@ class Decoder(val arch: Architecture, options: TCUOptions = TCUOptions())(
   }.elsewhen(instruction.bits.opcode === Opcode.Configure) {
     when(instruction.valid) {
       val args =
-        Wire(new ConfigureArgs(registerWidth, platformConfig.axi.addrWidth))
+        Wire(
+          new ConfigureArgs(
+            registerWidth,
+            platformConfig.dramAxiConfig.addrWidth
+          )
+        )
 
       args := instruction.bits.arguments.asTypeOf(args)
 

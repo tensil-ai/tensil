@@ -25,11 +25,6 @@ import chisel3.experimental.DataMirror
 
 // scalastyle:off number.of.methods
 package object util {
-  object Environment extends Enumeration {
-    type Environment = Value
-    val Synthesis, Simulation = Value
-  }
-
   def isOutput(x: Data): Boolean = {
     DataMirror.directionOf(x) == ActualDirection.Output
   }

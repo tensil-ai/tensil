@@ -22,7 +22,7 @@ import scala.collection.mutable
 import chiseltest.internal.TesterThreadList
 import tensil.ArchitectureDataType
 import tensil.PlatformConfig
-import tensil.mem.MemKind
+import tensil.mem.MemoryImplementation
 
 class TCUSpec extends UnitSpec {
   behavior of "TCU"

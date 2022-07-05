@@ -10,7 +10,7 @@ import tensil.FunUnitSpec
 import tensil.PlatformConfig
 import tensil.Architecture
 import scala.collection.mutable
-import tensil.mem.MemKind
+import tensil.mem.MemoryImplementation
 import chiseltest.internal.TesterThreadList
 import chiseltest.VerilatorBackendAnnotation
 import tensil.mem.MemControl
@@ -27,7 +27,10 @@ class TCULargeSpec extends FunUnitSpec {
     describe("with tiny arch") {
 
       implicit val platformConfig =
-        PlatformConfig.default.copy(memKind = MemKind.XilinxBlockRAM)
+        PlatformConfig.default.copy(
+          localMemImpl = MemoryImplementation.BlockRAM,
+          accumulatorMemImpl = MemoryImplementation.BlockRAM
+        )
       val gen                = FixedPoint(16.W, 8.BP)
       val arch               = Architecture.tiny
       implicit val axiConfig = axi.Config.Xilinx64
@@ -187,10 +190,11 @@ class TCULargeSpec extends FunUnitSpec {
   }
   describe("TCU") {
     describe("with tiny arch") {
-      // implicit val platformConfig =
-      //   PlatformConfig.default.copy(memKind = MemKind.ChiselSyncReadMem)
       implicit val platformConfig =
-        PlatformConfig.default.copy(memKind = MemKind.XilinxBlockRAM)
+        PlatformConfig.default.copy(
+          localMemImpl = MemoryImplementation.BlockRAM,
+          accumulatorMemImpl = MemoryImplementation.BlockRAM
+        )
       val gen             = FixedPoint(16.W, 8.BP)
       val arch            = Architecture.tiny
       implicit val layout = new InstructionLayout(arch)

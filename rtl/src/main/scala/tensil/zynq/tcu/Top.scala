@@ -11,8 +11,7 @@ import tensil.axi.{
   connectDownstreamInterface,
   connectUpstreamInterface
 }
-import tensil.mem.MemKind
-import tensil.util.Environment._
+import tensil.mem.MemoryImplementation
 import tensil.tcu.TCUOptions
 import tensil.{
   ArchitectureDataType,
@@ -31,7 +30,8 @@ case class Args(
     sampleBlockSize: Int = 0,
     decoderTimeout: Int = 100,
     validateInstructions: Boolean = false,
-    enableStatus: Boolean = false
+    enableStatus: Boolean = false,
+    useXilinxUltraRAM: Boolean = false,
 )
 
 class Top(
@@ -39,8 +39,6 @@ class Top(
     arch: Architecture,
     options: AXIWrapperTCUOptions,
     printSummary: Boolean
-)(implicit
-    val environment: Environment = Synthesis
 ) extends RawModule {
   override def desiredName: String = s"top_${archName}"
 
@@ -67,20 +65,14 @@ class Top(
       Some(IO(new AXI4Stream(layout.instructionSizeBytes * 8)))
     else None
 
-  val envReset = environment match {
-    case Simulation => reset
-    case Synthesis  => !reset // make reset active-low
-    case _          => reset
-  }
-  implicit val platformConfig: PlatformConfig = environment match {
-    case Simulation =>
-      PlatformConfig(MemKind.RegisterBank, options.dramAxiConfig)
-    case Synthesis =>
-      PlatformConfig(MemKind.XilinxBlockRAM, options.dramAxiConfig)
-    case _ => PlatformConfig(MemKind.RegisterBank, options.dramAxiConfig)
-  }
+  implicit val platformConfig =
+    PlatformConfig(
+      localMemImpl = options.localMemImpl,
+      accumulatorMemImpl = options.accumulatorMemImpl,
+      dramAxiConfig = options.dramAxiConfig
+    )
 
-  withClockAndReset(clock, envReset) {
+  withClockAndReset(clock, if (options.resetActiveLow) !reset else reset) {
     val tcu = Module(
       new AXIWrapperTCU(
         gen,
@@ -173,6 +165,11 @@ object Top extends App {
       .valueName("true|false")
       .action((x, c) => c.copy(enableStatus = x))
       .text("Enable status port, defaults to false")
+
+    opt[Boolean]("use-xilinx-ultra-ram")
+      .valueName("true|false")
+      .action((x, c) => c.copy(useXilinxUltraRAM = x))
+      .text("Use Xilinx Ultra RAM for local memory and BRAM for accumulators")
   }
 
   argParser.parse(args, Args()) match {
@@ -187,6 +184,12 @@ object Top extends App {
           validateInstructions = args.validateInstructions,
           enableStatus = args.enableStatus,
         ),
+        accumulatorMemImpl =
+          if (args.useXilinxUltraRAM) MemoryImplementation.XilinxBRAMMacro
+          else MemoryImplementation.BlockRAM,
+        localMemImpl =
+          if (args.useXilinxUltraRAM) MemoryImplementation.XilinxURAMMacro
+          else MemoryImplementation.BlockRAM,
         dramAxiConfig = args.dramAxiConfig
       )
 

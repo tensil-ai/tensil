@@ -11,7 +11,7 @@ import tensil.axi.{
   connectDownstreamInterface,
   connectUpstreamInterface
 }
-import tensil.mem.MemKind
+import tensil.mem.MemoryImplementation
 import tensil.tcu.TCUOptions
 import tensil.{
   ArchitectureDataType,
@@ -67,8 +67,8 @@ class Top(
 
   implicit val platformConfig =
     PlatformConfig(
-      localMemKind = options.localMemKind,
-      accumulatorMemKind = options.accumulatorMemKind,
+      localMemImpl = options.localMemImpl,
+      accumulatorMemImpl = options.accumulatorMemImpl,
       dramAxiConfig = options.dramAxiConfig
     )
 
@@ -182,12 +182,12 @@ object Top extends App {
           validateInstructions = args.validateInstructions,
           enableStatus = args.enableStatus,
         ),
-        accumulatorMemKind =
-          if (args.useXilinxUltraRAM) MemKind.XilinxBRAMMacro
-          else MemKind.BlockRAM,
-        localMemKind =
-          if (args.useXilinxUltraRAM) MemKind.XilinxURAMMacro
-          else MemKind.BlockRAM,
+        accumulatorMemImpl =
+          if (args.useXilinxUltraRAM) MemoryImplementation.XilinxBRAMMacro
+          else MemoryImplementation.BlockRAM,
+        localMemImpl =
+          if (args.useXilinxUltraRAM) MemoryImplementation.XilinxURAMMacro
+          else MemoryImplementation.BlockRAM,
         dramAxiConfig = args.dramAxiConfig
       )
 

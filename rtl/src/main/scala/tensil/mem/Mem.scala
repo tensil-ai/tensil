@@ -28,7 +28,7 @@ object OutQueue {
 class Mem[T <: Data](
     val gen: T,
     val depth: Long,
-    memKind: MemKind.Type = MemKind.RegisterBank,
+    memImpl: MemoryImplementation.Kind = MemoryImplementation.RegisterBank,
     debug: Boolean = false,
     name: String = "mem",
     controlQueueSize: Int = 2,
@@ -38,7 +38,7 @@ class Mem[T <: Data](
 
   val io = IO(new Port(gen, depth))
 
-  val mem = Module(new InnerMem(gen, depth, memKind))
+  val mem = Module(new InnerMem(gen, depth, memImpl))
 
   val control = io.control
   val input   = io.input
@@ -93,7 +93,7 @@ class Mem[T <: Data](
   class InnerMem[T <: Data](
       gen: T,
       depth: Long,
-      kind: MemKind.Type,
+      impl: MemoryImplementation.Kind,
   ) extends Module {
     val io = IO(new Bundle {
       val address = Input(UInt(log2Ceil(depth).W))
@@ -107,8 +107,8 @@ class Mem[T <: Data](
       }
     })
 
-    kind match {
-      case MemKind.RegisterBank => {
+    impl match {
+      case MemoryImplementation.RegisterBank => {
         if (depth > Int.MaxValue) {
           throw new Exception(
             s"depth $depth is too large for register bank mem type"
@@ -133,14 +133,14 @@ class Mem[T <: Data](
           }
         }
       }
-      case MemKind.ChiselSyncReadMem => {
+      case MemoryImplementation.ChiselSyncReadMem => {
         val mem = SyncReadMem(depth, gen, SyncReadMem.ReadFirst)
         io.read.data <> mem.read(io.address, io.read.enable)
         when(io.write.enable) {
           mem.write(io.address, io.write.data)
         }
       }
-      case MemKind.BlockRAM => {
+      case MemoryImplementation.BlockRAM => {
         val mem = Module(new BlockRAM(gen.getWidth, depth))
         mem.io.clk := clock.asBool
         mem.io.en := !reset.asBool
@@ -149,7 +149,8 @@ class Mem[T <: Data](
         mem.io.we := io.write.enable
         mem.io.di := io.write.data.asTypeOf(mem.io.di)
       }
-      case MemKind.XilinxBRAMMacro | MemKind.XilinxURAMMacro => {
+      case MemoryImplementation.XilinxBRAMMacro |
+          MemoryImplementation.XilinxURAMMacro => {
         throw new Exception("Only dual port Xilinx macros are supported")
       }
     }

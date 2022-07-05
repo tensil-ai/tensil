@@ -3,23 +3,24 @@
 
 package tensil
 
-import tensil.mem.MemKind.{Type, RegisterBank}
+import tensil.mem.MemoryImplementation
 import tensil.axi.Config
 
 /**
-  * @param memKind which kind of memory to implement, used for swapping out black boxes in simulation
-  * @param axi the AXI port width configurations to use for all AXI interfaces
+  * @param localMemImpl which kind of memory to implement local, used for swapping out black boxes in simulation
+  * @param accumulatorMemImpl which kind of memory to implement accumulators, used for swapping out black boxes in simulation
+  * @param dramAxiConfig the AXI port width configurations to use for all AXI interfaces
   */
 case class PlatformConfig(
-    localMemKind: Type,
-    accumulatorMemKind: Type,
+    localMemImpl: MemoryImplementation.Kind,
+    accumulatorMemImpl: MemoryImplementation.Kind,
     dramAxiConfig: Config,
 )
 
 object PlatformConfig {
   implicit val default = PlatformConfig(
-    localMemKind = RegisterBank,
-    accumulatorMemKind = RegisterBank,
+    localMemImpl = MemoryImplementation.RegisterBank,
+    accumulatorMemImpl = MemoryImplementation.RegisterBank,
     dramAxiConfig = Config.Xilinx,
   )
 }

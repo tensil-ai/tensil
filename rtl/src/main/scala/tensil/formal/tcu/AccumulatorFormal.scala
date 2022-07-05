@@ -8,13 +8,13 @@ import chisel3.experimental.{verification => v}
 import tensil.formal._
 import tensil.tcu._
 import tensil.util
-import tensil.mem.MemKind.BlockRAM
+import tensil.mem.MemoryImplementation.BlockRAM
 import chisel3.stage.ChiselGeneratorAnnotation
 import tensil.PlatformConfig
 
 class AccumulatorFormal extends Formal {
   implicit val platformConfig =
-    PlatformConfig.default.copy(accumulatorMemKind = BlockRAM)
+    PlatformConfig.default.copy(accumulatorMemImpl = BlockRAM)
   val m  = Module(new Accumulator(SInt(2.W), 2, 2))
   val io = IO(m.io.cloneType)
   io <> m.io

@@ -14,7 +14,7 @@ import tensil.util
 class DualPortMem[T <: Data](
     val gen: T,
     val depth: Long,
-    memKind: MemKind.Type = MemKind.RegisterBank,
+    memImpl: MemoryImplementation.Kind = MemoryImplementation.RegisterBank,
     debug: Boolean = false,
     name: String = "mem",
 ) extends Module {
@@ -30,7 +30,7 @@ class DualPortMem[T <: Data](
   dontTouch(io.tracepoint)
   dontTouch(io.programCounter)
 
-  val mem = Module(new InnerDualPortMem(gen, depth, memKind))
+  val mem = Module(new InnerDualPortMem(gen, depth, memImpl))
 
   connectPort(io.portA, mem.io.portA, "A")
   connectPort(io.portB, mem.io.portB, "B")
@@ -101,15 +101,15 @@ class DualPortMem[T <: Data](
   class InnerDualPortMem[T <: Data](
       gen: T,
       depth: Long,
-      kind: MemKind.Type,
+      impl: MemoryImplementation.Kind,
   ) extends Module {
     val io = IO(new Bundle {
       val portA = new InnerPort(gen, depth)
       val portB = new InnerPort(gen, depth)
     })
 
-    kind match {
-      case MemKind.RegisterBank => {
+    impl match {
+      case MemoryImplementation.RegisterBank => {
         if (depth > Int.MaxValue) {
           throw new Exception(
             s"depth $depth is too large for register bank mem type"
@@ -147,7 +147,7 @@ class DualPortMem[T <: Data](
           }
         }
       }
-      case MemKind.ChiselSyncReadMem => {
+      case MemoryImplementation.ChiselSyncReadMem => {
 
         /**
           * This approach will produce undefined behaviour
@@ -169,7 +169,7 @@ class DualPortMem[T <: Data](
           }
         }
       }
-      case MemKind.BlockRAM => {
+      case MemoryImplementation.BlockRAM => {
         val mem = Module(new DualPortBlockRAM(gen.getWidth, depth))
 
         mem.io.clka := clock.asBool
@@ -186,14 +186,17 @@ class DualPortMem[T <: Data](
         mem.io.web := io.portB.write.enable
         mem.io.dib := io.portB.write.data.asTypeOf(mem.io.dib)
       }
-      case MemKind.XilinxBRAMMacro | MemKind.XilinxURAMMacro => {
+      case MemoryImplementation.XilinxBRAMMacro |
+          MemoryImplementation.XilinxURAMMacro => {
         val mem = Module(
           new xilinx.RAMMacro(
             gen.getWidth,
             depth,
-            kind match {
-              case MemKind.XilinxBRAMMacro => xilinx.RAMMacro.BlockPrimitive
-              case MemKind.XilinxURAMMacro => xilinx.RAMMacro.UltraPrimitive
+            impl match {
+              case MemoryImplementation.XilinxBRAMMacro =>
+                xilinx.RAMMacro.BlockPrimitive
+              case MemoryImplementation.XilinxURAMMacro =>
+                xilinx.RAMMacro.UltraPrimitive
             }
           )
         )

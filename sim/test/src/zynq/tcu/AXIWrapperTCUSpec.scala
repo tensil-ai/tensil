@@ -35,7 +35,7 @@ import tensil.tcu.instruction.{
   ConfigureArgs,
   Configure
 }
-import tensil.mem.MemKind
+import tensil.mem.MemoryImplementation
 import tensil.tools.{ArchitectureDataTypeUtil, ResNet}
 import tensil.util.divCeil
 
@@ -45,8 +45,8 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
 
   implicit val platformConfig =
     PlatformConfig.default.copy(
-      localMemKind = MemKind.BlockRAM,
-      accumulatorMemKind = MemKind.BlockRAM
+      localMemImpl = MemoryImplementation.BlockRAM,
+      accumulatorMemImpl = MemoryImplementation.BlockRAM
     )
 
   def varyArchAndAXI[T <: Data with Num[T]](gen: T, arch: Architecture)(implicit

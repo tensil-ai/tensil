@@ -3,8 +3,8 @@
 
 package tensil.mem
 
-object MemKind extends Enumeration {
-  type Type = Value
+object MemoryImplementation extends Enumeration {
+  type Kind = Value
   val RegisterBank, ChiselSyncReadMem, BlockRAM, XilinxURAMMacro,
       XilinxBRAMMacro = Value
 }

@@ -6,7 +6,7 @@ package tensil.formal.mem
 import chisel3._
 import chisel3.experimental.{verification => v}
 import tensil.mem.DualPortMem
-import tensil.mem.MemKind.BlockRAM
+import tensil.mem.MemoryImplementation.BlockRAM
 import tensil.formal._
 import firrtl.MemKind
 import tensil.PlatformConfig

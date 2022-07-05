@@ -72,7 +72,7 @@ class TCU[T <: Data with Num[T]](
     new DualPortMem(
       Vec(layout.arch.arraySize, gen),
       layout.arch.localDepth.toInt,
-      platformConfig.localMemKind,
+      platformConfig.localMemImpl,
       name = "local",
       debug = false,
     )

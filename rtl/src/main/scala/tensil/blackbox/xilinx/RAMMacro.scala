@@ -13,14 +13,20 @@ object RAMMacro {
   val BlockPrimitive = "block"
 }
 
+/**
+  * @param width memory word width in bits
+  * @param depth memory depth in words
+  * @param primitive Xilinx memory primitive, UltraPrimitive and BlockPrimitive are supported
+  */
 class RAMMacro(width: Int, depth: Long, primitive: String)
     extends BlackBox
     with HasBlackBoxInline {
 
-  override def desiredName: String = s"xilinx_${primitive}_ram_dp_${width}x${depth}"
+  override def desiredName: String =
+    s"xilinx_${primitive}_ram_dp_${width}x${depth}"
 
   val addressWidth = util.widthOf(depth - 1).get
-  val memorySize = width * depth
+  val memorySize   = width * depth
 
   val io = IO(new Bundle {
     val clka  = Input(Bool())

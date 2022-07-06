@@ -31,6 +31,7 @@ class OnnxFrontend(
     graphStream: Option[OutputStream],
     options: CompilerOptions
 ) extends Frontend {
+  private val schedulingContext = new StandardSchedulingContext(arch, options)
 
   private object VarsDimensions {
     def apply(
@@ -394,24 +395,12 @@ class OnnxFrontend(
 
   private def startLayer(nodeProtos: Seq[NodeProto]): Scheduler = {
     if (graphPrinter.isDefined)
-      graphPrinter.get.startLayer(s"layer_$nextLayerIndex")
+      graphPrinter.get.startLayer(s"layer_${schedulingContext.nextLayerIndex}")
 
-    val layerIndex = nextLayerIndex
-    nextLayerIndex += 1
-
-    new Scheduler(
-      layerIndex,
-      arch,
-      options
-    )
+    schedulingContext.startLayer()
   }
 
-  /*private def finishLayer(scheduler: Scheduler, context: EmitContext) = {
-    scheduler.saveGraph(s"onnx_layer_${layerIndex - 1}.tgraph")
-    None
-  }*/
-
-  private def finishLayer(scheduler: Scheduler, context: EmitContext) = {
+  private def emitLayer(scheduler: Scheduler, context: EmitContext) = {
     if (graphPrinter.isDefined)
       graphPrinter.get.endLayer()
 
@@ -559,7 +548,7 @@ class OnnxFrontend(
 
       }
 
-      finishLayer(scheduler, context)
+      emitLayer(scheduler, context)
     }
 
   private def findInterLayerOutputs(
@@ -1094,7 +1083,7 @@ class OnnxFrontend(
 
         (
           Seq(inputVars.name, adjustedOutputVars.name),
-          finishLayer(scheduler, context)
+          emitLayer(scheduler, context)
         )
       } else
         (Seq(inputVars.name), None)
@@ -1271,7 +1260,7 @@ class OnnxFrontend(
           adjustedOutputsVars
             .map(vars => Seq(inputVars.name, vars.name))
             .toArray,
-          finishLayer(scheduler, context)
+          emitLayer(scheduler, context)
         )
       } else
         (Array.fill(num)(Seq(inputVars.name)), None)
@@ -1473,7 +1462,7 @@ class OnnxFrontend(
 
           (
             Seq(adjustedOutputVars.name),
-            finishLayer(scheduler, context)
+            emitLayer(scheduler, context)
           )
         } else
           (Nil, None)
@@ -1526,7 +1515,7 @@ class OnnxFrontend(
 
     scheduler.emitSave(outputTemp, outputVars)
 
-    finishLayer(scheduler, context)
+    emitLayer(scheduler, context)
   }
 
   private def emitLayerResize(
@@ -1712,7 +1701,7 @@ class OnnxFrontend(
 
     scheduler.emitSave(outputTemp, outputVars)
 
-    finishLayer(scheduler, context)
+    emitLayer(scheduler, context)
   }
 
   private def emitGlobalPool(
@@ -1745,7 +1734,7 @@ class OnnxFrontend(
 
     scheduler.emitSave(outputTemp, outputVars)
 
-    finishLayer(scheduler, context)
+    emitLayer(scheduler, context)
   }
 
   private def emitNorm(
@@ -1775,7 +1764,7 @@ class OnnxFrontend(
 
     scheduler.emitSave(outputTemp, outputVars)
 
-    finishLayer(scheduler, context)
+    emitLayer(scheduler, context)
   }
 
   private def emitActivate(
@@ -1808,7 +1797,7 @@ class OnnxFrontend(
 
     scheduler.emitSave(outputTemp, outputVars)
 
-    finishLayer(scheduler, context)
+    emitLayer(scheduler, context)
   }
 
   private def emitAdd(context: EmitContext, addProto: NodeProto): EmitResult = {
@@ -1835,7 +1824,7 @@ class OnnxFrontend(
 
     scheduler.emitSave(outputTemp, outputVars)
 
-    finishLayer(scheduler, context)
+    emitLayer(scheduler, context)
   }
 
   private def emitSub(
@@ -1882,7 +1871,7 @@ class OnnxFrontend(
 
     scheduler.emitSave(outputTemp, outputVars)
 
-    finishLayer(scheduler, context)
+    emitLayer(scheduler, context)
   }
 
   private def emitMul(
@@ -1929,7 +1918,7 @@ class OnnxFrontend(
 
     scheduler.emitSave(outputTemp, outputVars)
 
-    finishLayer(scheduler, context)
+    emitLayer(scheduler, context)
   }
 
   private def emitLayerConv(

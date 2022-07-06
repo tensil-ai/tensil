@@ -31,6 +31,7 @@ class TfFrontend(
     graphStream: Option[OutputStream],
     options: CompilerOptions
 ) extends Frontend {
+  private val schedulingContext = new StandardSchedulingContext(arch, options)
 
   private object VarsDimensions {
     def apply(
@@ -355,24 +356,12 @@ class TfFrontend(
 
   private def startLayer(nodeDefs: Seq[NodeDef]): Scheduler = {
     if (graphPrinter.isDefined)
-      graphPrinter.get.startLayer(s"layer_$nextLayerIndex")
+      graphPrinter.get.startLayer(s"layer_${schedulingContext.nextLayerIndex}")
 
-    val layerIndex = nextLayerIndex
-    nextLayerIndex += 1
-
-    new Scheduler(
-      layerIndex,
-      arch,
-      options
-    )
+    schedulingContext.startLayer()
   }
 
-  /*private def finishLayer(scheduler: Scheduler, context: EmitContext) = {
-    scheduler.saveGraph(s"tf_layer_${layerIndex - 1}.tgraph")
-    None
-  }*/
-
-  private def finishLayer(scheduler: Scheduler, context: EmitContext) = {
+  private def emitLayer(scheduler: Scheduler, context: EmitContext) = {
     if (graphPrinter.isDefined)
       graphPrinter.get.endLayer()
 
@@ -519,7 +508,7 @@ class TfFrontend(
 
       }
 
-      finishLayer(scheduler, context)
+      emitLayer(scheduler, context)
     }
 
   private def findInterLayerOutputs(
@@ -993,7 +982,7 @@ class TfFrontend(
 
         (
           Seq(inputVars.name, adjustedOutputVars.name),
-          finishLayer(scheduler, context)
+          emitLayer(scheduler, context)
         )
       } else
         (Seq(inputVars.name), None)
@@ -1277,7 +1266,7 @@ class TfFrontend(
           adjustedOutputsVars
             .map(vars => Seq(inputVars.name, vars.name))
             .toArray,
-          finishLayer(scheduler, context)
+          emitLayer(scheduler, context)
         )
       } else
         (Array.fill(num)(Seq(inputVars.name)), None)
@@ -1460,7 +1449,7 @@ class TfFrontend(
 
         (
           Seq(adjustedOutputVars.name),
-          finishLayer(scheduler, context)
+          emitLayer(scheduler, context)
         )
       } else
         (Nil, None)
@@ -1518,7 +1507,7 @@ class TfFrontend(
 
     scheduler.emitSave(outputTemp, outputVars)
 
-    finishLayer(scheduler, context)
+    emitLayer(scheduler, context)
   }
 
   private def emitLayerResizeBilinear(
@@ -1698,7 +1687,7 @@ class TfFrontend(
 
     scheduler.emitSave(outputTemp, outputVars)
 
-    finishLayer(scheduler, context)
+    emitLayer(scheduler, context)
   }
 
   private def emitNorm(context: EmitContext, normDef: NodeDef): EmitResult = {
@@ -1725,7 +1714,7 @@ class TfFrontend(
 
     scheduler.emitSave(outputTemp, outputVars)
 
-    finishLayer(scheduler, context)
+    emitLayer(scheduler, context)
   }
 
   private def emitActivate(
@@ -1755,7 +1744,7 @@ class TfFrontend(
 
     scheduler.emitSave(outputTemp, outputVars)
 
-    finishLayer(scheduler, context)
+    emitLayer(scheduler, context)
   }
 
   private def emitAdd(context: EmitContext, addDef: NodeDef): EmitResult = {
@@ -1782,7 +1771,7 @@ class TfFrontend(
 
     scheduler.emitSave(outputTemp, outputVars)
 
-    finishLayer(scheduler, context)
+    emitLayer(scheduler, context)
   }
 
   private def emitMean(context: EmitContext, meanDef: NodeDef): EmitResult = {
@@ -1809,7 +1798,7 @@ class TfFrontend(
 
     scheduler.emitSave(outputTemp, outputVars)
 
-    finishLayer(scheduler, context)
+    emitLayer(scheduler, context)
   }
 
   private def emitLayerConv2D(

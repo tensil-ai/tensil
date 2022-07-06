@@ -45,10 +45,10 @@ class MemorySpanAllocator() {
 
   def blend(
       ref: MemoryRef,
-      blendeeNames: Seq[MemoryRef],
+      blendeeRefs: Seq[MemoryRef],
       blendedSpan: MemorySpan
   ): MemorySpan = {
-    val newSet      = (blendeeNames :+ ref).toSet
+    val newSet      = (blendeeRefs :+ ref).toSet
     val existingSet = blendedSets.find(set => !(newSet & set).isEmpty)
 
     if (existingSet.isDefined)

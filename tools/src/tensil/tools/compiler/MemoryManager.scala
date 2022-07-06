@@ -25,13 +25,16 @@ class MemoryManager(
     tracepointConditions: Seq[TracepointCondition]
 ) {
 
-  private val tempSpace     = new InfiniteMemorySpace(MemoryTag.Temp)
-  private val tempAllocator = new InfiniteMemoryObjectAllocator(16384)
+  private val tempSpace =
+    ArenaMemorySpace("temp", MemoryTag.Temp, Long.MaxValue)
+  private val tempAllocator = new MemoryObjectAllocator(
+    new MemorySpanAllocator()
+  )
 
   private val varsSpace =
-    new MemorySpace("vars", MemoryTag.Vars, arch.varsDepth)
+    HeapMemorySpace("vars", MemoryTag.Vars, arch.varsDepth)
   private val constsSpace =
-    new MemorySpace("consts", MemoryTag.Consts, arch.constsDepth)
+    HeapMemorySpace("consts", MemoryTag.Consts, arch.constsDepth)
 
   private val spacesToFree = Seq(varsSpace, constsSpace)
 
@@ -188,7 +191,7 @@ class MemoryManager(
       name: String,
       dims: MemoryDimensions
   ): MemoryObject =
-    tempAllocator.allocateObject(tempSpace, name, dims)
+    tempAllocator.allocateObject(tempSpace, name, dims, Nil)
 
   def freeConsumedObjects(): Unit = {
     allocator.freeConsumedObjects(spacesToFree)

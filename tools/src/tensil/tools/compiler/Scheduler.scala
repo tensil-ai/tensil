@@ -45,11 +45,10 @@ abstract class Scheduler(
     println(s"LAYER $layerIndex, emitting HIR ...")
   }
 
-  private var tempOutputNodes =
+  private var tempOutputNodesByOutput =
     mutable.Map.empty[MemoryAddress, TempOutputNode]
-  private var varOutputNodes = mutable.Map.empty[MemoryAddress, VarOutputNode]
-
-  protected def roots = varOutputNodes.values.toSeq
+  private var varOutputNodesByInput =
+    mutable.Map.empty[MemoryAddress, VarOutputNode]
 
   protected var macs = 0L
 
@@ -148,14 +147,14 @@ abstract class Scheduler(
         case (output, g) => (output, g.map(_._2))
       }
     ) {
-      val matMulNode = tempOutputNodes
+      val matMulNode = tempOutputNodesByOutput
         .getOrElseUpdate(
           output,
           new MatMulNode(Vector.empty[MatMulInput], output)
         )
         .asInstanceOf[MatMulNode]
 
-      tempOutputNodes(output) =
+      tempOutputNodesByOutput(output) =
         new MatMulNode(matMulNode.inputs ++ matMulInputs, output)
     }
   }
@@ -167,8 +166,8 @@ abstract class Scheduler(
     require(inputObj.dims.sizeVectors == outputObj.dims.sizeVectors)
     for (i <- 0 until outputObj.dims.sizeVectors) {
       val output = outputObj.mkAddress(i)
-      require(!tempOutputNodes.contains(output))
-      tempOutputNodes(output) = new LoadNode(
+      require(!tempOutputNodesByOutput.contains(output))
+      tempOutputNodesByOutput(output) = new LoadNode(
         inputObj.mkAddress(i),
         output
       )
@@ -184,8 +183,8 @@ abstract class Scheduler(
     require(input1Obj.dims.sizeVectors == outputObj.dims.sizeVectors)
     for (i <- 0 until outputObj.dims.sizeVectors) {
       val output = outputObj.mkAddress(i)
-      require(!tempOutputNodes.contains(output))
-      tempOutputNodes(output) = new AddNode(
+      require(!tempOutputNodesByOutput.contains(output))
+      tempOutputNodesByOutput(output) = new AddNode(
         input0Obj.mkAddress(i),
         input1Obj.mkAddress(i),
         output
@@ -202,8 +201,8 @@ abstract class Scheduler(
     require(input1Obj.dims.sizeVectors == outputObj.dims.sizeVectors)
     for (i <- 0 until outputObj.dims.sizeVectors) {
       val output = outputObj.mkAddress(i)
-      require(!tempOutputNodes.contains(output))
-      tempOutputNodes(output) = new BinarySIMDNode(
+      require(!tempOutputNodesByOutput.contains(output))
+      tempOutputNodesByOutput(output) = new BinarySIMDNode(
         SIMDOp.Subtract,
         input0Obj.mkAddress(i),
         input1Obj.mkAddress(i),
@@ -221,8 +220,8 @@ abstract class Scheduler(
     require(input1Obj.dims.sizeVectors == outputObj.dims.sizeVectors)
     for (i <- 0 until outputObj.dims.sizeVectors) {
       val output = outputObj.mkAddress(i)
-      require(!tempOutputNodes.contains(output))
-      tempOutputNodes(output) = new BinarySIMDNode(
+      require(!tempOutputNodesByOutput.contains(output))
+      tempOutputNodesByOutput(output) = new BinarySIMDNode(
         SIMDOp.Multiply,
         input0Obj.mkAddress(i),
         input1Obj.mkAddress(i),
@@ -238,8 +237,8 @@ abstract class Scheduler(
     require(inputObj.dims.sizeVectors == outputObj.dims.sizeVectors)
     for (i <- 0 until outputObj.dims.sizeVectors) {
       val output = outputObj.mkAddress(i)
-      require(!tempOutputNodes.contains(output))
-      tempOutputNodes(output) = new ReluNode(
+      require(!tempOutputNodesByOutput.contains(output))
+      tempOutputNodesByOutput(output) = new ReluNode(
         inputObj.mkAddress(i),
         output
       )
@@ -253,8 +252,8 @@ abstract class Scheduler(
     require(inputObj.dims.sizeVectors == outputObj.dims.sizeVectors)
     for (i <- 0 until outputObj.dims.sizeVectors) {
       val output = outputObj.mkAddress(i)
-      require(!tempOutputNodes.contains(output))
-      tempOutputNodes(output) = new SoftmaxNode(
+      require(!tempOutputNodesByOutput.contains(output))
+      tempOutputNodesByOutput(output) = new SoftmaxNode(
         inputObj.mkAddress(i),
         output
       )
@@ -270,8 +269,8 @@ abstract class Scheduler(
     require(alphaObj.dims.sizeVectors == 1)
     for (i <- 0 until outputObj.dims.sizeVectors) {
       val output = outputObj.mkAddress(i)
-      require(!tempOutputNodes.contains(output))
-      tempOutputNodes(output) = new LeakyReluNode(
+      require(!tempOutputNodesByOutput.contains(output))
+      tempOutputNodesByOutput(output) = new LeakyReluNode(
         alphaObj.mkAddress(0),
         inputObj.mkAddress(i),
         output
@@ -289,8 +288,8 @@ abstract class Scheduler(
     require(!multiplierObj.isDefined || multiplierObj.get.dims.sizeVectors == 1)
     for (i <- 0 until outputObj.dims.sizeVectors) {
       val output = outputObj.mkAddress(i)
-      require(!tempOutputNodes.contains(output))
-      val node = tempOutputNodes(output) = new PoolNode(
+      require(!tempOutputNodesByOutput.contains(output))
+      val node = tempOutputNodesByOutput(output) = new PoolNode(
         op,
         output,
         inputObjs.map(_.mkAddress(i)).toVector,
@@ -310,8 +309,8 @@ abstract class Scheduler(
     require(offsetObj.dims.sizeVectors == outputObj.dims.sizeVectors)
     for (i <- 0 until outputObj.dims.sizeVectors) {
       val output = outputObj.mkAddress(i)
-      require(!tempOutputNodes.contains(output))
-      tempOutputNodes(output) = new NormNode(
+      require(!tempOutputNodesByOutput.contains(output))
+      tempOutputNodesByOutput(output) = new NormNode(
         inputObj.mkAddress(i),
         scaleObj.mkAddress(i),
         offsetObj.mkAddress(i),
@@ -329,8 +328,8 @@ abstract class Scheduler(
     require(scaleObjs.forall(_.dims.sizeVectors == outputObj.dims.sizeVectors))
     for (i <- 0 until outputObj.dims.sizeVectors) {
       val output = outputObj.mkAddress(i)
-      require(!tempOutputNodes.contains(output))
-      tempOutputNodes(output) = new InterpolateNode(
+      require(!tempOutputNodesByOutput.contains(output))
+      tempOutputNodesByOutput(output) = new InterpolateNode(
         output,
         inputObjs.map(_.mkAddress(i)).toVector,
         scaleObjs.map(_.mkAddress(i)).toVector
@@ -344,11 +343,11 @@ abstract class Scheduler(
   ): Unit = {
     require(inputObj.dims.sizeVectors == outputObj.dims.sizeVectors)
     for (i <- 0 until outputObj.dims.sizeVectors) {
-      val output = outputObj.mkAddress(i)
-      require(!tempOutputNodes.contains(output))
-      varOutputNodes(output) = new SaveNode(
-        inputObj.mkAddress(i),
-        output
+      val input = inputObj.mkAddress(i)
+      require(!varOutputNodesByInput.contains(input))
+      varOutputNodesByInput(input) = new SaveNode(
+        input,
+        outputObj.mkAddress(i)
       )
     }
   }
@@ -356,10 +355,10 @@ abstract class Scheduler(
   def saveGraph(fileName: String): Unit = {
     val stream = new ObjectOutputStream(new FileOutputStream(fileName))
 
-    for (node <- varOutputNodes.values)
+    for (node <- varOutputNodesByInput.values)
       stream.writeObject(node)
 
-    for (node <- tempOutputNodes.values)
+    for (node <- tempOutputNodesByOutput.values)
       stream.writeObject(node)
 
     stream.close()
@@ -374,10 +373,10 @@ abstract class Scheduler(
 
         if (node.isInstanceOf[VarOutputNode]) {
           val varOutputNode = node.asInstanceOf[VarOutputNode]
-          varOutputNodes(varOutputNode.output) = varOutputNode
+          varOutputNodesByInput(varOutputNode.output) = varOutputNode
         } else if (node.isInstanceOf[TempOutputNode]) {
           val tempOutputNode = node.asInstanceOf[TempOutputNode]
-          tempOutputNodes(tempOutputNode.output) = tempOutputNode
+          tempOutputNodesByOutput(tempOutputNode.output) = tempOutputNode
         }
       }
     } catch {
@@ -388,17 +387,26 @@ abstract class Scheduler(
   }
 
   def emit(backend: Backend): SchedulerResult = {
+    val tempInputTemps =
+      tempOutputNodesByOutput.values.map(_.inputTemps).flatten.toSet
+    val varInputTemps = varOutputNodesByInput.keys.toSet
+
+    val roots = (varInputTemps -- tempInputTemps).toSeq
+
     if (context.options.printProgress) {
       println(
-        s"Emitted ${varOutputNodes.size} root and ${tempOutputNodes.size} non-root node(s)"
+        s"Emitted ${roots.size} root and ${(varOutputNodesByInput.size + tempOutputNodesByOutput.size) - roots.size} non-root node(s)"
       )
       println(s"Planning ...")
     }
 
-    doEmit(backend)
+    doEmit(roots, backend)
   }
 
-  protected def doEmit(backend: Backend): SchedulerResult
+  protected def doEmit(
+      roots: Seq[MemoryAddress],
+      backend: Backend
+  ): SchedulerResult
 
   protected def inputsToLoad(
       nodes: Seq[Node],
@@ -448,23 +456,28 @@ abstract class Scheduler(
   }
 
   protected def traverseRoots(
-      roots: Seq[VarOutputNode]
+      roots: Seq[MemoryAddress]
   ): Seq[Node] = {
-    val traversedNodes = mutable.Map.empty[MemoryAddressRaw, Node]
+    val nodes = mutable.ArrayBuffer.empty[Node]
 
-    for (root <- roots) {
-      def traverseNodes(node: Node) {
-        for (temp <- node.inputTemps) {
-          val node = tempOutputNodes(temp)
-          traversedNodes(temp.raw) = node
-          traverseNodes(node)
-        }
+    def traverseTemp(temp: MemoryAddress) {
+      val tempOutputNode = tempOutputNodesByOutput(temp)
+      nodes += tempOutputNode
+
+      for (temp <- tempOutputNode.inputTemps) {
+        traverseTemp(temp)
       }
 
-      traverseNodes(root)
+      val varOutputNode = varOutputNodesByInput.get(temp)
+
+      if (varOutputNode.isDefined)
+        nodes += varOutputNode.get
     }
 
-    traversedNodes.values.toSeq ++ roots.asInstanceOf[Seq[Node]]
+    for (temp <- roots)
+      traverseTemp(temp)
+
+    nodes.toSeq
   }
 
   protected def estimateAccumulatorSize(
@@ -725,7 +738,8 @@ abstract class Scheduler(
     for (
       (inputLocalAddress, outputTempAddress) <- loadAccInputOutputs.sortBy(_._1)
     ) {
-      val outputAccAddress = accumulatorAllocator.allocate(outputTempAddress)
+      val outputAccAddress =
+        accumulatorAllocator.allocate(outputTempAddress, locate = true)
 
       loadAccRollup.emit(
         inputLocalAddress,

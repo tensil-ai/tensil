@@ -13,7 +13,7 @@ import tensil.tools.CompilerException
 class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
     extends Scheduler(layerIndex, context) {
 
-  override protected def doEmit(backend: Backend): SchedulerResult = {
+  override protected def doEmit(roots: Seq[MemoryAddress], backend: Backend): SchedulerResult = {
 
     /** Root's stage signature is a combination of the address
       * value for the first stage const (the first weight vector)
@@ -24,7 +24,7 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
         constAddressValuesHash: Int
     )
 
-    def rootStageSignature(root: VarOutputNode) = {
+    def rootStageSignature(root: MemoryAddress) = {
       val constValues =
         inputsToLoad(traverseRoots(Seq(root)), _.inputReusableConsts)
           .map(_.raw)
@@ -47,7 +47,7 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
     )
 
     case class PartitionInfo(
-        roots: Option[Seq[VarOutputNode]],
+        roots: Option[Seq[MemoryAddress]],
         usage: UsageInfo
     )
 
@@ -85,7 +85,7 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
             )
 
             def partitionRoots(
-                roots: Seq[VarOutputNode],
+                roots: Seq[MemoryAddress],
                 partitions: Seq[PartitionInfo] = Nil
             ): Seq[PartitionInfo] = {
               case class MaximumPartitionSizeInfo(
@@ -94,7 +94,7 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
               )
 
               def findNextMaximumPartitionSize(
-                  roots: Seq[VarOutputNode],
+                  roots: Seq[MemoryAddress],
                   n: Int = 1,
                   powerOfTwoPass: Boolean = true,
                   prevUsage: Option[UsageInfo] = None
@@ -195,7 +195,7 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
             val partitions =
               partitionRoots(
                 combinationCandidateStagedRoots.flatten
-                  .sortBy(_.output.raw)
+                  .sortBy(_.raw)
               )
 
             CombinedStageInfo(reusableConsts, partitions)

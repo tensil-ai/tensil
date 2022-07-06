@@ -13,7 +13,10 @@ import tensil.tools.CompilerException
 class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
     extends Scheduler(layerIndex, context) {
 
-  override protected def doEmit(roots: Seq[MemoryAddress], backend: Backend): SchedulerResult = {
+  override protected def doEmit(
+      roots: Seq[MemoryAddress],
+      backend: Backend
+  ): SchedulerResult = {
 
     /** Root's stage signature is a combination of the address
       * value for the first stage const (the first weight vector)
@@ -195,7 +198,7 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
             val partitions =
               partitionRoots(
                 combinationCandidateStagedRoots.flatten
-                  .sortBy(_.raw)
+                  .sortBy(findVarOutputNode(_).get.output.raw)
               )
 
             CombinedStageInfo(reusableConsts, partitions)

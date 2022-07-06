@@ -455,6 +455,9 @@ abstract class Scheduler(
       )
   }
 
+  protected def findVarOutputNode(inputTemp: MemoryAddress) =
+    varOutputNodesByInput.get(inputTemp)
+
   protected def traverseRoots(
       roots: Seq[MemoryAddress]
   ): Seq[Node] = {

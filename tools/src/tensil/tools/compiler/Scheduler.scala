@@ -400,6 +400,13 @@ abstract class Scheduler(
       tempOutputNodesByOutput.values.map(_.inputTemps).flatten.toSet
     val varInputTemps = varOutputNodesByInput.keys.toSet
 
+    /**
+      * Roots are temporary memory addresses that are the input to at
+      * least one `VarOutputNode` and are not the the input to any of
+      * the `TempOutputNode`s. In other words, roots are computation
+      * results not used in any other computation within the current
+      * layer.
+      */
     val roots = (varInputTemps -- tempInputTemps).toSeq
 
     if (context.options.printProgress) {
@@ -464,7 +471,9 @@ abstract class Scheduler(
       )
   }
 
-  protected def findVarOutputNodesByInput(inputTemp: MemoryAddress): Seq[VarOutputNode] =
+  protected def findVarOutputNodesByInput(
+      inputTemp: MemoryAddress
+  ): Seq[VarOutputNode] =
     varOutputNodesByInput.get(inputTemp) match {
       case None        => Nil
       case Some(nodes) => nodes
@@ -1138,8 +1147,9 @@ abstract class Scheduler(
           .map(_.asInstanceOf[SaveNode])
           .sortBy(_.output)
     ) {
-      val inputAccAddress    = accumulatorAllocator.locate(saveNode.input)
-      val outputLocalAddress = localAllocatorToSave.allocate(saveNode.output, locate = true)
+      val inputAccAddress = accumulatorAllocator.locate(saveNode.input)
+      val outputLocalAddress =
+        localAllocatorToSave.allocate(saveNode.output, locate = true)
 
       saveAccRollup.emit(
         outputLocalAddress,

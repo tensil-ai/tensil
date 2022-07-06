@@ -198,7 +198,7 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
             val partitions =
               partitionRoots(
                 combinationCandidateStagedRoots.flatten
-                  .sortBy(findVarOutputNode(_).get.output.raw)
+                  .sortBy(findVarOutputNodesByInput(_).head.output.raw)
               )
 
             CombinedStageInfo(reusableConsts, partitions)

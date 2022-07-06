@@ -48,7 +48,7 @@ abstract class Scheduler(
   private var tempOutputNodesByOutput =
     mutable.Map.empty[MemoryAddress, TempOutputNode]
   private var varOutputNodesByInput =
-    mutable.Map.empty[MemoryAddress, VarOutputNode]
+    mutable.Map.empty[MemoryAddress, mutable.ArrayBuffer[VarOutputNode]]
 
   protected var macs = 0L
 
@@ -344,8 +344,11 @@ abstract class Scheduler(
     require(inputObj.dims.sizeVectors == outputObj.dims.sizeVectors)
     for (i <- 0 until outputObj.dims.sizeVectors) {
       val input = inputObj.mkAddress(i)
-      require(!varOutputNodesByInput.contains(input))
-      varOutputNodesByInput(input) = new SaveNode(
+      val nodes = varOutputNodesByInput.getOrElseUpdate(
+        input,
+        mutable.ArrayBuffer.empty[VarOutputNode]
+      )
+      nodes += new SaveNode(
         input,
         outputObj.mkAddress(i)
       )
@@ -374,8 +377,11 @@ abstract class Scheduler(
         if (node.isInstanceOf[VarOutputNode]) {
           val varOutputNode = node.asInstanceOf[VarOutputNode]
           for (temp <- varOutputNode.inputTemps) {
-            require(!varOutputNodesByInput.contains(temp))
-            varOutputNodesByInput(temp) = varOutputNode
+            val nodes = varOutputNodesByInput.getOrElseUpdate(
+              temp,
+              mutable.ArrayBuffer.empty[VarOutputNode]
+            )
+            nodes += varOutputNode
           }
         } else if (node.isInstanceOf[TempOutputNode]) {
           val tempOutputNode = node.asInstanceOf[TempOutputNode]
@@ -458,14 +464,17 @@ abstract class Scheduler(
       )
   }
 
-  protected def findVarOutputNode(inputTemp: MemoryAddress) =
-    varOutputNodesByInput.get(inputTemp)
+  protected def findVarOutputNodesByInput(inputTemp: MemoryAddress): Seq[VarOutputNode] =
+    varOutputNodesByInput.get(inputTemp) match {
+      case None        => Nil
+      case Some(nodes) => nodes
+    }
 
   protected def traverseRoots(
       roots: Seq[MemoryAddress]
   ): Seq[Node] = {
     val uniqueTempOutputNodes = mutable.Map.empty[MemoryAddressRaw, Node]
-    val uniqueVarOutputNodes  = mutable.Map.empty[MemoryAddressRaw, Node]
+    val uniqueVarOutputNodes  = mutable.Map.empty[MemoryAddressRaw, Seq[Node]]
 
     def traverseTemp(temp: MemoryAddress) {
       val tempOutputNode = tempOutputNodesByOutput(temp)
@@ -475,16 +484,13 @@ abstract class Scheduler(
         traverseTemp(temp)
       }
 
-      val varOutputNode = varOutputNodesByInput.get(temp)
-
-      if (varOutputNode.isDefined)
-        uniqueVarOutputNodes(temp.raw) = varOutputNode.get
+      uniqueVarOutputNodes(temp.raw) = findVarOutputNodesByInput(temp)
     }
 
     for (temp <- roots)
       traverseTemp(temp)
 
-    uniqueTempOutputNodes.values.toSeq ++ uniqueVarOutputNodes.values.toSeq
+    uniqueTempOutputNodes.values.toSeq ++ uniqueVarOutputNodes.values.flatten.toSeq
   }
 
   protected def estimateAccumulatorSize(
@@ -1133,7 +1139,7 @@ abstract class Scheduler(
           .sortBy(_.output)
     ) {
       val inputAccAddress    = accumulatorAllocator.locate(saveNode.input)
-      val outputLocalAddress = localAllocatorToSave.allocate(saveNode.output)
+      val outputLocalAddress = localAllocatorToSave.allocate(saveNode.output, locate = true)
 
       saveAccRollup.emit(
         outputLocalAddress,

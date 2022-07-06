@@ -13,13 +13,7 @@ import tensil.tools.CompilerException
 class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
     extends Scheduler(layerIndex, context) {
 
-  def emit(backend: Backend): SchedulerResult = {
-    if (context.options.printProgress) {
-      println(
-        s"Emitted ${varOutputNodes.size} root and ${tempOutputNodes.size} non-root node(s)"
-      )
-      println(s"Planning stages and partition ...")
-    }
+  override protected def doEmit(backend: Backend): SchedulerResult = {
 
     /** Root's stage signature is a combination of the address
       * value for the first stage const (the first weight vector)
@@ -32,7 +26,7 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
 
     def rootStageSignature(root: VarOutputNode) = {
       val constValues =
-        inputsToLoad(traverseRoots(Seq(root)), _.inputStageConsts)
+        inputsToLoad(traverseRoots(Seq(root)), _.inputReusableConsts)
           .map(_.raw)
       StageSignature(
         firstConstAddressValue = constValues.headOption,
@@ -40,7 +34,7 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
       )
     }
 
-    val rootsByStages = varOutputNodes.values.par
+    val rootsByStages = roots.par
       .groupBy(rootStageSignature(_))
       .seq
       .toSeq
@@ -58,7 +52,7 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
     )
 
     case class CombinedStageInfo(
-        constsToLoad: Seq[MemoryAddress],
+        reusableConsts: Seq[MemoryAddress],
         partitions: Seq[PartitionInfo]
     )
 
@@ -85,9 +79,9 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
           )
           .par
           .map(combinationCandidateStagedRoots => {
-            val consts = inputsToLoad(
+            val reusableConsts = inputsToLoad(
               traverseRoots(combinationCandidateStagedRoots.map(_.head)),
-              _.inputStageConsts
+              _.inputReusableConsts
             )
 
             def partitionRoots(
@@ -108,9 +102,14 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
                 require(roots.size > 0)
 
                 val nodes           = traverseRoots(roots.take(n))
-                val accumulatorSize = estimatePartitionAccumulatorSize(nodes)
+                val accumulatorSize = estimateAccumulatorSize(nodes)
                 val localSize =
-                  estimatePartitionLocalSize(nodes) + consts.size
+                  estimateLocalSize(
+                    nodes,
+                    includeReusableConsts = false,
+                    includeNonReusableConsts = true,
+                    includeVars = true
+                  ) + reusableConsts.size
                 val usage = UsageInfo(
                   accumulatorSize = accumulatorSize,
                   localSize = localSize
@@ -199,7 +198,7 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
                   .sortBy(_.output.raw)
               )
 
-            CombinedStageInfo(consts, partitions)
+            CombinedStageInfo(reusableConsts, partitions)
           })
           .seq
 
@@ -292,11 +291,13 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
             Some(initStats)
           )
 
-          emitStageInit(
+          emitLoadMemory(
             initSegment.segmentLir,
-            stage.constsToLoad,
-            initLocalAllocator
+            initLocalAllocator,
+            stage.reusableConsts
           )
+
+          initSegment.segmentLir.endEmit()
 
           val partitionSegmentAndStats = stage.partitions.zipWithIndex.par
             .map({
@@ -341,14 +342,38 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
                     )
                   )
 
-                emitStagePartition(
+                val nodes = traverseRoots(partition.roots.get)
+
+                emitLoadConsts(
                   loadSegment.segmentLir,
+                  partitionLocalAllocator,
+                  nodes,
+                  includeReusableConsts = false,
+                  includeNonReusableConsts = true
+                )
+
+                emitLoadVars(
+                  loadSegment.segmentLir,
+                  partitionLocalAllocator,
+                  nodes
+                )
+
+                emitCompute(
                   computeSegment.segmentLir,
+                  partitionLocalAllocator,
+                  partitionLocalAllocator,
+                  nodes
+                )
+
+                emitSaveVars(
                   saveSegment.segmentLir,
                   partitionLocalAllocator,
-                  partitionLocalAllocator,
-                  traverseRoots(partition.roots.get)
+                  nodes
                 )
+
+                loadSegment.segmentLir.endEmit()
+                computeSegment.segmentLir.endEmit()
+                saveSegment.segmentLir.endEmit()
 
                 Seq(
                   (loadSegment, loadStats),

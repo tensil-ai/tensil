@@ -8,10 +8,10 @@ import scala.collection.mutable
 import tensil.tools.compiler.{MemoryAddress, MemoryTag, MemoryAddressHelper}
 
 sealed abstract class Node extends Serializable {
-  lazy val inputTemps: Seq[MemoryAddress]           = Nil
-  lazy val inputVars: Seq[MemoryAddress]            = Nil
-  lazy val inputPartitionConsts: Seq[MemoryAddress] = Nil
-  lazy val inputStageConsts: Seq[MemoryAddress]     = Nil
+  lazy val inputTemps: Seq[MemoryAddress]             = Nil
+  lazy val inputVars: Seq[MemoryAddress]              = Nil
+  lazy val inputNonReusableConsts: Seq[MemoryAddress] = Nil
+  lazy val inputReusableConsts: Seq[MemoryAddress]    = Nil
 }
 
 sealed abstract class VarOutputNode(
@@ -56,9 +56,9 @@ class MatMulNode(
 
   override lazy val inputVars =
     inputs.map(_.input).filter(_.tag == MemoryTag.Vars)
-  override lazy val inputPartitionConsts =
+  override lazy val inputNonReusableConsts =
     inputs.map(_.input).filter(_.tag == MemoryTag.Consts)
-  override lazy val inputStageConsts = inputs
+  override lazy val inputReusableConsts = inputs
     .flatMap(_.weights)
     .filter(_.tag == MemoryTag.Consts)
 }
@@ -73,7 +73,7 @@ class LoadNode(
 
   override lazy val inputVars: Seq[MemoryAddress] =
     if (input.tag == MemoryTag.Vars) Seq(input) else Nil
-  override lazy val inputPartitionConsts: Seq[MemoryAddress] =
+  override lazy val inputNonReusableConsts: Seq[MemoryAddress] =
     if (input.tag == MemoryTag.Consts) Seq(input) else Nil
 }
 
@@ -90,7 +90,7 @@ class AddNode(
   override lazy val inputTemps = Seq(input0)
   override lazy val inputVars: Seq[MemoryAddress] =
     if (input1.tag == MemoryTag.Vars) Seq(input1) else Nil
-  override lazy val inputPartitionConsts: Seq[MemoryAddress] =
+  override lazy val inputNonReusableConsts: Seq[MemoryAddress] =
     if (input1.tag == MemoryTag.Consts) Seq(input1) else Nil
 }
 

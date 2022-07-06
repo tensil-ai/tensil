@@ -8,21 +8,11 @@ import tensil.TablePrinter
 class StandardScheduler2(layerIndex: Int, context: StandardSchedulingContext)
     extends Scheduler(layerIndex, context) {
 
-  def emit(backend: Backend): SchedulerResult = {
-    if (context.options.printProgress) {
-      println(
-        s"Emitted ${varOutputNodes.size} root and ${tempOutputNodes.size} non-root node(s)"
-      )
-      println(s"Planning stages and partition ...")
-    }
+  override protected def doEmit(backend: Backend): SchedulerResult = {
+    val nodes = traverseRoots(roots)
 
-    val roots        = varOutputNodes.values.toSeq
-    val nodes        = traverseRoots(roots)
-    val constsToLoad = inputsToLoad(nodes, _.inputStageConsts)
-
-    val accumulatorSize = estimatePartitionAccumulatorSize(nodes)
-    val localSize =
-      estimatePartitionLocalSize(nodes) + constsToLoad.size
+    val accumulatorSize = estimateAccumulatorSize(nodes)
+    val localSize       = estimateLocalSize(nodes)
 
     val name             = s"LAYER $layerIndex"
     val maximumRootsSize = roots.size
@@ -50,8 +40,6 @@ class StandardScheduler2(layerIndex: Int, context: StandardSchedulingContext)
     val previousLocalAllocator = RenamingMemoryAllocator(localSpace)
     val nextLocalAllocator     = RenamingMemoryAllocator(localSpace)
 
-    emitStageInit(initSegment.segmentLir, constsToLoad, previousLocalAllocator)
-
     val loadKey = BackendSegmentKey(layerIndex, 0, 0, BackendSegmentKey.Load)
     val computeKey =
       BackendSegmentKey(layerIndex, 0, 0, BackendSegmentKey.Compute)
@@ -76,14 +64,35 @@ class StandardScheduler2(layerIndex: Int, context: StandardSchedulingContext)
         )
       )
 
-    emitStagePartition(
+    emitLoadConsts(
+      initSegment.segmentLir,
+      previousLocalAllocator,
+      nodes
+    )
+
+    emitLoadVars(
       loadSegment.segmentLir,
+      previousLocalAllocator,
+      nodes
+    )
+
+    emitCompute(
       computeSegment.segmentLir,
-      saveSegment.segmentLir,
       previousLocalAllocator,
       nextLocalAllocator,
       nodes
     )
+
+    emitSaveVars(
+      saveSegment.segmentLir,
+      nextLocalAllocator,
+      nodes
+    )
+
+    initSegment.segmentLir.endEmit()
+    loadSegment.segmentLir.endEmit()
+    computeSegment.segmentLir.endEmit()
+    saveSegment.segmentLir.endEmit()
 
     backend.emitSegment(initSegment)
     backend.emitSegment(loadSegment)

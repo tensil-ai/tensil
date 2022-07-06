@@ -18,23 +18,23 @@ class RenamingMemoryAllocator private (
     space: MemorySpace,
     private val renameMap: mutable.Map[MemoryAddress, MemoryAddress]
 ) extends mutable.Cloneable[RenamingMemoryAllocator] {
-  def allocate(refAddress: MemoryAddress): MemoryAddress =
-    renameMap.get(refAddress) match {
-      case Some(allocatedAddress) => allocatedAddress
+  def locate(refAddress: MemoryAddress): MemoryAddress = renameMap(refAddress)
+
+  def allocate(refAddress: MemoryAddress): MemoryAddress = {
+    require(!renameMap.contains(refAddress))
+
+    space.allocate(refAddress.ref, 1) match {
+      case Some(allocatedSpan) =>
+        val allocatedAddress = allocatedSpan(0)
+        renameMap(refAddress) = allocatedAddress
+        allocatedAddress
+
       case None =>
-        space.allocate(refAddress.ref, 1) match {
-          case Some(allocatedSpan) =>
-            val allocatedAddress = allocatedSpan(0)
-            renameMap(refAddress) = allocatedAddress
-            allocatedAddress
-
-          case None =>
-            throw new CompilerException(
-              s"Insufficient ${space.name} memory to allocate ${refAddress}"
-            )
-        }
-
+        throw new CompilerException(
+          s"Insufficient ${space.name} memory to allocate ${refAddress}"
+        )
     }
+  }
 
   def free(): Unit = {
     space.free(renameMap.values.toArray)

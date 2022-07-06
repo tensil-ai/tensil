@@ -578,7 +578,8 @@ abstract class Scheduler(
       context.arch.accumulatorDepth
     )
 
-    val accumulatorAllocator = RenamingMemoryAllocator(accumulatorSpace)
+    val accumulatorAllocator =
+      RenamingMemoryAllocator(accumulatorSpace, Set(MemoryTag.Temp))
 
     val groupedMatMulInputOutputs =
       mutable.Map.empty[Int, mutable.ArrayBuffer[

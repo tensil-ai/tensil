@@ -281,7 +281,10 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
               MemoryTag.Local,
               context.arch.threadLocalDepth
             )
-          val initLocalAllocator = RenamingMemoryAllocator(localSpace)
+          val initLocalAllocator = RenamingMemoryAllocator(
+            localSpace,
+            Set(MemoryTag.Consts, MemoryTag.Vars)
+          )
 
           val initKey =
             BackendSegmentKey(layerIndex, i, 0, BackendSegmentKey.Init)

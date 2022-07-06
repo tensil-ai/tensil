@@ -373,7 +373,10 @@ abstract class Scheduler(
 
         if (node.isInstanceOf[VarOutputNode]) {
           val varOutputNode = node.asInstanceOf[VarOutputNode]
-          varOutputNodesByInput(varOutputNode.output) = varOutputNode
+          for (temp <- varOutputNode.inputTemps) {
+            require(!varOutputNodesByInput.contains(temp))
+            varOutputNodesByInput(temp) = varOutputNode
+          }
         } else if (node.isInstanceOf[TempOutputNode]) {
           val tempOutputNode = node.asInstanceOf[TempOutputNode]
           tempOutputNodesByOutput(tempOutputNode.output) = tempOutputNode

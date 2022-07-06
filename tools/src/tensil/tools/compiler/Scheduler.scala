@@ -464,11 +464,12 @@ abstract class Scheduler(
   protected def traverseRoots(
       roots: Seq[MemoryAddress]
   ): Seq[Node] = {
-    val nodes = mutable.ArrayBuffer.empty[Node]
+    val uniqueTempOutputNodes = mutable.Map.empty[MemoryAddressRaw, Node]
+    val uniqueVarOutputNodes  = mutable.Map.empty[MemoryAddressRaw, Node]
 
     def traverseTemp(temp: MemoryAddress) {
       val tempOutputNode = tempOutputNodesByOutput(temp)
-      nodes += tempOutputNode
+      uniqueTempOutputNodes(temp.raw) = tempOutputNode
 
       for (temp <- tempOutputNode.inputTemps) {
         traverseTemp(temp)
@@ -477,13 +478,13 @@ abstract class Scheduler(
       val varOutputNode = varOutputNodesByInput.get(temp)
 
       if (varOutputNode.isDefined)
-        nodes += varOutputNode.get
+        uniqueVarOutputNodes(temp.raw) = varOutputNode.get
     }
 
     for (temp <- roots)
       traverseTemp(temp)
 
-    nodes.toSeq
+    uniqueTempOutputNodes.values.toSeq ++ uniqueVarOutputNodes.values.toSeq
   }
 
   protected def estimateAccumulatorSize(

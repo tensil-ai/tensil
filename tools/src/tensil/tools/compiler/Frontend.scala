@@ -13,4 +13,20 @@ abstract class Frontend {
   def mkConstsDimensions(shape: Shape): MemoryDimensions
 
   val graphPrinter: Option[GraphPrinter]
+
+  def startLayer(context: EmitContext): Scheduler = {
+    if (graphPrinter.isDefined)
+      graphPrinter.get.startLayer(
+        s"layer_${context.schedulingContext.nextLayerIndex}"
+      )
+
+    context.schedulingContext.startLayer()
+  }
+
+  def emitLayer(context: EmitContext, scheduler: Scheduler): EmitResult = {
+    if (graphPrinter.isDefined)
+      graphPrinter.get.endLayer()
+
+    Some(scheduler.emit(context.backend))
+  }
 }

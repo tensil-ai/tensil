@@ -313,18 +313,8 @@ object Compiler {
       )
 
       val emitResults = for (emitter <- flowEmitters) yield {
-        if (frontend.graphPrinter.isDefined)
-          frontend.graphPrinter.get.startLayer(
-            s"layer_${context.schedulingContext.nextLayerIndex}"
-          )
-
         val r = emitter(context)
-
         mm.freeConsumedObjects()
-
-        if (frontend.graphPrinter.isDefined)
-          frontend.graphPrinter.get.endLayer()
-
         r
       }
 

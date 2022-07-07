@@ -4,6 +4,7 @@
 package tensil.tools.compiler
 
 case class EmitContext(
+    schedulingContext: SchedulingContext,
     backend: Backend,
     mm: MemoryManager,
     outputNames: Seq[String]

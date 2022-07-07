@@ -20,6 +20,7 @@ import _root_.tensil.tools.{
 import _root_.tensil.tools.data.{Shape, TensorData}
 import _root_.tensil.tools.util
 import _root_.tensil.{TablePrinter, Architecture}
+import tensil.tools.GraphPrinter
 
 object TfFrontend {
   val ModelFileNameExtension = "pb"
@@ -31,8 +32,6 @@ class TfFrontend(
     graphStream: Option[OutputStream],
     options: CompilerOptions
 ) extends Frontend {
-  private val schedulingContext = new StandardSchedulingContext(arch, options)
-
   private object VarsDimensions {
     def apply(
         number: Int,
@@ -151,7 +150,7 @@ class TfFrontend(
     }
   }
 
-  val graphPrinter =
+  val graphPrinter: Option[TfFrontendGraphPrinter] =
     graphStream.map(new TfFrontendGraphPrinter(_, "model", arch.arraySize))
 
   /*
@@ -352,22 +351,6 @@ class TfFrontend(
   ): Seq[Emitter] =
     recursiveRewrite(defs, emitter +: emitters)
 
-  private var nextLayerIndex = 0
-
-  private def startLayer(nodeDefs: Seq[NodeDef]): Scheduler = {
-    if (graphPrinter.isDefined)
-      graphPrinter.get.startLayer(s"layer_${schedulingContext.nextLayerIndex}")
-
-    schedulingContext.startLayer()
-  }
-
-  private def emitLayer(scheduler: Scheduler, context: EmitContext) = {
-    if (graphPrinter.isDefined)
-      graphPrinter.get.endLayer()
-
-    Some(scheduler.emit(context.backend))
-  }
-
   private def doRewriteLayer(
       nodeDef: NodeDef,
       biasDef: Option[NodeDef],
@@ -377,11 +360,7 @@ class TfFrontend(
       poolDef: Option[NodeDef]
   ): Emitter =
     (context: EmitContext) => {
-      val scheduler = startLayer(
-        Seq(Some(nodeDef), biasDef, addDef, normDef, activateDef, poolDef)
-          .filter(_.isDefined)
-          .map(_.get)
-      )
+      val scheduler = context.schedulingContext.startLayer()
 
       val (consumers, nodeName) =
         if (biasDef.isDefined)
@@ -508,7 +487,7 @@ class TfFrontend(
 
       }
 
-      emitLayer(scheduler, context)
+      Some(scheduler.emit(context.backend))
     }
 
   private def findInterLayerOutputs(
@@ -926,7 +905,7 @@ class TfFrontend(
 
     val (outputNames, r) =
       if (groupedByOffsetPairs.size > 1) {
-        val scheduler = startLayer(Seq(reshapeDef))
+        val scheduler = context.schedulingContext.startLayer()
         val adjustedOutputTemp = context.mm.allocateTempObject(
           reshapeDef.name,
           outputDims
@@ -982,7 +961,7 @@ class TfFrontend(
 
         (
           Seq(inputVars.name, adjustedOutputVars.name),
-          emitLayer(scheduler, context)
+          Some(scheduler.emit(context.backend))
         )
       } else
         (Seq(inputVars.name), None)
@@ -1189,7 +1168,7 @@ class TfFrontend(
 
     val (outputsNames, r) =
       if (groupedByOffsetPairs.size > 1) {
-        val scheduler = startLayer(Seq(splitDef))
+        val scheduler = context.schedulingContext.startLayer()
 
         val adjustedOutputsTemp =
           for (i <- 0 until outputsDims.size)
@@ -1266,7 +1245,7 @@ class TfFrontend(
           adjustedOutputsVars
             .map(vars => Seq(inputVars.name, vars.name))
             .toArray,
-          emitLayer(scheduler, context)
+          Some(scheduler.emit(context.backend))
         )
       } else
         (Array.fill(num)(Seq(inputVars.name)), None)
@@ -1379,7 +1358,7 @@ class TfFrontend(
 
     val (inputNamesToAdd, r) =
       if (groupedByOffsetPairs.size > 1) {
-        val scheduler = startLayer(Seq(concatDef))
+        val scheduler = context.schedulingContext.startLayer()
 
         val adjustedOutputTemp = context.mm.allocateTempObject(
           concatDef.name,
@@ -1449,7 +1428,7 @@ class TfFrontend(
 
         (
           Seq(adjustedOutputVars.name),
-          emitLayer(scheduler, context)
+          Some(scheduler.emit(context.backend))
         )
       } else
         (Nil, None)
@@ -1476,7 +1455,7 @@ class TfFrontend(
       context: EmitContext,
       resizeImageDef: NodeDef
   ): EmitResult = {
-    val scheduler = startLayer(Seq(resizeImageDef))
+    val scheduler = context.schedulingContext.startLayer()
 
     val inputVars =
       context.mm.consumeObject(
@@ -1507,7 +1486,7 @@ class TfFrontend(
 
     scheduler.emitSave(outputTemp, outputVars)
 
-    emitLayer(scheduler, context)
+    Some(scheduler.emit(context.backend))
   }
 
   private def emitLayerResizeBilinear(
@@ -1664,7 +1643,7 @@ class TfFrontend(
   }
 
   private def emitPool(context: EmitContext, poolDef: NodeDef): EmitResult = {
-    val scheduler = startLayer(Seq(poolDef))
+    val scheduler = context.schedulingContext.startLayer()
 
     val inputVars =
       context.mm.consumeObject(poolDef.input(0), Seq(poolDef.name))
@@ -1687,11 +1666,11 @@ class TfFrontend(
 
     scheduler.emitSave(outputTemp, outputVars)
 
-    emitLayer(scheduler, context)
+    Some(scheduler.emit(context.backend))
   }
 
   private def emitNorm(context: EmitContext, normDef: NodeDef): EmitResult = {
-    val scheduler = startLayer(Seq(normDef))
+    val scheduler = context.schedulingContext.startLayer()
 
     val inputVars =
       context.mm.consumeObject(normDef.input(0), Seq(normDef.name))
@@ -1714,14 +1693,14 @@ class TfFrontend(
 
     scheduler.emitSave(outputTemp, outputVars)
 
-    emitLayer(scheduler, context)
+    Some(scheduler.emit(context.backend))
   }
 
   private def emitActivate(
       context: EmitContext,
       activateDef: NodeDef
   ): EmitResult = {
-    val scheduler = startLayer(Seq(activateDef))
+    val scheduler = context.schedulingContext.startLayer()
 
     val inputVars =
       context.mm.consumeObject(activateDef.input(0), Seq(activateDef.name))
@@ -1744,11 +1723,11 @@ class TfFrontend(
 
     scheduler.emitSave(outputTemp, outputVars)
 
-    emitLayer(scheduler, context)
+    Some(scheduler.emit(context.backend))
   }
 
   private def emitAdd(context: EmitContext, addDef: NodeDef): EmitResult = {
-    val scheduler = startLayer(Seq(addDef))
+    val scheduler = context.schedulingContext.startLayer()
 
     val input0Vars =
       context.mm.consumeObject(addDef.input(0), Seq(addDef.name))
@@ -1771,11 +1750,11 @@ class TfFrontend(
 
     scheduler.emitSave(outputTemp, outputVars)
 
-    emitLayer(scheduler, context)
+    Some(scheduler.emit(context.backend))
   }
 
   private def emitMean(context: EmitContext, meanDef: NodeDef): EmitResult = {
-    val scheduler = startLayer(Seq(meanDef))
+    val scheduler = context.schedulingContext.startLayer()
 
     val inputVars =
       context.mm.consumeObject(meanDef.input(0), Seq(meanDef.name))
@@ -1798,7 +1777,7 @@ class TfFrontend(
 
     scheduler.emitSave(outputTemp, outputVars)
 
-    emitLayer(scheduler, context)
+    Some(scheduler.emit(context.backend))
   }
 
   private def emitLayerConv2D(

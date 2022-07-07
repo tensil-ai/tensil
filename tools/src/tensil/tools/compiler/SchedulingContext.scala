@@ -7,7 +7,6 @@ import tensil.Architecture
 import tensil.tools.CompilerOptions
 
 abstract class SchedulingContext(
-    val arch: Architecture,
     val options: CompilerOptions
 ) {
   private var nextLayerIndexVar = 0

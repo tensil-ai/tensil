@@ -116,7 +116,7 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
                 )
 
                 if (
-                  accumulatorSize > context.arch.accumulatorDepth || localSize > context.arch.threadLocalDepth
+                  accumulatorSize > context.options.arch.accumulatorDepth || localSize > context.options.arch.threadLocalDepth
                 ) {
                   if (n == 1)
                     /**
@@ -215,7 +215,7 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
           if (prevStages.isDefined)
             prevStages.get
           else {
-            if (accumulatorSize > context.arch.accumulatorDepth)
+            if (accumulatorSize > context.options.arch.accumulatorDepth)
               throw new CompilerException(
                 s"Insufficient accumulators, required at least ${accumulatorSize} for a single root"
               )
@@ -260,8 +260,9 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
     val localSize              = partitions.map(_.usage.localSize).max
 
     val accumulatorUtilization =
-      accumulatorSize.toFloat / context.arch.accumulatorDepth.toFloat
-    val localUtilization = localSize.toFloat / context.arch.localDepth.toFloat
+      accumulatorSize.toFloat / context.options.arch.accumulatorDepth.toFloat
+    val localUtilization =
+      localSize.toFloat / context.options.arch.localDepth.toFloat
 
     val stats = new Stats()
 
@@ -279,7 +280,7 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
             ArenaMemorySpace(
               "local",
               MemoryTag.Local,
-              context.arch.threadLocalDepth
+              context.options.arch.threadLocalDepth
             )
           val initLocalAllocator = RenamingMemoryAllocator(
             localSpace,
@@ -419,7 +420,7 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
 
     val stageInitInstructionCounts = instructionsCounts.map(_._1)
     val partitionInstructionCounts = instructionsCounts.map(_._2).flatten
-    val macEfficiency              = Stats.macEfficiency(stats, context.arch, macs)
+    val macEfficiency              = Stats.macEfficiency(stats, context.options.arch, macs)
 
     if (context.options.printSchedulerSummary) {
       val tb = new TablePrinter(Some(s"$name SCHEDULER SUMMARY"))
@@ -445,7 +446,7 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
         "Partition average number of instructions",
         partitionInstructionCounts.sum / partitionInstructionCounts.size
       )
-      Stats.printSummary(stats, tb, context.arch, Some(macs))
+      Stats.printSummary(stats, tb, context.options.arch, Some(macs))
       tb.addNamedLine(
         "Total number of instructions",
         stageInitInstructionCounts.sum + partitionInstructionCounts.sum
@@ -477,8 +478,8 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
         ): Unit = {
           val tb = new TablePrinter(Some(title), true)
           Stats.printStrideStats(
-            context.arch.stride0Depth,
-            context.arch.stride1Depth,
+            context.options.arch.stride0Depth,
+            context.options.arch.stride1Depth,
             stats,
             select,
             tb

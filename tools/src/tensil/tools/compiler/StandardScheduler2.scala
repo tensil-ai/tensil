@@ -18,8 +18,9 @@ class StandardScheduler2(layerIndex: Int, context: StandardSchedulingContext)
     val maximumRootsSize = roots.size
 
     val accumulatorUtilization =
-      accumulatorSize.toFloat / context.arch.accumulatorDepth.toFloat
-    val localUtilization = localSize.toFloat / context.arch.localDepth.toFloat
+      accumulatorSize.toFloat / context.options.arch.accumulatorDepth.toFloat
+    val localUtilization =
+      localSize.toFloat / context.options.arch.localDepth.toFloat
 
     val stats = new Stats()
 
@@ -36,7 +37,11 @@ class StandardScheduler2(layerIndex: Int, context: StandardSchedulingContext)
     )
 
     val localSpace =
-      HeapMemorySpace("local", MemoryTag.Local, context.arch.threadLocalDepth)
+      HeapMemorySpace(
+        "local",
+        MemoryTag.Local,
+        context.options.arch.threadLocalDepth
+      )
     val previousLocalAllocator =
       RenamingMemoryAllocator(localSpace, Set(MemoryTag.Consts, MemoryTag.Vars))
     val nextLocalAllocator =
@@ -115,14 +120,14 @@ class StandardScheduler2(layerIndex: Int, context: StandardSchedulingContext)
       )
     }
 
-    val macEfficiency = Stats.macEfficiency(stats, context.arch, macs)
+    val macEfficiency = Stats.macEfficiency(stats, context.options.arch, macs)
 
     if (context.options.printSchedulerSummary) {
       val tb = new TablePrinter(Some(s"$name SCHEDULER SUMMARY"))
       tb.addNamedLine("Partition results size", maximumRootsSize)
       tb.addNamedLine("Partition accumulator size", accumulatorSize)
       tb.addNamedLine("Partition local size", localSize)
-      Stats.printSummary(stats, tb, context.arch, Some(macs))
+      Stats.printSummary(stats, tb, context.options.arch, Some(macs))
       tb.addNamedLine(
         "Total number of instructions",
         instructionsCount
@@ -154,8 +159,8 @@ class StandardScheduler2(layerIndex: Int, context: StandardSchedulingContext)
         ): Unit = {
           val tb = new TablePrinter(Some(title), true)
           Stats.printStrideStats(
-            context.arch.stride0Depth,
-            context.arch.stride1Depth,
+            context.options.arch.stride0Depth,
+            context.options.arch.stride1Depth,
             stats,
             select,
             tb

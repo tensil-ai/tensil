@@ -76,7 +76,10 @@ abstract class Scheduler(
       )
 
     val weightsHeight =
-      util.divCeil(weightsObj.dims.heightVectors, context.arch.arraySize)
+      util.divCeil(
+        weightsObj.dims.heightVectors,
+        context.options.arch.arraySize
+      )
 
     for (pair <- inputOutputPairs) {
       if (
@@ -113,9 +116,9 @@ abstract class Scheduler(
         }
 
         val weights =
-          for (k <- 0 until context.arch.arraySize)
+          for (k <- 0 until context.options.arch.arraySize)
             yield weightsObj.mkAddress(
-              i + (k + j * context.arch.arraySize) * weightsObj.dims.widthVectors
+              i + (k + j * context.options.arch.arraySize) * weightsObj.dims.widthVectors
             )
 
         val weightsAndBias = weights.reverse :+ bias
@@ -554,7 +557,7 @@ abstract class Scheduler(
   ): Unit = {
     val loadLocalRollup = new DoubleAddressRollup(
       lir.emitDataMove(toLocal = true, accumulate = false, _, _, _, _, _),
-      context.arch
+      context.options.arch
     )
 
     for (address <- addressesToLoad)
@@ -575,7 +578,7 @@ abstract class Scheduler(
     val accumulatorSpace = ArenaMemorySpace(
       "accumulator",
       MemoryTag.Accumulators,
-      context.arch.accumulatorDepth
+      context.options.arch.accumulatorDepth
     )
 
     val accumulatorAllocator =
@@ -649,7 +652,7 @@ abstract class Scheduler(
     ) {
       val loadWeightsRollup = new SingleAddressReverseRollup(
         lir.emitLoadWeights(_, _, _),
-        context.arch
+        context.options.arch
       )
 
       for (weights <- weightsSeq) {
@@ -664,11 +667,11 @@ abstract class Scheduler(
 
       val matMulRollup = new DoubleAddressRollup(
         lir.emitMatMul(accumulate = false, _, _, _, _, _),
-        context.arch
+        context.options.arch
       )
       val matMulAccumulateRollup = new DoubleAddressRollup(
         lir.emitMatMul(accumulate = true, _, _, _, _, _),
-        context.arch
+        context.options.arch
       )
 
       groupedMatMulInputOutputs.get(weightsKey) match {
@@ -714,7 +717,7 @@ abstract class Scheduler(
     val loadAccRollup = new DoubleAddressRollup(
       lir
         .emitDataMove(toLocal = false, accumulate = false, _, _, _, _, _),
-      context.arch
+      context.options.arch
     )
 
     val loadAccInputOutputs = nodes
@@ -759,7 +762,7 @@ abstract class Scheduler(
     val addRollup = new DoubleAddressRollup(
       lir
         .emitDataMove(toLocal = false, accumulate = true, _, _, _, _, _),
-      context.arch
+      context.options.arch
     )
 
     for (
@@ -1101,7 +1104,7 @@ abstract class Scheduler(
     val saveAccRollup = new DoubleAddressRollup(
       lir
         .emitDataMove(toLocal = true, accumulate = false, _, _, _, _, _),
-      context.arch
+      context.options.arch
     )
 
     for (
@@ -1131,7 +1134,7 @@ abstract class Scheduler(
     val saveLocalRollup = new DoubleAddressRollup(
       lir
         .emitDataMove(toLocal = false, accumulate = false, _, _, _, _, _),
-      context.arch
+      context.options.arch
     )
 
     for (

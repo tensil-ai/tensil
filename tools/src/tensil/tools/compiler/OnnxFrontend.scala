@@ -20,6 +20,7 @@ import _root_.tensil.tools.util
 import _root_.tensil.{TablePrinter, Architecture}
 import com.google.protobuf.CodedInputStream
 import onnx.onnx.TensorShapeProto
+import tensil.tools.GraphPrinter
 
 object OnnxFrontend {
   val ModelFileNameExtension = "onnx"
@@ -31,8 +32,6 @@ class OnnxFrontend(
     graphStream: Option[OutputStream],
     options: CompilerOptions
 ) extends Frontend {
-  private val schedulingContext = new StandardSchedulingContext(arch, options)
-
   private object VarsDimensions {
     def apply(
         number: Int,
@@ -167,7 +166,7 @@ class OnnxFrontend(
     }
   }
 
-  val graphPrinter =
+  val graphPrinter: Option[OnnxFrontendGraphPrinter] =
     graphStream.map(
       new OnnxFrontendGraphPrinter(
         _,
@@ -391,22 +390,6 @@ class OnnxFrontend(
   ): Seq[Emitter] =
     recursiveRewrite(protos, emitter +: emitters)
 
-  private var nextLayerIndex = 0
-
-  private def startLayer(nodeProtos: Seq[NodeProto]): Scheduler = {
-    if (graphPrinter.isDefined)
-      graphPrinter.get.startLayer(s"layer_${schedulingContext.nextLayerIndex}")
-
-    schedulingContext.startLayer()
-  }
-
-  private def emitLayer(scheduler: Scheduler, context: EmitContext) = {
-    if (graphPrinter.isDefined)
-      graphPrinter.get.endLayer()
-
-    Some(scheduler.emit(context.backend))
-  }
-
   private def doRewriteLayer(
       nodeProto: NodeProto,
       addProto: Option[NodeProto],
@@ -415,17 +398,7 @@ class OnnxFrontend(
       poolProto: Option[NodeProto]
   ): Emitter =
     (context: EmitContext) => {
-      val scheduler = startLayer(
-        Seq(
-          Some(nodeProto),
-          addProto,
-          normProto,
-          activateProto,
-          poolProto
-        )
-          .filter(_.isDefined)
-          .map(_.get)
-      )
+      val scheduler = context.schedulingContext.startLayer()
 
       val (consumers, nodeName) =
         (
@@ -548,7 +521,7 @@ class OnnxFrontend(
 
       }
 
-      emitLayer(scheduler, context)
+      Some(scheduler.emit(context.backend))
     }
 
   private def findInterLayerOutputs(
@@ -1027,7 +1000,7 @@ class OnnxFrontend(
 
     val (outputNames, r) =
       if (groupedByOffsetPairs.size > 1) {
-        val scheduler = startLayer(Seq(reshapeProto))
+        val scheduler = context.schedulingContext.startLayer()
         val adjustedOutputTemp = context.mm.allocateTempObject(
           reshapeProto.output(0),
           outputDims
@@ -1083,7 +1056,7 @@ class OnnxFrontend(
 
         (
           Seq(inputVars.name, adjustedOutputVars.name),
-          emitLayer(scheduler, context)
+          Some(scheduler.emit(context.backend))
         )
       } else
         (Seq(inputVars.name), None)
@@ -1184,7 +1157,7 @@ class OnnxFrontend(
 
     val (outputsNames, r) =
       if (groupedByOffsetPairs.size > 1) {
-        val scheduler = startLayer(Seq(splitProto))
+        val scheduler = context.schedulingContext.startLayer()
 
         val adjustedOutputsTemp =
           for (i <- 0 until outputsDims.size)
@@ -1260,7 +1233,7 @@ class OnnxFrontend(
           adjustedOutputsVars
             .map(vars => Seq(inputVars.name, vars.name))
             .toArray,
-          emitLayer(scheduler, context)
+          Some(scheduler.emit(context.backend))
         )
       } else
         (Array.fill(num)(Seq(inputVars.name)), None)
@@ -1391,7 +1364,7 @@ class OnnxFrontend(
 
       val (inputNamesToAdd, r) =
         if (groupedByOffsetPairs.size > 1) {
-          val scheduler = startLayer(Seq(concatProto))
+          val scheduler = context.schedulingContext.startLayer()
 
           val adjustedOutputTemp = context.mm.allocateTempObject(
             concatProto.name.get,
@@ -1462,7 +1435,7 @@ class OnnxFrontend(
 
           (
             Seq(adjustedOutputVars.name),
-            emitLayer(scheduler, context)
+            Some(scheduler.emit(context.backend))
           )
         } else
           (Nil, None)
@@ -1490,7 +1463,7 @@ class OnnxFrontend(
       context: EmitContext,
       resizeProto: NodeProto
   ): EmitResult = {
-    val scheduler = startLayer(Seq(resizeProto))
+    val scheduler = context.schedulingContext.startLayer()
 
     val inputVars =
       context.mm.consumeObject(
@@ -1515,7 +1488,7 @@ class OnnxFrontend(
 
     scheduler.emitSave(outputTemp, outputVars)
 
-    emitLayer(scheduler, context)
+    Some(scheduler.emit(context.backend))
   }
 
   private def emitLayerResize(
@@ -1678,7 +1651,7 @@ class OnnxFrontend(
       context: EmitContext,
       poolProto: NodeProto
   ): EmitResult = {
-    val scheduler = startLayer(Seq(poolProto))
+    val scheduler = context.schedulingContext.startLayer()
 
     val inputVars =
       context.mm.consumeObject(poolProto.input(0), Seq(poolProto.name.get))
@@ -1701,14 +1674,14 @@ class OnnxFrontend(
 
     scheduler.emitSave(outputTemp, outputVars)
 
-    emitLayer(scheduler, context)
+    Some(scheduler.emit(context.backend))
   }
 
   private def emitGlobalPool(
       context: EmitContext,
       globalPoolProto: NodeProto
   ): EmitResult = {
-    val scheduler = startLayer(Seq(globalPoolProto))
+    val scheduler = context.schedulingContext.startLayer()
 
     val inputVars =
       context.mm.consumeObject(
@@ -1734,14 +1707,14 @@ class OnnxFrontend(
 
     scheduler.emitSave(outputTemp, outputVars)
 
-    emitLayer(scheduler, context)
+    Some(scheduler.emit(context.backend))
   }
 
   private def emitNorm(
       context: EmitContext,
       normProto: NodeProto
   ): EmitResult = {
-    val scheduler = startLayer(Seq(normProto))
+    val scheduler = context.schedulingContext.startLayer()
 
     val inputVars =
       context.mm.consumeObject(normProto.input(0), Seq(normProto.name.get))
@@ -1764,14 +1737,14 @@ class OnnxFrontend(
 
     scheduler.emitSave(outputTemp, outputVars)
 
-    emitLayer(scheduler, context)
+    Some(scheduler.emit(context.backend))
   }
 
   private def emitActivate(
       context: EmitContext,
       activateProto: NodeProto
   ): EmitResult = {
-    val scheduler = startLayer(Seq(activateProto))
+    val scheduler = context.schedulingContext.startLayer()
 
     val inputVars =
       context.mm.consumeObject(
@@ -1797,11 +1770,11 @@ class OnnxFrontend(
 
     scheduler.emitSave(outputTemp, outputVars)
 
-    emitLayer(scheduler, context)
+    Some(scheduler.emit(context.backend))
   }
 
   private def emitAdd(context: EmitContext, addProto: NodeProto): EmitResult = {
-    val scheduler = startLayer(Seq(addProto))
+    val scheduler = context.schedulingContext.startLayer()
 
     val input0Vars =
       context.mm.consumeObject(addProto.input(0), Seq(addProto.name.get))
@@ -1824,14 +1797,14 @@ class OnnxFrontend(
 
     scheduler.emitSave(outputTemp, outputVars)
 
-    emitLayer(scheduler, context)
+    Some(scheduler.emit(context.backend))
   }
 
   private def emitSub(
       context: EmitContext,
       nodeProto: NodeProto
   ): EmitResult = {
-    val scheduler = startLayer(Seq(nodeProto))
+    val scheduler = context.schedulingContext.startLayer()
 
     val input0Vars =
       context.mm.consumeObject(nodeProto.input(0), Seq(nodeProto.name.get))
@@ -1871,14 +1844,14 @@ class OnnxFrontend(
 
     scheduler.emitSave(outputTemp, outputVars)
 
-    emitLayer(scheduler, context)
+    Some(scheduler.emit(context.backend))
   }
 
   private def emitMul(
       context: EmitContext,
       nodeProto: NodeProto
   ): EmitResult = {
-    val scheduler = startLayer(Seq(nodeProto))
+    val scheduler = context.schedulingContext.startLayer()
 
     val input0Vars =
       context.mm.consumeObject(nodeProto.input(0), Seq(nodeProto.name.get))
@@ -1918,7 +1891,7 @@ class OnnxFrontend(
 
     scheduler.emitSave(outputTemp, outputVars)
 
-    emitLayer(scheduler, context)
+    Some(scheduler.emit(context.backend))
   }
 
   private def emitLayerConv(

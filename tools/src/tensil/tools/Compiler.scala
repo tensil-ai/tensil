@@ -29,6 +29,7 @@ import tensil.tools.compiler.{
   SchedulerResult,
   Stats
 }
+import tensil.tools.compiler.StandardSchedulingContext
 
 class CompilerException(message: String) extends Exception(message) {}
 
@@ -304,11 +305,26 @@ object Compiler {
         println(s"Rewritten to ${flowEmitters.size} emitter(s)")
       }
 
-      val context = EmitContext(backend, mm, outputNames)
+      val context = EmitContext(
+        schedulingContext = new StandardSchedulingContext(options),
+        backend = backend,
+        mm = mm,
+        outputNames = outputNames
+      )
 
       val emitResults = for (emitter <- flowEmitters) yield {
+        if (frontend.graphPrinter.isDefined)
+          frontend.graphPrinter.get.startLayer(
+            s"layer_${context.schedulingContext.nextLayerIndex}"
+          )
+
         val r = emitter(context)
+
         mm.freeConsumedObjects()
+
+        if (frontend.graphPrinter.isDefined)
+          frontend.graphPrinter.get.endLayer()
+
         r
       }
 

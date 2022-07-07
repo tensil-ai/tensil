@@ -6,8 +6,8 @@ package tensil.tools.compiler
 import tensil.Architecture
 import tensil.tools.CompilerOptions
 
-class StandardSchedulingContext(arch: Architecture, options: CompilerOptions)
-    extends SchedulingContext(arch, options) {
+class StandardSchedulingContext(options: CompilerOptions)
+    extends SchedulingContext(options) {
 
   override protected def mkScheduler(layerIndex: Int): Scheduler =
     new StandardScheduler(

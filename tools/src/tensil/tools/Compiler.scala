@@ -27,9 +27,10 @@ import tensil.tools.compiler.{
   MemoryTag,
   MemoryAddressHelper,
   SchedulerResult,
-  Stats
+  Stats,
+  StandardSchedulingContext,
+  StandardSchedulingContext2
 }
-import tensil.tools.compiler.StandardSchedulingContext
 
 class CompilerException(message: String) extends Exception(message) {}
 

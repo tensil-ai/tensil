@@ -5,10 +5,13 @@ package tensil.tools.compiler
 
 import tensil.TablePrinter
 
-class StandardScheduler2(layerIndex: Int, context: StandardSchedulingContext)
+class StandardScheduler2(layerIndex: Int, context: StandardSchedulingContext2)
     extends Scheduler(layerIndex, context) {
 
-  override protected def doEmit(roots: Seq[MemoryAddress], backend: Backend): SchedulerResult = {
+  override protected def doEmit(
+      roots: Seq[MemoryAddress],
+      backend: Backend
+  ): SchedulerResult = {
     val nodes = traverseRoots(roots)
 
     val accumulatorSize = estimateAccumulatorSize(nodes)

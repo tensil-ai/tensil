@@ -294,7 +294,7 @@ class MemBoundarySplitterSpec extends FunUnitSpec {
 
           val cases = Array(
             Test(
-              boundary - 128 * bytesPerWord,
+              (boundary - 128 * bytesPerWord) % boundary,
               256,
               "request does cross a boundary"
             ),

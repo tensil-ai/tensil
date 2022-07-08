@@ -309,7 +309,7 @@ object Compiler {
       val schedulingContext = new StandardSchedulingContext(options)
       //new StandardSchedulingContext2(options, mm.localSpace)
 
-      val emitResults = for (emitter <- flowEmitters) yield {
+      val layerSchedulerResults = for (emitter <- flowEmitters) yield {
         if (frontend.graphPrinter.isDefined)
           frontend.graphPrinter.get.startLayer(
             s"layer_${schedulingContext.nextLayerIndex}"
@@ -328,7 +328,7 @@ object Compiler {
         if (frontend.graphPrinter.isDefined)
           frontend.graphPrinter.get.endLayer()
 
-        val r = Some(scheduler.emit(backend))
+        val r = scheduler.emit(backend)
         mm.freeConsumedObjects()
         r
       }
@@ -341,7 +341,6 @@ object Compiler {
         Some(backendStats)
       )
 
-      layerSchedulerResults = emitResults.filter(_.isDefined).map(_.get).toList
       macs = layerSchedulerResults.map(_.macs).sum
       macEfficiency = Stats.macEfficiency(backendStats, options.arch, macs)
 

@@ -17,7 +17,7 @@ sealed abstract class Node extends Serializable {
 sealed abstract class VarOutputNode(
     val output: MemoryAddress
 ) extends Node {
-  require(output.tag == MemoryTag.Vars)
+  require(output.tag == MemoryTag.DRAM0 || output.tag == MemoryTag.Local)
 }
 
 class SaveNode(
@@ -40,11 +40,18 @@ case class MatMulInput(
     val input: MemoryAddress
 ) {
   require(
-    weights.forall(a => a.tag == MemoryTag.Consts || a.tag == MemoryTag.Zeroes)
+    weights.forall(a =>
+      a.tag == MemoryTag.DRAM1 ||
+        a.tag == MemoryTag.Local ||
+        a.tag == MemoryTag.Zeroes
+    )
   )
 
   require(
-    input.tag == MemoryTag.Zeroes || input.tag == MemoryTag.Consts || input.tag == MemoryTag.Vars
+    input.tag == MemoryTag.Zeroes ||
+      input.tag == MemoryTag.DRAM1 ||
+      input.tag == MemoryTag.DRAM0 ||
+      input.tag == MemoryTag.Local
   )
 }
 
@@ -55,12 +62,12 @@ class MatMulNode(
   require(output.tag == MemoryTag.Temp)
 
   override lazy val inputVars =
-    inputs.map(_.input).filter(_.tag == MemoryTag.Vars)
+    inputs.map(_.input).filter(_.tag == MemoryTag.DRAM0)
   override lazy val inputNonReusableConsts =
-    inputs.map(_.input).filter(_.tag == MemoryTag.Consts)
+    inputs.map(_.input).filter(_.tag == MemoryTag.DRAM1)
   override lazy val inputReusableConsts = inputs
     .flatMap(_.weights)
-    .filter(_.tag == MemoryTag.Consts)
+    .filter(_.tag == MemoryTag.DRAM1)
 }
 
 class LoadNode(
@@ -68,13 +75,15 @@ class LoadNode(
     output: MemoryAddress
 ) extends TempOutputNode(output) {
   require(
-    input.tag == MemoryTag.Vars || input.tag == MemoryTag.Consts
+    input.tag == MemoryTag.DRAM0 ||
+      input.tag == MemoryTag.DRAM1 ||
+      input.tag == MemoryTag.Local
   )
 
   override lazy val inputVars: Seq[MemoryAddress] =
-    if (input.tag == MemoryTag.Vars) Seq(input) else Nil
+    if (input.tag == MemoryTag.DRAM0) Seq(input) else Nil
   override lazy val inputNonReusableConsts: Seq[MemoryAddress] =
-    if (input.tag == MemoryTag.Consts) Seq(input) else Nil
+    if (input.tag == MemoryTag.DRAM1) Seq(input) else Nil
 }
 
 class AddNode(
@@ -84,14 +93,16 @@ class AddNode(
 ) extends TempOutputNode(output) {
   require(input0.tag == MemoryTag.Temp)
   require(
-    input1.tag == MemoryTag.Vars || input1.tag == MemoryTag.Consts
+    input1.tag == MemoryTag.DRAM0 ||
+      input1.tag == MemoryTag.DRAM1 ||
+      input1.tag == MemoryTag.Local
   )
 
   override lazy val inputTemps = Seq(input0)
   override lazy val inputVars: Seq[MemoryAddress] =
-    if (input1.tag == MemoryTag.Vars) Seq(input1) else Nil
+    if (input1.tag == MemoryTag.DRAM0) Seq(input1) else Nil
   override lazy val inputNonReusableConsts: Seq[MemoryAddress] =
-    if (input1.tag == MemoryTag.Consts) Seq(input1) else Nil
+    if (input1.tag == MemoryTag.DRAM1) Seq(input1) else Nil
 }
 
 class BinarySIMDNode(

@@ -65,6 +65,11 @@ class Emulator[T : NumericWithMAC : ClassTag](
   def writeDRAM1(size: MemoryAddressRaw, bytes: Array[Byte]): Unit =
     writeDRAM1(size, arrayToStream(bytes))
 
+  def writeLocal(size: MemoryAddressRaw, stream: InputStream) =
+    executive.writeLocal(0L until size, new DataInputStream(stream))
+  def writeLocal(size: MemoryAddressRaw, bytes: Array[Byte]): Unit =
+    writeLocal(size, arrayToStream(bytes))
+
   def run(programBytes: Array[Byte], trace: ExecutiveTrace): Unit =
     run(new ByteArrayInputStream(programBytes), trace)
 
@@ -247,6 +252,14 @@ class Emulator[T : NumericWithMAC : ClassTag](
         for (j <- 0 until arch.arraySize)
           dram1Array(i.toInt * arch.arraySize + j) = dataType.readConst(stream)
     }
+    def writeLocal(
+        addresses: Seq[MemoryAddressRaw],
+        stream: DataInputStream
+    ): Unit = {
+      for (i <- addresses)
+        for (j <- 0 until arch.arraySize)
+          localArray(i.toInt * arch.arraySize + j) = dataType.readConst(stream)
+    }
 
     private def executeRead(
         array: Array[T],
@@ -353,10 +366,10 @@ class Emulator[T : NumericWithMAC : ClassTag](
               case MemoryTag.Accumulators =>
                 executeReadAccumulator(k)
 
-              case MemoryTag.Vars =>
+              case MemoryTag.DRAM0 =>
                 executeReadDram0(k)
 
-              case MemoryTag.Consts =>
+              case MemoryTag.DRAM1 =>
                 executeReadDram1(k)
             }
           } else
@@ -457,10 +470,10 @@ class Emulator[T : NumericWithMAC : ClassTag](
               case MemoryTag.Accumulators =>
                 finishReadAccumulator(k)
 
-              case MemoryTag.Vars =>
+              case MemoryTag.DRAM0 =>
                 finishReadDram0(k)
 
-              case MemoryTag.Consts =>
+              case MemoryTag.DRAM1 =>
                 finishReadDram1(k)
             }
           } else
@@ -477,10 +490,10 @@ class Emulator[T : NumericWithMAC : ClassTag](
                 case MemoryTag.Accumulators =>
                   (accumulatorArray, base)
 
-                case MemoryTag.Vars =>
+                case MemoryTag.DRAM0 =>
                   (dram0Array, base)
 
-                case MemoryTag.Consts =>
+                case MemoryTag.DRAM1 =>
                   (dram1Array, base)
               }
             }

@@ -281,13 +281,13 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
         case (stage, i) =>
           val localSpace =
             ArenaMemorySpace(
-              "local",
+              "Local",
               MemoryTag.Local,
               context.options.arch.threadLocalDepth
             )
           val initLocalAllocator = RenamingMemoryAllocator(
             localSpace,
-            Set(MemoryTag.Consts, MemoryTag.Vars)
+            Set(MemoryTag.DRAM1, MemoryTag.DRAM0)
           )
 
           val initKey =

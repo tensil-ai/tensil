@@ -20,23 +20,26 @@ class MemoryManager(
     constsStream: OutputStream,
     dataType: ArchitectureDataType,
     arch: Architecture,
+    outputNames: Seq[String],
     mkConstsDimensions: (Shape) => MemoryDimensions,
     traceContext: TraceContext,
     tracepointConditions: Seq[TracepointCondition]
 ) {
 
   private val tempSpace =
-    ArenaMemorySpace("temp", MemoryTag.Temp, Long.MaxValue)
+    ArenaMemorySpace("Temp", MemoryTag.Temp, Long.MaxValue)
   private val tempAllocator = new MemoryObjectAllocator(
     new MemorySpanAllocator()
   )
 
-  private val varsSpace =
-    HeapMemorySpace("vars", MemoryTag.Vars, arch.varsDepth)
-  private val constsSpace =
-    HeapMemorySpace("consts", MemoryTag.Consts, arch.constsDepth)
+  val dram0Space =
+    HeapMemorySpace("DRAM0", MemoryTag.DRAM0, arch.dram0Depth)
+  val dram1Space =
+    HeapMemorySpace("DRAM1", MemoryTag.DRAM1, arch.dram1Depth)
+  val localSpace =
+    HeapMemorySpace("Local", MemoryTag.Local, arch.threadLocalDepth)
 
-  private val spacesToFree = Seq(varsSpace, constsSpace)
+  private val spacesToFree = Seq(dram0Space, dram1Space, localSpace)
 
   private val allocator = new MemoryObjectAllocator(
     new MemorySpanAllocator()
@@ -113,11 +116,6 @@ class MemoryManager(
   def inputObjects  = inputObjectsBuffer.toSeq
   def outputObjects = outputObjectsBuffer.toSeq
 
-  def constsMaxSize = constsSpace.maxSize
-  def constsAggSize = constsSpace.aggSize
-  def varsMaxSize   = varsSpace.maxSize
-  def varsAggSize   = varsSpace.aggSize
-
   def emitOutputObject(name: String): MemoryObject = {
     val outputObj = consumeObject(name, Nil) // TODO: consume pinned object
 
@@ -131,7 +129,8 @@ class MemoryManager(
       dims: MemoryDimensions,
       consumers: Seq[String]
   ): MemoryObject = {
-    val inputObj = allocateVarsObject(
+    val inputObj = allocator.allocateObject(
+      dram0Space,
       name,
       dims,
       consumers
@@ -150,7 +149,8 @@ class MemoryManager(
       consumers: Seq[String]
   ): MemoryObject =
     allocator.allocateObject(
-      varsSpace,
+      //if (outputNames.contains(name)) dram0Space else localSpace,
+      dram0Space,
       name,
       dims,
       consumers
@@ -292,7 +292,7 @@ class MemoryManager(
     addConstSize(dims.sizeScalars, dims.sizeVectors)
 
     val constObj = allocator.allocateObject(
-      constsSpace,
+      dram1Space,
       name,
       dims,
       Seq("pin") // TODO: we need another mechanism to pin constant objects

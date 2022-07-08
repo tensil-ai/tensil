@@ -595,7 +595,11 @@ abstract class Scheduler(
       context.options.arch
     )
 
-    for (address <- addressesToLoad)
+    for (
+      address <- addressesToLoad.filter(a =>
+        a.tag == MemoryTag.DRAM0 || a.tag == MemoryTag.DRAM1
+      )
+    )
       loadLocalRollup.emit(
         localAllocator.allocate(address),
         address
@@ -611,7 +615,7 @@ abstract class Scheduler(
       nodes: Seq[Node]
   ): Unit = {
     val accumulatorSpace = ArenaMemorySpace(
-      "accumulator",
+      "Accumulator",
       MemoryTag.Accumulators,
       context.options.arch.accumulatorDepth
     )
@@ -1163,33 +1167,40 @@ abstract class Scheduler(
     saveAccRollup.finalEmit()
   }
 
-  protected def emitSaveVars(
+  protected def emitSaveMemory(
       lir: LIR,
-      localAllocator: RenamingMemoryAllocator,
-      nodes: Seq[Node]
+      addressePairsToSave: Seq[(MemoryAddress, MemoryAddress)]
   ): Unit = {
     val saveLocalRollup = new DoubleAddressRollup(
-      lir
-        .emitDataMove(toLocal = false, accumulate = false, _, _, _, _, _),
+      lir.emitDataMove(toLocal = false, accumulate = false, _, _, _, _, _),
       context.options.arch
     )
 
     for (
-      saveNode <-
-        nodes
-          .filter(_.isInstanceOf[SaveNode])
-          .map(_.asInstanceOf[SaveNode])
-          .sortBy(_.output)
-    ) {
-      val inputLocalAddress = localAllocator.locate(saveNode.output)
-      val outputVarsAddress = saveNode.output
-
-      saveLocalRollup.emit(
-        inputLocalAddress,
-        outputVarsAddress
+      (localAddress, dram0Address) <- addressePairsToSave.filter(pair =>
+        pair._1.tag == MemoryTag.Local && pair._2.tag == MemoryTag.DRAM0
       )
-    }
+    )
+      saveLocalRollup.emit(
+        localAddress,
+        dram0Address
+      )
 
     saveLocalRollup.finalEmit()
   }
+
+  protected def emitSaveVars(
+      lir: LIR,
+      localAllocator: RenamingMemoryAllocator,
+      nodes: Seq[Node]
+  ): Unit =
+    emitSaveMemory(
+      lir,
+      nodes
+        .filter(_.isInstanceOf[SaveNode])
+        .map(_.asInstanceOf[SaveNode])
+        .filter(_.output.tag == MemoryTag.DRAM0)
+        .sortBy(_.output)
+        .map(n => (localAllocator.locate(n.output), n.output))
+    )
 }

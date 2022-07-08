@@ -145,7 +145,7 @@ object Compiler {
     programStream.close()
 
     def objectToEntries(obj: MemoryObject) = {
-      require(obj.span.forall(_.tag == MemoryTag.Vars))
+      require(obj.span.forall(_.tag == MemoryTag.DRAM0))
 
       var entries = mutable.ArrayBuffer.empty[InputOutputEntry]
 
@@ -268,6 +268,7 @@ object Compiler {
       constsStream = constsStream,
       dataType = options.arch.dataType,
       arch = options.arch,
+      outputNames = outputNames,
       mkConstsDimensions = frontend.mkConstsDimensions,
       traceContext = traceContext,
       tracepointConditions = options.tracepointConditions
@@ -308,6 +309,7 @@ object Compiler {
 
       val context = EmitContext(
         schedulingContext = new StandardSchedulingContext(options),
+        //new StandardSchedulingContext2(options, mm.localSpace),
         backend = backend,
         mm = mm,
         outputNames = outputNames
@@ -337,8 +339,8 @@ object Compiler {
         backend.instructionsCount * layout.instructionSizeBytes
       val stats =
         CompilerStats(
-          constsUsedSize = mm.constsMaxSize,
-          varsUsedSize = mm.varsMaxSize,
+          constsUsedSize = mm.dram1Space.maxSize,
+          varsUsedSize = mm.dram0Space.maxSize,
           layersNumber = layerSchedulerResults.size,
           programSizeBytes = programSizeBytes,
           constsScalarSize = mm.constsScalarSize,
@@ -366,24 +368,34 @@ object Compiler {
         tb.addNamedLine("Model", modelName)
         layout.addTableLines(tb)
         tb.addNamedLine(
-          "Consts memory maximum usage (vectors/scalars)",
-          mm.constsMaxSize,
-          mm.constsMaxSize * options.arch.arraySize
+          "DRAM0 maximum usage (vectors/scalars)",
+          mm.dram0Space.maxSize,
+          mm.dram0Space.maxSize * options.arch.arraySize
         )
         tb.addNamedLine(
-          "Vars memory maximum usage (vectors/scalars)",
-          mm.varsMaxSize,
-          mm.varsMaxSize * options.arch.arraySize
+          "DRAM0 aggregate usage (vectors/scalars)",
+          mm.dram0Space.aggSize,
+          mm.dram0Space.aggSize * options.arch.arraySize
         )
         tb.addNamedLine(
-          "Consts memory aggregate usage (vectors/scalars)",
-          mm.constsAggSize,
-          mm.constsAggSize * options.arch.arraySize
+          "DRAM1 maximum usage (vectors/scalars)",
+          mm.dram1Space.maxSize,
+          mm.dram1Space.maxSize * options.arch.arraySize
         )
         tb.addNamedLine(
-          "Vars memory aggregate usage (vectors/scalars)",
-          mm.varsAggSize,
-          mm.varsAggSize * options.arch.arraySize
+          "DRAM1 aggregate usage (vectors/scalars)",
+          mm.dram1Space.aggSize,
+          mm.dram1Space.aggSize * options.arch.arraySize
+        )
+        tb.addNamedLine(
+          "Local memory maximum usage (vectors/scalars)",
+          mm.localSpace.maxSize,
+          mm.localSpace.maxSize * options.arch.arraySize
+        )
+        tb.addNamedLine(
+          "Local memory aggregate usage (vectors/scalars)",
+          mm.localSpace.aggSize,
+          mm.localSpace.aggSize * options.arch.arraySize
         )
         tb.addNamedLine("Number of layers", layerSchedulerResults.size)
         Stats.printSummary(

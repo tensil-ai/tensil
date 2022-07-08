@@ -164,9 +164,9 @@ class StreamParser(
             DataMoveFlags.LocalToAccumulatorAccumulate =>
           MemoryTag.Accumulators
         case DataMoveFlags.DRAM0ToLocal | DataMoveFlags.LocalToDRAM0 =>
-          MemoryTag.Vars
+          MemoryTag.DRAM0
         case DataMoveFlags.DRAM1ToLocal | DataMoveFlags.LocalToDRAM1 =>
-          MemoryTag.Consts
+          MemoryTag.DRAM1
       }
 
       lir.emitDataMove(

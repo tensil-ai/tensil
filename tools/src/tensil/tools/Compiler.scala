@@ -307,7 +307,7 @@ object Compiler {
       }
 
       val schedulingContext = new StandardSchedulingContext(options)
-        //new StandardSchedulingContext2(options, mm.localSpace)
+      //new StandardSchedulingContext2(options, mm.localSpace)
 
       val emitResults = for (emitter <- flowEmitters) yield {
         if (frontend.graphPrinter.isDefined)
@@ -401,16 +401,18 @@ object Compiler {
           mm.dram1Space.aggSize,
           mm.dram1Space.aggSize * options.arch.arraySize
         )
-        tb.addNamedLine(
-          "Local memory maximum usage (vectors/scalars)",
-          mm.localSpace.maxSize,
-          mm.localSpace.maxSize * options.arch.arraySize
-        )
-        tb.addNamedLine(
-          "Local memory aggregate usage (vectors/scalars)",
-          mm.localSpace.aggSize,
-          mm.localSpace.aggSize * options.arch.arraySize
-        )
+        if (mm.localSpace.maxSize != 0)
+          tb.addNamedLine(
+            "Local memory maximum usage (vectors/scalars)",
+            mm.localSpace.maxSize,
+            mm.localSpace.maxSize * options.arch.arraySize
+          )
+        if (mm.localSpace.aggSize != 0)
+          tb.addNamedLine(
+            "Local memory aggregate usage (vectors/scalars)",
+            mm.localSpace.aggSize,
+            mm.localSpace.aggSize * options.arch.arraySize
+          )
         tb.addNamedLine("Number of layers", layerSchedulerResults.size)
         Stats.printSummary(
           backendStats,

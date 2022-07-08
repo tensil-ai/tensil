@@ -26,25 +26,21 @@ import tensil.tools.util
 import tensil.{TablePrinter, TableLine, Architecture}
 
 case class SchedulerResult(
-    numberOfCombinedStages: Int,
-    numberOfStages: Int,
-    numberOfPartitions: Int,
-    cycles: Long,
-    energy: Long,
-    accumulatorUtilization: Float,
-    localUtilization: Float,
-    macs: Long,
-    macEfficiency: Float
+    numberOfCombinedStages: Int = 0,
+    numberOfStages: Int = 0,
+    numberOfPartitions: Int = 0,
+    cycles: Long = 0,
+    energy: Long = 0,
+    accumulatorUtilization: Float = 0,
+    localUtilization: Float = 0,
+    macs: Long = 0,
+    macEfficiency: Float = Float.NaN
 ) {}
 
 abstract class Scheduler(
     layerIndex: Int,
     context: SchedulingContext
 ) extends HIR {
-  if (context.options.printProgress) {
-    println(s"LAYER $layerIndex, emitting HIR ...")
-  }
-
   private var tempOutputNodesByOutput =
     mutable.Map.empty[MemoryAddress, TempOutputNode]
   private var varOutputNodesByInput =
@@ -414,31 +410,15 @@ abstract class Scheduler(
 
     if (!roots.isEmpty) {
       if (context.options.printProgress) {
+        println(s"---------------------- Layer ${layerIndex} ----------------------")
         println(
-          s"Emitted ${roots.size} root and ${(varOutputNodesByInput.size + tempOutputNodesByOutput.size) - roots.size} non-root node(s)"
+          s"HIR emitted with ${roots.size} root and ${(varOutputNodesByInput.size + tempOutputNodesByOutput.size) - roots.size} non-root node(s)"
         )
-        println(s"Planning ...")
       }
 
       doEmit(roots, backend)
-    } else {
-      if (context.options.printProgress)
-        println(
-          "No node(s) emitted"
-        )
-
-      SchedulerResult(
-        numberOfCombinedStages = 0,
-        numberOfStages = 0,
-        numberOfPartitions = 0,
-        cycles = 0,
-        energy = 0,
-        accumulatorUtilization = 0,
-        localUtilization = 0,
-        macs = 0,
-        macEfficiency = Float.NaN
-      )
-    }
+    } else
+      SchedulerResult()
   }
 
   protected def doEmit(

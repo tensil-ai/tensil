@@ -9,7 +9,7 @@ import tensil.tools.CompilerOptions
 class StandardSchedulingContext(options: CompilerOptions)
     extends SchedulingContext(options) {
 
-  override protected def mkScheduler(layerIndex: Int): Scheduler =
+  override def mkScheduler(layerIndex: Int): Scheduler =
     new StandardScheduler(
       layerIndex,
       this

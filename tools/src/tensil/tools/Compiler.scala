@@ -282,10 +282,10 @@ object Compiler {
       traceContext = traceContext
     )
 
-    var layerSchedulerResults: Seq[SchedulerResult] = Nil
-    var macs                                         = 0L
-    var macEfficiency                                = 0f
-    val backendStats                                 = new Stats()
+    var layerSchedulerResults = mutable.ArrayBuffer.empty[SchedulerResult]
+    var macs                  = 0L
+    var macEfficiency         = 0f
+    val backendStats          = new Stats()
 
     try {
       if (options.printProgress)
@@ -306,16 +306,17 @@ object Compiler {
         println(s"Rewritten to ${flowEmitters.size} emitter(s)")
       }
 
+      var nextLayerIndex    = 0
       val schedulingContext = new StandardSchedulingContext(options)
       //new StandardSchedulingContext2(options, mm.localSpace)
 
-      layerSchedulerResults = for (emitter <- flowEmitters) yield {
+      for (emitter <- flowEmitters) {
         if (frontend.graphPrinter.isDefined)
           frontend.graphPrinter.get.startLayer(
-            s"layer_${schedulingContext.nextLayerIndex}"
+            s"layer_${nextLayerIndex}"
           )
 
-        val scheduler = schedulingContext.startLayer()
+        val scheduler = schedulingContext.mkScheduler(nextLayerIndex)
 
         emitter(
           EmitContext(
@@ -330,7 +331,11 @@ object Compiler {
 
         val r = scheduler.emit(backend)
         mm.freeConsumedObjects()
-        r
+
+        if (r.numberOfStages != 0) {
+          nextLayerIndex += 1
+          layerSchedulerResults += r
+        }
       }
 
       if (frontend.graphPrinter.isDefined) frontend.graphPrinter.get.endPrint
@@ -479,7 +484,6 @@ object Compiler {
             Stats.getUnitsLetterAndDivisor(
               groupResultsWithIndex
                 .map(_._1.cycles)
-                .filter(v => v > 0)
                 .max
             )
           tb.addLine(
@@ -496,7 +500,6 @@ object Compiler {
             Stats.getUnitsLetterAndDivisor(
               groupResultsWithIndex
                 .map(_._1.energy)
-                .filter(v => v > 0)
                 .max
             )
           tb.addLine(
@@ -513,7 +516,6 @@ object Compiler {
             Stats.getUnitsLetterAndDivisor(
               groupResultsWithIndex
                 .map(_._1.macs)
-                .filter(v => v > 0)
                 .max
             )
           tb.addLine(

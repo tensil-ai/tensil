@@ -11,7 +11,7 @@ class StandardSchedulingContext2(
     val localSpace: MemorySpace
 ) extends SchedulingContext(options) {
 
-  override protected def mkScheduler(layerIndex: Int): Scheduler =
+  override def mkScheduler(layerIndex: Int): Scheduler =
     new StandardScheduler2(
       layerIndex,
       this

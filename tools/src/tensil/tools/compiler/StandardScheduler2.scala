@@ -27,10 +27,6 @@ class StandardScheduler2(layerIndex: Int, context: StandardSchedulingContext2)
 
     val stats = new Stats()
 
-    if (context.options.printProgress) {
-      println(s"Emitting LIR ...")
-    }
-
     val kinds = Seq(
       BackendSegmentKey.Init,
       BackendSegmentKey.Load,
@@ -87,7 +83,7 @@ class StandardScheduler2(layerIndex: Int, context: StandardSchedulingContext2)
 
     if (context.options.printProgress) {
       println(
-        s"Emitted ${instructionsCount} instruction(s)"
+        s"LIR emitted for ${instructionsCount} instruction(s)"
       )
     }
 

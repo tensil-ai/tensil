@@ -271,9 +271,8 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
 
     if (context.options.printProgress) {
       println(
-        s"Planned ${numberOfCombinedStages} stage(s) and ${numberOfPartitions} partition(s)"
+        s"HIR scheduled onto ${numberOfCombinedStages} stage(s) and ${numberOfPartitions} partition(s)"
       )
-      println(s"Emitting LIR ...")
     }
 
     val instructionsCounts = stages.zipWithIndex.par
@@ -387,7 +386,7 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
 
     if (context.options.printProgress) {
       println(
-        s"Emitted ${instructionsCounts.map(pair => pair._1 + pair._2.sum).sum} instruction(s)"
+        s"LIR emitted for ${instructionsCounts.map(pair => pair._1 + pair._2.sum).sum} instruction(s)"
       )
     }
 

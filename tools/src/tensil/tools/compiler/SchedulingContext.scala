@@ -9,16 +9,5 @@ import tensil.tools.CompilerOptions
 abstract class SchedulingContext(
     val options: CompilerOptions
 ) {
-  private var nextLayerIndexVar = 0
-
-  def nextLayerIndex = nextLayerIndexVar
-
-  def startLayer(): Scheduler = {
-    val layerIndex = nextLayerIndexVar
-    nextLayerIndexVar += 1
-
-    mkScheduler(layerIndex)
-  }
-
-  protected def mkScheduler(layerIndex: Int): Scheduler
+  def mkScheduler(layerIndex: Int): Scheduler
 }

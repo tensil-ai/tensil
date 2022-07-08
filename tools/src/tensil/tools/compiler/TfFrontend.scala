@@ -408,7 +408,7 @@ class TfFrontend(
             consumers
           )
 
-          context.scheduler.emitSave(outputTemp, outputVars)
+          context.hir.emitSave(outputTemp, outputVars)
         }
 
       emitSaveIfConsumed(matMulTemp, consumers)
@@ -566,7 +566,7 @@ class TfFrontend(
 
       if (nonFinalOutputObj.isDefined) {
 
-        context.scheduler.emitSave(
+        context.hir.emitSave(
           nonFinalOutputObj.get,
           finalOutputObj
         )
@@ -908,7 +908,7 @@ class TfFrontend(
             val pixelAdjustedOutputTemp =
               mkSub(adjustedOutputTemp, indexPair._1, pixelDims)
 
-            context.scheduler.emitMatMul(
+            context.hir.emitMatMul(
               pixelWeightsConst,
               None,
               Seq(
@@ -934,7 +934,7 @@ class TfFrontend(
           indexPair <- indexPairs
         ) {
 
-          context.scheduler.emitSave(
+          context.hir.emitSave(
             mkSub(adjustedOutputTemp, indexPair._1, pixelDims),
             mkSub(adjustedOutputVars, indexPair._1, pixelDims)
           )
@@ -1170,7 +1170,7 @@ class TfFrontend(
                 pixelDims
               )
 
-            context.scheduler.emitMatMul(
+            context.hir.emitMatMul(
               pixelWeightsConst,
               None,
               Seq(
@@ -1198,7 +1198,7 @@ class TfFrontend(
           indexPair <- indexPairs
         ) {
 
-          context.scheduler.emitSave(
+          context.hir.emitSave(
             mkSub(
               adjustedOutputsTemp(indexPair._1._1),
               indexPair._1._2,
@@ -1353,7 +1353,7 @@ class TfFrontend(
                 pixelDims
               )
 
-            context.scheduler.emitMatMul(
+            context.hir.emitMatMul(
               pixelWeightsConst,
               None,
               Seq(
@@ -1380,7 +1380,7 @@ class TfFrontend(
           indexPair <- indexPairs
         ) {
 
-          context.scheduler.emitSave(
+          context.hir.emitSave(
             mkSub(
               adjustedOutputTemp,
               indexPair._1,
@@ -1431,7 +1431,7 @@ class TfFrontend(
       inputVars.dims
     )
 
-    context.scheduler.emitLoad(inputVars, inputTemp)
+    context.hir.emitLoad(inputVars, inputTemp)
 
     val outputTemp =
       if (resizeImageDef.op == "ResizeBilinear")
@@ -1447,7 +1447,7 @@ class TfFrontend(
       findInterLayerOutputs(context, resizeImageDef.name, None)
     )
 
-    context.scheduler.emitSave(outputTemp, outputVars)
+    context.hir.emitSave(outputTemp, outputVars)
 
   }
 
@@ -1527,7 +1527,7 @@ class TfFrontend(
             lerpConst.dims
           )
 
-          context.scheduler.emitLoad(lerpConst, lerpTemp)
+          context.hir.emitLoad(lerpConst, lerpTemp)
 
           lerpTemp
         }
@@ -1586,7 +1586,7 @@ class TfFrontend(
         VarsDimensions(outputTemp.dims.channels)
       )
 
-      context.scheduler.emitInterpolate(
+      context.hir.emitInterpolate(
         pixelInputsTemp,
         lerpsTemp,
         pixelOutputTemp
@@ -1612,7 +1612,7 @@ class TfFrontend(
       inputVars.dims
     )
 
-    context.scheduler.emitLoad(inputVars, inputTemp)
+    context.hir.emitLoad(inputVars, inputTemp)
 
     val outputTemp =
       emitLayerPool(context, poolDef, inputTemp)
@@ -1623,7 +1623,7 @@ class TfFrontend(
       findInterLayerOutputs(context, poolDef.name, None)
     )
 
-    context.scheduler.emitSave(outputTemp, outputVars)
+    context.hir.emitSave(outputTemp, outputVars)
   }
 
   private def emitNorm(context: EmitContext, normDef: NodeDef): Unit = {
@@ -1635,7 +1635,7 @@ class TfFrontend(
       inputVars.dims
     )
 
-    context.scheduler.emitLoad(inputVars, inputTemp)
+    context.hir.emitLoad(inputVars, inputTemp)
 
     val outputTemp =
       emitLayerNorm(context, normDef, inputTemp)
@@ -1646,7 +1646,7 @@ class TfFrontend(
       findInterLayerOutputs(context, normDef.name, None)
     )
 
-    context.scheduler.emitSave(outputTemp, outputVars)
+    context.hir.emitSave(outputTemp, outputVars)
   }
 
   private def emitActivate(
@@ -1661,7 +1661,7 @@ class TfFrontend(
       inputVars.dims
     )
 
-    context.scheduler.emitLoad(inputVars, inputTemp)
+    context.hir.emitLoad(inputVars, inputTemp)
 
     val outputTemp =
       emitLayerActivate(context, activateDef, inputTemp)
@@ -1672,7 +1672,7 @@ class TfFrontend(
       findInterLayerOutputs(context, activateDef.name, None)
     )
 
-    context.scheduler.emitSave(outputTemp, outputVars)
+    context.hir.emitSave(outputTemp, outputVars)
   }
 
   private def emitAdd(context: EmitContext, addDef: NodeDef): Unit = {
@@ -1684,7 +1684,7 @@ class TfFrontend(
       input0Vars.dims
     )
 
-    context.scheduler.emitLoad(input0Vars, input0Temp)
+    context.hir.emitLoad(input0Vars, input0Temp)
 
     val outputTemp =
       emitLayerAdd(context, addDef, input0Temp)
@@ -1695,7 +1695,7 @@ class TfFrontend(
       findInterLayerOutputs(context, addDef.name, None)
     )
 
-    context.scheduler.emitSave(outputTemp, outputVars)
+    context.hir.emitSave(outputTemp, outputVars)
   }
 
   private def emitMean(context: EmitContext, meanDef: NodeDef): Unit = {
@@ -1708,7 +1708,7 @@ class TfFrontend(
       inputVars.dims
     )
 
-    context.scheduler.emitLoad(inputVars, inputTemp)
+    context.hir.emitLoad(inputVars, inputTemp)
 
     val outputTemp =
       emitLayerMean(context, meanDef, inputTemp)
@@ -1719,7 +1719,7 @@ class TfFrontend(
       findInterLayerOutputs(context, meanDef.name, None)
     )
 
-    context.scheduler.emitSave(outputTemp, outputVars)
+    context.hir.emitSave(outputTemp, outputVars)
   }
 
   private def emitLayerConv2D(
@@ -1853,7 +1853,7 @@ class TfFrontend(
             MemoryOptionalInputOutputObjects(None, pixelOutputTemp)
         }
 
-      context.scheduler.emitMatMul(
+      context.hir.emitMatMul(
         pixelWeights,
         if (withBias) bias else None,
         pixelPairs
@@ -1900,7 +1900,7 @@ class TfFrontend(
       MemoryOptionalInputOutputObjects(Some(inputVars), outputTemp)
     )
 
-    context.scheduler.emitMatMul(
+    context.hir.emitMatMul(
       weights,
       bias,
       pairs
@@ -2015,7 +2015,7 @@ class TfFrontend(
         multiplierConst.dims
       )
 
-      context.scheduler.emitLoad(multiplierConst, multiplierTemp)
+      context.hir.emitLoad(multiplierConst, multiplierTemp)
 
       Some(multiplierTemp)
     } else None
@@ -2046,7 +2046,7 @@ class TfFrontend(
           )
         }
 
-      context.scheduler.emitPool(
+      context.hir.emitPool(
         poolDef.op,
         pixelInputsTemp,
         pixelOutputTemp,
@@ -2076,13 +2076,13 @@ class TfFrontend(
 
     activateDef.op match {
       case "Relu" =>
-        context.scheduler.emitRelu(
+        context.hir.emitRelu(
           inputTemp,
           outputTemp
         )
 
       case "Softmax" =>
-        context.scheduler.emitSoftmax(
+        context.hir.emitSoftmax(
           inputTemp,
           outputTemp
         )
@@ -2112,8 +2112,8 @@ class TfFrontend(
           alphaConst.dims
         )
 
-        context.scheduler.emitLoad(alphaConst, alphaTemp)
-        context.scheduler.emitLeakyRelu(
+        context.hir.emitLoad(alphaConst, alphaTemp)
+        context.hir.emitLeakyRelu(
           inputTemp,
           alphaTemp,
           outputTemp
@@ -2206,8 +2206,8 @@ class TfFrontend(
       offsetConst.dims
     )
 
-    context.scheduler.emitLoad(scaleConst, scaleTemp)
-    context.scheduler.emitLoad(offsetConst, offsetTemp)
+    context.hir.emitLoad(scaleConst, scaleTemp)
+    context.hir.emitLoad(offsetConst, offsetTemp)
 
     val outputTemp = context.mm.allocateTempObject(
       normDef.name,
@@ -2225,7 +2225,7 @@ class TfFrontend(
       val pixelInputTemp  = mkSub(inputTemp, offset, dims)
       val pixelOutputTemp = mkSub(outputTemp, offset, dims)
 
-      context.scheduler.emitNorm(
+      context.hir.emitNorm(
         pixelInputTemp,
         scaleTemp,
         offsetTemp,
@@ -2260,7 +2260,7 @@ class TfFrontend(
     val input1Vars =
       context.mm.consumeObject(input1Name, Seq(addDef.name))
 
-    context.scheduler.emitAdd(
+    context.hir.emitAdd(
       input0Temp,
       input1Vars,
       outputTemp
@@ -2319,7 +2319,7 @@ class TfFrontend(
       multiplierConst.dims
     )
 
-    context.scheduler.emitLoad(multiplierConst, multiplierTemp)
+    context.hir.emitLoad(multiplierConst, multiplierTemp)
 
     for (n <- 0 until inputDims.numberVectors) {
       val dims = VarsDimensions(inputDims.channels)
@@ -2337,7 +2337,7 @@ class TfFrontend(
           mkSub(inputTemp, offset, dims)
         }
 
-      context.scheduler.emitPool(
+      context.hir.emitPool(
         "AvgPool",
         pixelInputsTemp,
         pixelOutputTemp,

@@ -436,7 +436,7 @@ class OnnxFrontend(
             consumers
           )
 
-          context.scheduler.emitSave(outputTemp, outputVars)
+          context.hir.emitSave(outputTemp, outputVars)
         }
 
       emitSaveIfConsumed(matMulTemp, consumers)
@@ -890,7 +890,7 @@ class OnnxFrontend(
         graphPrinter.get.printOutputPost(finalOutputObj)
 
       if (nonFinalOutputObj.isDefined) {
-        context.scheduler.emitSave(
+        context.hir.emitSave(
           nonFinalOutputObj.get,
           finalOutputObj
         )
@@ -996,7 +996,7 @@ class OnnxFrontend(
             val pixelAdjustedOutputTemp =
               mkSub(adjustedOutputTemp, indexPair._1, pixelDims)
 
-            context.scheduler.emitMatMul(
+            context.hir.emitMatMul(
               pixelWeightsConst,
               None,
               Seq(
@@ -1022,7 +1022,7 @@ class OnnxFrontend(
           indexPair <- indexPairs
         ) {
 
-          context.scheduler.emitSave(
+          context.hir.emitSave(
             mkSub(adjustedOutputTemp, indexPair._1, pixelDims),
             mkSub(adjustedOutputVars, indexPair._1, pixelDims)
           )
@@ -1153,7 +1153,7 @@ class OnnxFrontend(
                 pixelDims
               )
 
-            context.scheduler.emitMatMul(
+            context.hir.emitMatMul(
               pixelWeightsConst,
               None,
               Seq(
@@ -1181,7 +1181,7 @@ class OnnxFrontend(
           indexPair <- indexPairs
         ) {
 
-          context.scheduler.emitSave(
+          context.hir.emitSave(
             mkSub(
               adjustedOutputsTemp(indexPair._1._1),
               indexPair._1._2,
@@ -1348,7 +1348,7 @@ class OnnxFrontend(
                   pixelDims
                 )
 
-              context.scheduler.emitMatMul(
+              context.hir.emitMatMul(
                 pixelWeightsConst,
                 None,
                 Seq(
@@ -1375,7 +1375,7 @@ class OnnxFrontend(
             indexPair <- indexPairs
           ) {
 
-            context.scheduler.emitSave(
+            context.hir.emitSave(
               mkSub(
                 adjustedOutputTemp,
                 indexPair._1,
@@ -1427,7 +1427,7 @@ class OnnxFrontend(
       inputVars.dims
     )
 
-    context.scheduler.emitLoad(inputVars, inputTemp)
+    context.hir.emitLoad(inputVars, inputTemp)
 
     val outputTemp = emitLayerResize(context, resizeProto, inputTemp)
 
@@ -1437,7 +1437,7 @@ class OnnxFrontend(
       findInterLayerOutputs(context, resizeProto.output(0), None)
     )
 
-    context.scheduler.emitSave(outputTemp, outputVars)
+    context.hir.emitSave(outputTemp, outputVars)
   }
 
   private def emitLayerResize(
@@ -1519,7 +1519,7 @@ class OnnxFrontend(
             lerpConst.dims
           )
 
-          context.scheduler.emitLoad(lerpConst, lerpTemp)
+          context.hir.emitLoad(lerpConst, lerpTemp)
 
           lerpTemp
         }
@@ -1578,7 +1578,7 @@ class OnnxFrontend(
         VarsDimensions(outputTemp.dims.channels)
       )
 
-      context.scheduler.emitInterpolate(
+      context.hir.emitInterpolate(
         pixelInputsTemp,
         lerpsTemp,
         pixelOutputTemp
@@ -1607,7 +1607,7 @@ class OnnxFrontend(
       inputVars.dims
     )
 
-    context.scheduler.emitLoad(inputVars, inputTemp)
+    context.hir.emitLoad(inputVars, inputTemp)
 
     val outputTemp =
       emitLayerPool(context, poolProto, inputTemp)
@@ -1618,7 +1618,7 @@ class OnnxFrontend(
       findInterLayerOutputs(context, poolProto.output(0), None)
     )
 
-    context.scheduler.emitSave(outputTemp, outputVars)
+    context.hir.emitSave(outputTemp, outputVars)
   }
 
   private def emitGlobalPool(
@@ -1636,7 +1636,7 @@ class OnnxFrontend(
       inputVars.dims
     )
 
-    context.scheduler.emitLoad(inputVars, inputTemp)
+    context.hir.emitLoad(inputVars, inputTemp)
 
     val outputTemp =
       emitLayerGlobalPool(context, globalPoolProto, inputTemp)
@@ -1647,7 +1647,7 @@ class OnnxFrontend(
       findInterLayerOutputs(context, globalPoolProto.output(0), None)
     )
 
-    context.scheduler.emitSave(outputTemp, outputVars)
+    context.hir.emitSave(outputTemp, outputVars)
   }
 
   private def emitNorm(
@@ -1662,7 +1662,7 @@ class OnnxFrontend(
       inputVars.dims
     )
 
-    context.scheduler.emitLoad(inputVars, inputTemp)
+    context.hir.emitLoad(inputVars, inputTemp)
 
     val outputTemp =
       emitLayerNorm(context, normProto, inputTemp)
@@ -1673,7 +1673,7 @@ class OnnxFrontend(
       findInterLayerOutputs(context, normProto.output(0), None)
     )
 
-    context.scheduler.emitSave(outputTemp, outputVars)
+    context.hir.emitSave(outputTemp, outputVars)
   }
 
   private def emitActivate(
@@ -1691,7 +1691,7 @@ class OnnxFrontend(
       inputVars.dims
     )
 
-    context.scheduler.emitLoad(inputVars, inputTemp)
+    context.hir.emitLoad(inputVars, inputTemp)
 
     val outputTemp =
       emitLayerActivate(context, activateProto, inputTemp)
@@ -1702,7 +1702,7 @@ class OnnxFrontend(
       findInterLayerOutputs(context, activateProto.output(0), None)
     )
 
-    context.scheduler.emitSave(outputTemp, outputVars)
+    context.hir.emitSave(outputTemp, outputVars)
   }
 
   private def emitAdd(context: EmitContext, addProto: NodeProto): Unit = {
@@ -1714,7 +1714,7 @@ class OnnxFrontend(
       input0Vars.dims
     )
 
-    context.scheduler.emitLoad(input0Vars, input0Temp)
+    context.hir.emitLoad(input0Vars, input0Temp)
 
     val outputTemp =
       emitLayerAdd(context, addProto, input0Temp)
@@ -1725,7 +1725,7 @@ class OnnxFrontend(
       findInterLayerOutputs(context, addProto.output(0), None)
     )
 
-    context.scheduler.emitSave(outputTemp, outputVars)
+    context.hir.emitSave(outputTemp, outputVars)
   }
 
   private def emitSub(
@@ -1740,7 +1740,7 @@ class OnnxFrontend(
       input0Vars.dims
     )
 
-    context.scheduler.emitLoad(input0Vars, input0Temp)
+    context.hir.emitLoad(input0Vars, input0Temp)
 
     val input1VarsOrConst = if (tensorProtos.isDefinedAt(nodeProto.input(1))) {
       context.mm.addPendingConst(
@@ -1757,7 +1757,7 @@ class OnnxFrontend(
       input1VarsOrConst.dims
     )
 
-    context.scheduler.emitLoad(input1VarsOrConst, input1Temp)
+    context.hir.emitLoad(input1VarsOrConst, input1Temp)
 
     val outputTemp =
       emitLayerSub(context, nodeProto, input0Temp, input1Temp)
@@ -1768,7 +1768,7 @@ class OnnxFrontend(
       findInterLayerOutputs(context, nodeProto.output(0), None)
     )
 
-    context.scheduler.emitSave(outputTemp, outputVars)
+    context.hir.emitSave(outputTemp, outputVars)
   }
 
   private def emitMul(
@@ -1783,7 +1783,7 @@ class OnnxFrontend(
       input0Vars.dims
     )
 
-    context.scheduler.emitLoad(input0Vars, input0Temp)
+    context.hir.emitLoad(input0Vars, input0Temp)
 
     val input1VarsOrConst = if (tensorProtos.isDefinedAt(nodeProto.input(1))) {
       context.mm.addPendingConst(
@@ -1800,7 +1800,7 @@ class OnnxFrontend(
       input1VarsOrConst.dims
     )
 
-    context.scheduler.emitLoad(input1VarsOrConst, input1Temp)
+    context.hir.emitLoad(input1VarsOrConst, input1Temp)
 
     val outputTemp =
       emitLayerMul(context, nodeProto, input0Temp, input1Temp)
@@ -1811,7 +1811,7 @@ class OnnxFrontend(
       findInterLayerOutputs(context, nodeProto.output(0), None)
     )
 
-    context.scheduler.emitSave(outputTemp, outputVars)
+    context.hir.emitSave(outputTemp, outputVars)
   }
 
   private def emitLayerConv(
@@ -1982,7 +1982,7 @@ class OnnxFrontend(
             MemoryOptionalInputOutputObjects(None, pixelOutputTemp)
         }
 
-      context.scheduler.emitMatMul(
+      context.hir.emitMatMul(
         pixelWeights,
         if (withBias) bias else None,
         pixelPairs
@@ -2040,7 +2040,7 @@ class OnnxFrontend(
       MemoryOptionalInputOutputObjects(Some(inputVars), outputTemp)
     )
 
-    context.scheduler.emitMatMul(
+    context.hir.emitMatMul(
       weights,
       bias,
       pairs
@@ -2090,7 +2090,7 @@ class OnnxFrontend(
       MemoryOptionalInputOutputObjects(Some(inputVars), outputTemp)
     )
 
-    context.scheduler.emitMatMul(
+    context.hir.emitMatMul(
       weights,
       bias,
       pairs
@@ -2177,7 +2177,7 @@ class OnnxFrontend(
         multiplierConst.dims
       )
 
-      context.scheduler.emitLoad(multiplierConst, multiplierTemp)
+      context.hir.emitLoad(multiplierConst, multiplierTemp)
 
       Some(multiplierTemp)
     } else None
@@ -2208,7 +2208,7 @@ class OnnxFrontend(
           )
         }
 
-      context.scheduler.emitPool(
+      context.hir.emitPool(
         poolProto.opType.get match {
           case "MaxPool"     => "MaxPool"
           case "AveragePool" => "AvgPool"
@@ -2262,7 +2262,7 @@ class OnnxFrontend(
       multiplierConst.dims
     )
 
-    context.scheduler.emitLoad(multiplierConst, multiplierTemp)
+    context.hir.emitLoad(multiplierConst, multiplierTemp)
 
     for (n <- 0 until inputDims.numberVectors) {
       val dims = VarsDimensions(inputDims.channels)
@@ -2280,7 +2280,7 @@ class OnnxFrontend(
           mkSub(inputTemp, offset, dims)
         }
 
-      context.scheduler.emitPool(
+      context.hir.emitPool(
         "AvgPool",
         pixelInputsTemp,
         pixelOutputTemp,
@@ -2310,13 +2310,13 @@ class OnnxFrontend(
 
     activateProto.opType.get match {
       case "Relu" =>
-        context.scheduler.emitRelu(
+        context.hir.emitRelu(
           inputTemp,
           outputTemp
         )
 
       case "Softmax" =>
-        context.scheduler.emitSoftmax(
+        context.hir.emitSoftmax(
           inputTemp,
           outputTemp
         )
@@ -2344,8 +2344,8 @@ class OnnxFrontend(
           alphaConst.dims
         )
 
-        context.scheduler.emitLoad(alphaConst, alphaTemp)
-        context.scheduler.emitLeakyRelu(
+        context.hir.emitLoad(alphaConst, alphaTemp)
+        context.hir.emitLeakyRelu(
           inputTemp,
           alphaTemp,
           outputTemp
@@ -2420,8 +2420,8 @@ class OnnxFrontend(
       offsetConst.dims
     )
 
-    context.scheduler.emitLoad(scaleConst, scaleTemp)
-    context.scheduler.emitLoad(offsetConst, offsetTemp)
+    context.hir.emitLoad(scaleConst, scaleTemp)
+    context.hir.emitLoad(offsetConst, offsetTemp)
 
     val outputTemp = context.mm.allocateTempObject(
       normProto.output(0),
@@ -2439,7 +2439,7 @@ class OnnxFrontend(
       val pixelInputTemp  = mkSub(inputTemp, offset, dims)
       val pixelOutputTemp = mkSub(outputTemp, offset, dims)
 
-      context.scheduler.emitNorm(
+      context.hir.emitNorm(
         pixelInputTemp,
         scaleTemp,
         offsetTemp,
@@ -2482,7 +2482,7 @@ class OnnxFrontend(
     } else
       context.mm.consumeObject(input1Name, Seq(addProto.name.get))
 
-    context.scheduler.emitAdd(
+    context.hir.emitAdd(
       input0Temp,
       input1VarsOrConst,
       outputTemp
@@ -2509,7 +2509,7 @@ class OnnxFrontend(
       input0Temp.dims
     )
 
-    context.scheduler.emitSub(
+    context.hir.emitSub(
       input0Temp,
       input1Temp,
       outputTemp
@@ -2536,7 +2536,7 @@ class OnnxFrontend(
       input0Temp.dims
     )
 
-    context.scheduler.emitMul(
+    context.hir.emitMul(
       input0Temp,
       input1Temp,
       outputTemp

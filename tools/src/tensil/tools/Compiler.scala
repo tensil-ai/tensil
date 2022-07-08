@@ -282,7 +282,7 @@ object Compiler {
       traceContext = traceContext
     )
 
-    var layerSchedulerResults: List[SchedulerResult] = Nil
+    var layerSchedulerResults: Seq[SchedulerResult] = Nil
     var macs                                         = 0L
     var macEfficiency                                = 0f
     val backendStats                                 = new Stats()
@@ -309,7 +309,7 @@ object Compiler {
       val schedulingContext = new StandardSchedulingContext(options)
       //new StandardSchedulingContext2(options, mm.localSpace)
 
-      val layerSchedulerResults = for (emitter <- flowEmitters) yield {
+      layerSchedulerResults = for (emitter <- flowEmitters) yield {
         if (frontend.graphPrinter.isDefined)
           frontend.graphPrinter.get.startLayer(
             s"layer_${schedulingContext.nextLayerIndex}"
@@ -319,7 +319,7 @@ object Compiler {
 
         emitter(
           EmitContext(
-            scheduler = scheduler,
+            hir = scheduler,
             mm = mm,
             outputNames = outputNames
           )

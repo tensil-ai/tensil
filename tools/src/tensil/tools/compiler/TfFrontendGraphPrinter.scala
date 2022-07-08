@@ -18,6 +18,17 @@ class TfFrontendGraphPrinter(stream: OutputStream, name: String, arraySize: Int)
 
   def endLayer() = layerName = None
 
+  private def beforePrintNode(): Unit =
+    if (layerName.isDefined)
+      printStartSubGraph(
+        GraphPrinter.quoteName(s"cluster_${layerName.get}"),
+        GraphPrinter.quote(shortName(layerName.get))
+      )
+
+  private def afterPrintNode(): Unit =
+    if (layerName.isDefined)
+      printEndSubGraph()
+
   def printOp(
       nodeDef: NodeDef,
       outputs: Seq[MemoryObject],
@@ -43,11 +54,7 @@ class TfFrontendGraphPrinter(stream: OutputStream, name: String, arraySize: Int)
       case (obj, i) => mkOutputPort(obj, i)
     }.mkString
 
-    if (layerName.isDefined)
-      printStartSubGraph(
-        GraphPrinter.quoteName(s"cluster_${layerName.get}"),
-        GraphPrinter.quote(shortName(layerName.get))
-      )
+    beforePrintNode()
 
     printNode(
       GraphPrinter.quote(name),
@@ -59,8 +66,7 @@ class TfFrontendGraphPrinter(stream: OutputStream, name: String, arraySize: Int)
       "plaintext"
     )
 
-    if (layerName.isDefined)
-      printEndSubGraph()
+    afterPrintNode()
 
     for (input <- inputs) {
       val (edgeName, edgePort) = parseEdgePort(input.name)
@@ -76,11 +82,16 @@ class TfFrontendGraphPrinter(stream: OutputStream, name: String, arraySize: Int)
   def printInputPost(obj: MemoryObject): Unit = {
     val inputPostName = s"Input/${obj.name}"
 
+    beforePrintNode()
+
     printNode(
       GraphPrinter.quote(inputPostName),
       GraphPrinter.quote(""),
       "circle"
     )
+
+    afterPrintNode()
+
     printEdge(
       GraphPrinter.quote(inputPostName),
       GraphPrinter.quote(obj.name),
@@ -93,11 +104,15 @@ class TfFrontendGraphPrinter(stream: OutputStream, name: String, arraySize: Int)
   ): Unit = {
     val outputPostName = s"Output/${obj.name}"
 
+    beforePrintNode()
+
     printNode(
       GraphPrinter.quote(outputPostName),
       GraphPrinter.quote(""),
       "doublecircle"
     )
+
+    afterPrintNode()
 
     val (edgeName, edgePort) = parseEdgePort(obj.name)
 

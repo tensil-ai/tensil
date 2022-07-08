@@ -22,6 +22,17 @@ class OnnxFrontendGraphPrinter(
 
   def endLayer() = layerName = None
 
+  private def beforePrintNode(): Unit =
+    if (layerName.isDefined)
+      printStartSubGraph(
+        GraphPrinter.quoteName(s"cluster_${layerName.get}"),
+        GraphPrinter.quote(shortName(layerName.get))
+      )
+
+  private def afterPrintNode(): Unit =
+    if (layerName.isDefined)
+      printEndSubGraph()
+
   def printOp(
       nodeProto: NodeProto,
       outputs: Seq[MemoryObject],
@@ -48,11 +59,7 @@ class OnnxFrontendGraphPrinter(
 
     val colspan = Math.max(inputs.size, outputs.size)
 
-    if (layerName.isDefined)
-      printStartSubGraph(
-        GraphPrinter.quoteName(s"cluster_${layerName.get}"),
-        GraphPrinter.quote(shortName(layerName.get))
-      )
+    beforePrintNode()
 
     printNode(
       GraphPrinter.quoteName(name),
@@ -60,8 +67,7 @@ class OnnxFrontendGraphPrinter(
       "record"
     )
 
-    if (layerName.isDefined)
-      printEndSubGraph()
+    afterPrintNode()
 
     for (input <- inputs)
       outputNodeNames.get(input.name) match {
@@ -84,21 +90,29 @@ class OnnxFrontendGraphPrinter(
   }
 
   def printInputPost(obj: MemoryObject): Unit = {
+    beforePrintNode()
+
     printNode(
       GraphPrinter.quoteName(obj.name),
       GraphPrinter.quote(""),
       "circle"
     )
+
+    afterPrintNode()
   }
 
   def printOutputPost(
       obj: MemoryObject
   ): Unit = {
+    beforePrintNode()
+
     printNode(
       GraphPrinter.quoteName(obj.name),
       GraphPrinter.quote(""),
       "doublecircle"
     )
+
+    afterPrintNode()
 
     for (outputNodeName <- outputNodeNames(obj.name))
       printEdge(

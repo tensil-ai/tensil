@@ -298,7 +298,7 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
             Some(initStats)
           )
 
-          emitLoadMemory(
+          emitAllocateAndLoadMemory(
             initSegment.segmentLir,
             initLocalAllocator,
             stage.reusableConsts
@@ -310,49 +310,25 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
             .map({
               case (partition, j) =>
                 val partitionLocalAllocator = initLocalAllocator.clone()
-
-                val loadKey = BackendSegmentKey(
-                  layerIndex,
-                  i,
-                  j,
-                  BackendSegmentKey.Load
-                )
-                val computeKey = BackendSegmentKey(
-                  layerIndex,
-                  i,
-                  j,
-                  BackendSegmentKey.Compute
-                )
-                val saveKey = BackendSegmentKey(
-                  layerIndex,
-                  i,
-                  j,
+                val kinds = Seq(
+                  BackendSegmentKey.Load,
+                  BackendSegmentKey.Compute,
                   BackendSegmentKey.Save
                 )
-
-                val (loadStats, computeStats, saveStats) =
-                  (new Stats(), new Stats(), new Stats())
-
-                val (loadSegment, computeSegment, saveSegment) =
-                  (
-                    backend.mkSegment(
-                      loadKey,
-                      Some(loadStats)
-                    ),
-                    backend.mkSegment(
-                      computeKey,
-                      Some(computeStats)
-                    ),
-                    backend.mkSegment(
-                      saveKey,
-                      Some(saveStats)
+                val statsByKind = kinds.map(kind => kind -> new Stats()).toMap
+                val segmentsByKind = kinds
+                  .map(kind =>
+                    kind -> backend.mkSegment(
+                      BackendSegmentKey(layerIndex, i, j, kind),
+                      Some(statsByKind(kind))
                     )
                   )
+                  .toMap
 
                 val nodes = traverseRoots(partition.roots.get)
 
                 emitLoadConsts(
-                  loadSegment.segmentLir,
+                  segmentsByKind(BackendSegmentKey.Load).segmentLir,
                   partitionLocalAllocator,
                   nodes,
                   includeReusableConsts = false,
@@ -360,33 +336,27 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
                 )
 
                 emitLoadVars(
-                  loadSegment.segmentLir,
+                  segmentsByKind(BackendSegmentKey.Load).segmentLir,
                   partitionLocalAllocator,
                   nodes
                 )
 
                 emitCompute(
-                  computeSegment.segmentLir,
-                  partitionLocalAllocator,
+                  segmentsByKind(BackendSegmentKey.Compute).segmentLir,
                   partitionLocalAllocator,
                   nodes
                 )
 
                 emitSaveVars(
-                  saveSegment.segmentLir,
+                  segmentsByKind(BackendSegmentKey.Save).segmentLir,
                   partitionLocalAllocator,
                   nodes
                 )
 
-                loadSegment.segmentLir.endEmit()
-                computeSegment.segmentLir.endEmit()
-                saveSegment.segmentLir.endEmit()
-
-                Seq(
-                  (loadSegment, loadStats),
-                  (computeSegment, computeStats),
-                  (saveSegment, saveStats)
-                )
+                segmentsByKind.values.foreach(_.segmentLir.endEmit())
+                segmentsByKind.map {
+                  case (kind, segment) => (segment, statsByKind(kind))
+                }
             })
             .seq
 

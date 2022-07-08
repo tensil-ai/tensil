@@ -23,22 +23,26 @@ class RenamingMemoryAllocator private (
   def locate(refAddress: MemoryAddress): MemoryAddress =
     if (refTags.contains(refAddress.tag)) renameMap(refAddress) else refAddress
 
-  def allocate(
-      refAddress: MemoryAddress,
-      locate: Boolean = false
-  ): MemoryAddress =
+  def allocate(refAddress: MemoryAddress): MemoryAddress = {
+    val (allocated, allocatedAddress) = allocateOrLocate(refAddress)
+    require(allocated)
+    allocatedAddress
+  }
+
+  def allocateOrLocate(
+      refAddress: MemoryAddress
+  ): (Boolean, MemoryAddress) =
     if (refTags.contains(refAddress.tag))
       renameMap.get(refAddress) match {
         case Some(allocatedAddress) =>
-          require(locate)
-          allocatedAddress
+          (false, allocatedAddress)
 
         case None =>
           space.allocate(refAddress.ref, 1) match {
             case Some(allocatedSpan) =>
               val allocatedAddress = allocatedSpan(0)
               renameMap(refAddress) = allocatedAddress
-              allocatedAddress
+              (true, allocatedAddress)
 
             case None =>
               throw new CompilerException(
@@ -46,7 +50,7 @@ class RenamingMemoryAllocator private (
               )
           }
       }
-    else refAddress
+    else (false, refAddress)
 
   def free(): Unit = {
     space.free(renameMap.values.toArray)

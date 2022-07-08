@@ -31,85 +31,59 @@ class StandardScheduler2(layerIndex: Int, context: StandardSchedulingContext2)
       println(s"Emitting LIR ...")
     }
 
-    val initKey =
-      BackendSegmentKey(layerIndex, 0, 0, BackendSegmentKey.Init)
-    val initStats = new Stats()
-    val initSegment = backend.mkSegment(
-      initKey,
-      Some(initStats)
+    val kinds = Seq(
+      BackendSegmentKey.Init,
+      BackendSegmentKey.Load,
+      BackendSegmentKey.Compute,
+      BackendSegmentKey.Save
     )
+    val statsByKind = kinds.map(kind => kind -> new Stats()).toMap
+    val segmentsByKind = kinds
+      .map(kind =>
+        kind -> backend.mkSegment(
+          BackendSegmentKey(layerIndex, 0, 0, kind),
+          Some(statsByKind(kind))
+        )
+      )
+      .toMap
 
     val localAllocator =
-      RenamingMemoryAllocator(context.localSpace, Set(MemoryTag.DRAM1, MemoryTag.DRAM0))
-
-    val loadKey = BackendSegmentKey(layerIndex, 0, 0, BackendSegmentKey.Load)
-    val computeKey =
-      BackendSegmentKey(layerIndex, 0, 0, BackendSegmentKey.Compute)
-    val saveKey = BackendSegmentKey(layerIndex, 0, 0, BackendSegmentKey.Save)
-
-    val (loadStats, computeStats, saveStats) =
-      (new Stats(), new Stats(), new Stats())
-
-    val (loadSegment, computeSegment, saveSegment) =
-      (
-        backend.mkSegment(
-          loadKey,
-          Some(loadStats)
-        ),
-        backend.mkSegment(
-          computeKey,
-          Some(computeStats)
-        ),
-        backend.mkSegment(
-          saveKey,
-          Some(saveStats)
-        )
+      RenamingMemoryAllocator(
+        context.localSpace,
+        Set(MemoryTag.DRAM1, MemoryTag.DRAM0)
       )
 
     emitLoadConsts(
-      initSegment.segmentLir,
+      segmentsByKind(BackendSegmentKey.Init).segmentLir,
       localAllocator,
       nodes
     )
 
     emitLoadVars(
-      loadSegment.segmentLir,
+      segmentsByKind(BackendSegmentKey.Load).segmentLir,
       localAllocator,
       nodes
     )
 
     emitCompute(
-      computeSegment.segmentLir,
-      localAllocator,
+      segmentsByKind(BackendSegmentKey.Compute).segmentLir,
       localAllocator,
       nodes
     )
 
     emitSaveVars(
-      saveSegment.segmentLir,
+      segmentsByKind(BackendSegmentKey.Save).segmentLir,
       localAllocator,
       nodes
     )
 
     localAllocator.free()
 
-    initSegment.segmentLir.endEmit()
-    loadSegment.segmentLir.endEmit()
-    computeSegment.segmentLir.endEmit()
-    saveSegment.segmentLir.endEmit()
+    segmentsByKind.values.foreach(_.segmentLir.endEmit())
+    segmentsByKind.values.foreach(backend.emitSegment(_))
+    statsByKind.values.foreach(stats.add(_))
 
-    backend.emitSegment(initSegment)
-    backend.emitSegment(loadSegment)
-    backend.emitSegment(computeSegment)
-    backend.emitSegment(saveSegment)
-
-    stats.add(initStats)
-    stats.add(loadStats)
-    stats.add(computeStats)
-    stats.add(saveStats)
-
-    val instructionsCount =
-      initSegment.instructionsCount + loadSegment.instructionsCount + computeSegment.instructionsCount + saveSegment.instructionsCount
+    val instructionsCount = segmentsByKind.values.map(_.instructionsCount).sum
 
     if (context.options.printProgress) {
       println(

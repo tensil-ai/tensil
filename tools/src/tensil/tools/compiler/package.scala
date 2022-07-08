@@ -10,7 +10,7 @@ package object compiler {
   type MemoryAddress      = Long
   type MemorySpan         = Array[MemoryAddress]
   type EmitResult         = Option[SchedulerResult]
-  type Emitter            = EmitContext => EmitResult
+  type Emitter            = EmitContext => Unit
   type InstructionAddress = Long
   type BackendSegmentKey  = (Int, Int, Int, Int)
 

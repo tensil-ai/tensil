@@ -268,7 +268,6 @@ object Compiler {
       constsStream = constsStream,
       dataType = options.arch.dataType,
       arch = options.arch,
-      outputNames = outputNames,
       mkConstsDimensions = frontend.mkConstsDimensions,
       traceContext = traceContext,
       tracepointConditions = options.tracepointConditions
@@ -307,19 +306,34 @@ object Compiler {
         println(s"Rewritten to ${flowEmitters.size} emitter(s)")
       }
 
-      val context = EmitContext(
-        schedulingContext = new StandardSchedulingContext(options),
-        //new StandardSchedulingContext2(options, mm.localSpace),
-        backend = backend,
-        mm = mm,
-        outputNames = outputNames
-      )
+      val schedulingContext = new StandardSchedulingContext(options)
+        //new StandardSchedulingContext2(options, mm.localSpace)
 
       val emitResults = for (emitter <- flowEmitters) yield {
-        val r = emitter(context)
+        if (frontend.graphPrinter.isDefined)
+          frontend.graphPrinter.get.startLayer(
+            s"layer_${schedulingContext.nextLayerIndex}"
+          )
+
+        val scheduler = schedulingContext.startLayer()
+
+        emitter(
+          EmitContext(
+            scheduler = scheduler,
+            mm = mm,
+            outputNames = outputNames
+          )
+        )
+
+        if (frontend.graphPrinter.isDefined)
+          frontend.graphPrinter.get.endLayer()
+
         mm.freeConsumedObjects()
-        r
+
+        Some(scheduler.emit(backend))
       }
+
+      if (frontend.graphPrinter.isDefined) frontend.graphPrinter.get.endPrint
 
       backend.writeSegments(
         programStream,

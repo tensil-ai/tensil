@@ -24,7 +24,8 @@ class SaveNode(
     val input: MemoryAddress,
     output: MemoryAddress
 ) extends VarOutputNode(output) {
-  require(input.tag == MemoryTag.Temp)
+  require(input.tag != output.tag)
+  require(input.tag == MemoryTag.Temp || input.tag == MemoryTag.Local)
 
   override lazy val inputTemps = Seq(input)
 }

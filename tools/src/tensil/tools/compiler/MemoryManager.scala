@@ -20,7 +20,6 @@ class MemoryManager(
     constsStream: OutputStream,
     dataType: ArchitectureDataType,
     arch: Architecture,
-    outputNames: Seq[String],
     mkConstsDimensions: (Shape) => MemoryDimensions,
     traceContext: TraceContext,
     tracepointConditions: Seq[TracepointCondition]
@@ -116,12 +115,26 @@ class MemoryManager(
   def inputObjects  = inputObjectsBuffer.toSeq
   def outputObjects = outputObjectsBuffer.toSeq
 
-  def emitOutputObject(name: String): MemoryObject = {
+  def emitOutputObject(name: String): (MemoryObject, Option[MemoryObject]) = {
     val outputObj = consumeObject(name, Nil) // TODO: consume pinned object
 
-    outputObjectsBuffer += outputObj
+    val (nonFinal, finalOutputObj) =
+      if (outputObj.span(0).tag == MemoryTag.Local) {
+        (
+          true,
+          allocator.allocateObject(
+            dram0Space,
+            name,
+            outputObj.dims,
+            Nil
+          )
+        )
+      } else
+        (false, outputObj)
 
-    outputObj
+    outputObjectsBuffer += finalOutputObj
+
+    (finalOutputObj, if (nonFinal) Some(outputObj) else None)
   }
 
   def emitInputObject(
@@ -149,7 +162,7 @@ class MemoryManager(
       consumers: Seq[String]
   ): MemoryObject =
     allocator.allocateObject(
-      //if (outputNames.contains(name)) dram0Space else localSpace,
+      //localSpace,
       dram0Space,
       name,
       dims,

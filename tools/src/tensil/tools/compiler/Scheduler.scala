@@ -449,51 +449,49 @@ abstract class Scheduler(
   protected def inputsToLoad(
       nodes: Seq[Node],
       inputs: Node => Seq[MemoryAddress]
-  ): Seq[MemoryAddress] =
-    if (nodes.isEmpty) Nil
-    else {
-      val nodesWithInputsToLoadCount =
-        nodes.filter(!inputs(_).isEmpty).size
-      val maxInputsToLoadCount = nodes.map(inputs(_).size).max
+  ): Seq[MemoryAddress] = {
+    val nodesWithInputsToLoadCount =
+      nodes.filter(!inputs(_).isEmpty).size
+    val maxInputsToLoadCount = nodes.map(inputs(_).size).max
 
-      /*
-       * In order to improve rollup efficiency we need to determine
-       * the best sorting order for inputs loaded into local memory.
-       *
-       * If number of nodes with inputs is greater than maximum
-       * number of inputs per node, we sort the entire set of inputs.
-       * This will likely produce one rollup per memory tag.
-       *
-       * If otherwise, we sort inputs for each node. This will likely
-       * produce one rollup per node per memory tag.
-       */
+    /*
+     * In order to improve rollup efficiency we need to determine
+     * the best sorting order for inputs loaded into local memory.
+     *
+     * If number of nodes with inputs is greater than maximum
+     * number of inputs per node, we sort the entire set of inputs.
+     * This will likely produce one rollup per memory tag.
+     *
+     * If otherwise, we sort inputs for each node. This will likely
+     * produce one rollup per node per memory tag.
+     */
 
-      def distinctByLocation(
-          addresses: Seq[MemoryAddress]
-      ): Seq[MemoryAddress] = {
-        val set = mutable.Set.empty[MemoryAddress]
+    def distinctByLocation(
+        addresses: Seq[MemoryAddress]
+    ): Seq[MemoryAddress] = {
+      val set = mutable.Set.empty[MemoryAddress]
 
-        for (address <- addresses if !set.contains(address)) yield {
-          set.add(address)
-          address
-        }
+      for (address <- addresses if !set.contains(address)) yield {
+        set.add(address)
+        address
       }
-
-      if (nodesWithInputsToLoadCount > maxInputsToLoadCount)
-        distinctByLocation(
-          nodes
-            .flatMap(inputs(_))
-            .sorted
-        )
-      else
-        distinctByLocation(
-          nodes
-            .map(inputs(_))
-            .filter(_.nonEmpty)
-            .sortBy(_.min)
-            .flatMap(_.sorted)
-        )
     }
+
+    if (nodesWithInputsToLoadCount > maxInputsToLoadCount)
+      distinctByLocation(
+        nodes
+          .flatMap(inputs(_))
+          .sorted
+      )
+    else
+      distinctByLocation(
+        nodes
+          .map(inputs(_))
+          .filter(_.nonEmpty)
+          .sortBy(_.min)
+          .flatMap(_.sorted)
+      )
+  }
 
   protected def findVarOutputNodesByInput(
       inputTemp: MemoryAddress
@@ -623,15 +621,15 @@ abstract class Scheduler(
       context.options.arch
     )
 
-    for (address <- addressesToLoad) {
-      val (allocated, localAddress) = localAllocator.allocateOrLocate(address)
-
-      if (allocated)
-        loadLocalRollup.emit(
-          localAddress,
-          address
-        )
-    }
+    for (
+      address <- addressesToLoad.filter(a =>
+        a.tag == MemoryTag.DRAM0 || a.tag == MemoryTag.DRAM1
+      )
+    )
+      loadLocalRollup.emit(
+        localAllocator.allocate(address),
+        address
+      )
 
     loadLocalRollup.finalEmit()
   }

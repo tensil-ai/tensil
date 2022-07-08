@@ -328,9 +328,9 @@ object Compiler {
         if (frontend.graphPrinter.isDefined)
           frontend.graphPrinter.get.endLayer()
 
+        val r = Some(scheduler.emit(backend))
         mm.freeConsumedObjects()
-
-        Some(scheduler.emit(backend))
+        r
       }
 
       if (frontend.graphPrinter.isDefined) frontend.graphPrinter.get.endPrint

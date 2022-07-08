@@ -595,11 +595,19 @@ abstract class Scheduler(
       context.options.arch
     )
 
-    for (address <- addressesToLoad)
-      loadLocalRollup.emit(
-        localAllocator.allocate(address),
-        address
-      )
+    for (address <- addressesToLoad) {
+      val (allocated, localAddress) = localAllocator.allocateOrLocate(address)
+
+      // REMOVE:
+      if (address.tag == MemoryTag.Vars && allocated)
+        println(s"Allocated: ${address}")
+
+      if (allocated)
+        loadLocalRollup.emit(
+          localAddress,
+          address
+        )
+    }
 
     loadLocalRollup.finalEmit()
   }
@@ -763,9 +771,10 @@ abstract class Scheduler(
     for (
       (inputLocalAddress, outputTempAddress) <- loadAccInputOutputs.sortBy(_._1)
     ) {
-      val outputAccAddress =
-        accumulatorAllocator.allocate(outputTempAddress, locate = true)
+      val (_, outputAccAddress) =
+        accumulatorAllocator.allocateOrLocate(outputTempAddress)
 
+      // TODO: skip if not allocated?
       loadAccRollup.emit(
         inputLocalAddress,
         outputAccAddress
@@ -1151,9 +1160,10 @@ abstract class Scheduler(
           .sortBy(_.output)
     ) {
       val inputAccAddress = accumulatorAllocator.locate(saveNode.input)
-      val outputLocalAddress =
-        localAllocatorToSave.allocate(saveNode.output, locate = true)
+      val (_, outputLocalAddress) =
+        localAllocatorToSave.allocateOrLocate(saveNode.output)
 
+      // TODO: skip if not allocated?
       saveAccRollup.emit(
         outputLocalAddress,
         inputAccAddress

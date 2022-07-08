@@ -84,13 +84,17 @@ class MemoryObjectAllocator(
     }
   }
 
-  def freeConsumedObjects(spaces: Seq[MemorySpace]): Unit = {
-    for (
-      (name, allocation) <- allocations.filter(_._2.currentConsumers.isEmpty)
-    ) {
-      allocator.free(spaces, allocation.ref)
-      allocations.remove(name)
-    }
+  def freeConsumedObjects(spaces: Seq[MemorySpace]): MemorySpan = {
+    val freedSpans =
+      for (
+        (name, allocation) <- allocations.filter(_._2.currentConsumers.isEmpty)
+      ) yield {
+        allocator.free(spaces, allocation.ref)
+        allocations.remove(name)
+        allocation.obj.span
+      }
+
+    freedSpans.flatten.toArray
   }
 
   private def trackAllocationAndMakeObject(

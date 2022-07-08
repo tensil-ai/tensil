@@ -20,16 +20,22 @@ class RenamingMemoryAllocator private (
     refTags: Set[MemoryTag],
     private val renameMap: mutable.Map[MemoryAddress, MemoryAddress]
 ) extends mutable.Cloneable[RenamingMemoryAllocator] {
+  def map = renameMap.toMap
+
   def locate(refAddress: MemoryAddress): MemoryAddress = renameMap(refAddress)
 
-  def allocate(
-      refAddress: MemoryAddress,
-      locate: Boolean = false
-  ): MemoryAddress =
+  def allocate(refAddress: MemoryAddress): MemoryAddress = {
+    val (allocated, allocatedAddress) = allocateOrLocate(refAddress)
+    require(allocated)
+    allocatedAddress
+  }
+
+  def allocateOrLocate(
+      refAddress: MemoryAddress
+  ): (Boolean, MemoryAddress) =
     renameMap.get(refAddress) match {
       case Some(allocatedAddress) =>
-        require(locate)
-        allocatedAddress
+        (false, allocatedAddress)
 
       case None =>
         require(refTags.contains(refAddress.tag))
@@ -38,7 +44,7 @@ class RenamingMemoryAllocator private (
           case Some(allocatedSpan) =>
             val allocatedAddress = allocatedSpan(0)
             renameMap(refAddress) = allocatedAddress
-            allocatedAddress
+            (true, allocatedAddress)
 
           case None =>
             throw new CompilerException(
@@ -47,9 +53,31 @@ class RenamingMemoryAllocator private (
         }
     }
 
-  def free(): Unit = {
-    space.free(renameMap.values.toArray)
-    renameMap.clear()
+  def freeTag(refTag: MemoryTag): Unit = {
+    val (refAddresses, allocatedAddresses) = renameMap.filter {
+      case (refAddress, allocatedAddress) => refAddress.tag == refTag
+    }.unzip
+
+    // REMOVE:
+    println(s"BEFORE FREE TAG: ${renameMap.size}")
+
+    space.free(allocatedAddresses.toArray)
+    refAddresses.foreach(renameMap.remove(_))
+
+    println(s"AFTER FREE TAG: ${renameMap.size}")
+  }
+
+  def freeSpan(refAddresses: MemorySpan): Unit = {
+    val allocatedAddresses =
+      refAddresses.map(renameMap.get(_)).filter(_.isDefined).map(_.get)
+
+    // REMOVE:
+    println(s"BEFORE FREE SPAN: ${renameMap.size}")
+
+    space.free(allocatedAddresses.toArray)
+    refAddresses.foreach(renameMap.remove(_))
+
+    println(s"AFTER FREE SPAN: ${renameMap.size}")
   }
 
   override def clone(): RenamingMemoryAllocator =

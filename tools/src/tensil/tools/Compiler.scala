@@ -306,18 +306,22 @@ object Compiler {
         println(s"Rewritten to ${flowEmitters.size} emitter(s)")
       }
 
+      val schedulingContext = new StandardSchedulingContext(options)
       val context = EmitContext(
-        schedulingContext = new StandardSchedulingContext(options),
+        schedulingContext = schedulingContext,
         backend = backend,
         mm = mm,
         outputNames = outputNames
       )
 
-      val emitResults = for (emitter <- flowEmitters) yield {
-        val r = emitter(context)
-        mm.freeConsumedObjects()
-        r
-      }
+      val emitResults =
+        (schedulingContext.emitPreamble(backend)
+          +: flowEmitters.map(emitter => {
+            val r = emitter(context)
+            schedulingContext.freeConsumedObjects(mm.freeConsumedObjects())
+            r
+          })) :+
+          schedulingContext.emitPostamble(backend)
 
       backend.writeSegments(
         programStream,

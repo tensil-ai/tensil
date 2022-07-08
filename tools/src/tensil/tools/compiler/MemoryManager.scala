@@ -193,9 +193,8 @@ class MemoryManager(
   ): MemoryObject =
     tempAllocator.allocateObject(tempSpace, name, dims, Nil)
 
-  def freeConsumedObjects(): Unit = {
+  def freeConsumedObjects(): MemorySpan =
     allocator.freeConsumedObjects(spacesToFree)
-  }
 
   def reportObjects() = allocator.reportObjects()
   def reportSpans()   = allocator.reportSpans()

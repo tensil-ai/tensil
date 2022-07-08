@@ -20,5 +20,9 @@ abstract class SchedulingContext(
     mkScheduler(layerIndex)
   }
 
+  def emitPreamble(backend: Backend): EmitResult  = None
+  def emitPostamble(backend: Backend): EmitResult = None
+  def freeConsumedObjects(freedSpan: MemorySpan): Unit = {}
+
   protected def mkScheduler(layerIndex: Int): Scheduler
 }

@@ -39,17 +39,6 @@ class StandardScheduler2(layerIndex: Int, context: StandardSchedulingContext2)
       Some(initStats)
     )
 
-    val localSpace =
-      HeapMemorySpace(
-        "local",
-        MemoryTag.Local,
-        context.options.arch.threadLocalDepth
-      )
-    val previousLocalAllocator =
-      RenamingMemoryAllocator(localSpace, Set(MemoryTag.Consts, MemoryTag.Vars))
-    val nextLocalAllocator =
-      RenamingMemoryAllocator(localSpace, Set(MemoryTag.Consts, MemoryTag.Vars))
-
     val loadKey = BackendSegmentKey(layerIndex, 0, 0, BackendSegmentKey.Load)
     val computeKey =
       BackendSegmentKey(layerIndex, 0, 0, BackendSegmentKey.Compute)
@@ -76,26 +65,20 @@ class StandardScheduler2(layerIndex: Int, context: StandardSchedulingContext2)
 
     emitLoadConsts(
       initSegment.segmentLir,
-      previousLocalAllocator,
+      context.localAllocator,
       nodes
     )
 
     emitLoadVars(
       loadSegment.segmentLir,
-      previousLocalAllocator,
+      context.localAllocator,
       nodes
     )
 
     emitCompute(
       computeSegment.segmentLir,
-      previousLocalAllocator,
-      nextLocalAllocator,
-      nodes
-    )
-
-    emitSaveVars(
-      saveSegment.segmentLir,
-      nextLocalAllocator,
+      context.localAllocator,
+      context.localAllocator,
       nodes
     )
 

@@ -524,8 +524,6 @@ class TfFrontend(
     } else {
       context.mm.aliasPendingConst(identifyDef.input(0), identifyDef.name)
     }
-
-    None
   }
 
   private def emitPlaceholder(
@@ -554,8 +552,6 @@ class TfFrontend(
       )
       graphPrinter.get.printInputPost(placeholderVars)
     }
-
-    None
   }
 
   private def emitOutput(
@@ -576,10 +572,6 @@ class TfFrontend(
         )
       }
     }
-
-    if (graphPrinter.isDefined) graphPrinter.get.endPrint
-
-    None
   }
 
   private def emitConst(
@@ -590,8 +582,6 @@ class TfFrontend(
       constDef.name,
       util.getTensorData(constDef)
     )
-
-    None
   }
 
   private def emitShape(context: EmitContext, shapeDef: NodeDef): Unit = {
@@ -607,8 +597,6 @@ class TfFrontend(
         DataType.DT_INT32
       )
     )
-
-    None
   }
 
   private def emitStridedSlice(
@@ -718,8 +706,6 @@ class TfFrontend(
       stridedSliceDef.name,
       new TensorData(Shape(), Seq(input.as1D(begin(0))), dtype)
     )
-
-    None
   }
 
   private def emitPack(
@@ -769,8 +755,6 @@ class TfFrontend(
       packDef.name,
       new TensorData(packedShape, packedData, dtype)
     )
-
-    None
   }
 
   private def emitTile(
@@ -818,8 +802,6 @@ class TfFrontend(
       tileDef.name,
       new TensorData(tiledShape, tiledData, dtype)
     )
-
-    None
   }
 
   private def emitCast(
@@ -853,8 +835,6 @@ class TfFrontend(
       castDef.name,
       new TensorData(input.shape, castedData, DataType.DT_FLOAT)
     )
-
-    None
   }
 
   private def emitReshape(
@@ -1065,8 +1045,6 @@ class TfFrontend(
         Seq(outputVars),
         Seq(inputVars)
       )
-
-    None
   }
 
   private def emitSplit(context: EmitContext, splitDef: NodeDef): Unit = {

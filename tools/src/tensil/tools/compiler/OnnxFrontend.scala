@@ -651,8 +651,6 @@ class OnnxFrontend(
         Seq(outputVars),
         Seq(inputVars)
       )
-
-    None
   }
 
   private def emitShape(
@@ -1248,9 +1246,6 @@ class OnnxFrontend(
           org.tensorflow.framework.types.DataType.DT_FLOAT
         )
       )
-
-      None
-
     } else {
 
       if (axis != 1)

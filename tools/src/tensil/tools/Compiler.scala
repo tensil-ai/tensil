@@ -329,7 +329,7 @@ object Compiler {
         if (frontend.graphPrinter.isDefined)
           frontend.graphPrinter.get.endLayer()
 
-        val r = scheduler.emit(backend)
+        val r = scheduler.lower(backend)
         mm.freeConsumedObjects()
 
         if (r.numberOfStages != 0) {

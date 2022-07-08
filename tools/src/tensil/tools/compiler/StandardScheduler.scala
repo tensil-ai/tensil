@@ -13,7 +13,7 @@ import tensil.tools.CompilerException
 class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
     extends Scheduler(layerIndex, context) {
 
-  override protected def doEmit(
+  override protected def doLower(
       roots: Seq[MemoryAddress],
       backend: Backend
   ): SchedulerResult = {
@@ -297,7 +297,7 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
             Some(initStats)
           )
 
-          emitAllocateAndLoadMemory(
+          allocateAndLoadMemory(
             initSegment.segmentLir,
             initLocalAllocator,
             stage.reusableConsts
@@ -326,7 +326,7 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
 
                 val nodes = traverseRoots(partition.roots.get)
 
-                emitLoadConsts(
+                lowerLoadConsts(
                   segmentsByKind(BackendSegmentKey.Load).segmentLir,
                   partitionLocalAllocator,
                   nodes,
@@ -334,19 +334,19 @@ class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
                   includeNonReusableConsts = true
                 )
 
-                emitLoadVars(
+                lowerLoadVars(
                   segmentsByKind(BackendSegmentKey.Load).segmentLir,
                   partitionLocalAllocator,
                   nodes
                 )
 
-                emitCompute(
+                lowerCompute(
                   segmentsByKind(BackendSegmentKey.Compute).segmentLir,
                   partitionLocalAllocator,
                   nodes
                 )
 
-                emitSaveVars(
+                lowerSaveVars(
                   segmentsByKind(BackendSegmentKey.Save).segmentLir,
                   partitionLocalAllocator,
                   nodes

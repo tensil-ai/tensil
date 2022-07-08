@@ -394,7 +394,7 @@ abstract class Scheduler(
     stream.close()
   }
 
-  def emit(backend: Backend): SchedulerResult = {
+  def lower(backend: Backend): SchedulerResult = {
     val tempInputTemps =
       tempOutputNodesByOutput.values.map(_.inputTemps).flatten.toSet
     val varInputTemps = varOutputNodesByInput.keys.toSet
@@ -410,18 +410,20 @@ abstract class Scheduler(
 
     if (!roots.isEmpty) {
       if (context.options.printProgress) {
-        println(s"---------------------- Layer ${layerIndex} ----------------------")
+        println(
+          s"---------------------- Layer ${layerIndex} ----------------------"
+        )
         println(
           s"HIR emitted with ${roots.size} root and ${(varOutputNodesByInput.size + tempOutputNodesByOutput.size) - roots.size} non-root node(s)"
         )
       }
 
-      doEmit(roots, backend)
+      doLower(roots, backend)
     } else
       SchedulerResult()
   }
 
-  protected def doEmit(
+  protected def doLower(
       roots: Seq[MemoryAddress],
       backend: Backend
   ): SchedulerResult
@@ -558,7 +560,7 @@ abstract class Scheduler(
     unique.size
   }
 
-  protected def emitLoadConsts(
+  protected def lowerLoadConsts(
       lir: LIR,
       localAllocator: RenamingMemoryAllocator,
       nodes: Seq[Node],
@@ -566,32 +568,32 @@ abstract class Scheduler(
       includeNonReusableConsts: Boolean = true,
   ): Unit = {
     if (includeReusableConsts)
-      emitAllocateAndLoadMemory(
+      allocateAndLoadMemory(
         lir,
         localAllocator,
         inputsToLoad(nodes, _.inputReusableConsts)
       )
 
     if (includeNonReusableConsts)
-      emitAllocateAndLoadMemory(
+      allocateAndLoadMemory(
         lir,
         localAllocator,
         inputsToLoad(nodes, _.inputNonReusableConsts)
       )
   }
 
-  protected def emitLoadVars(
+  protected def lowerLoadVars(
       lir: LIR,
       localAllocator: RenamingMemoryAllocator,
       nodes: Seq[Node]
   ): Unit =
-    emitAllocateAndLoadMemory(
+    allocateAndLoadMemory(
       lir,
       localAllocator,
       inputsToLoad(nodes, _.inputVars)
     )
 
-  protected def emitAllocateAndLoadMemory(
+  protected def allocateAndLoadMemory(
       lir: LIR,
       localAllocator: RenamingMemoryAllocator,
       addressesToLoad: Seq[MemoryAddress]
@@ -614,7 +616,7 @@ abstract class Scheduler(
     loadLocalRollup.finalEmit()
   }
 
-  protected def emitCompute(
+  protected def lowerCompute(
       lir: LIR,
       localAllocator: RenamingMemoryAllocator,
       nodes: Seq[Node]
@@ -1174,7 +1176,7 @@ abstract class Scheduler(
     saveAccRollup.finalEmit()
   }
 
-  protected def emitSaveVars(
+  protected def lowerSaveVars(
       lir: LIR,
       localAllocator: RenamingMemoryAllocator,
       nodes: Seq[Node]

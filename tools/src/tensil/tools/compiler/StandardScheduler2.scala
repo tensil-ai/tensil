@@ -8,7 +8,7 @@ import tensil.TablePrinter
 class StandardScheduler2(layerIndex: Int, context: StandardSchedulingContext2)
     extends Scheduler(layerIndex, context) {
 
-  override protected def doEmit(
+  override protected def doLower(
       roots: Seq[MemoryAddress],
       backend: Backend
   ): SchedulerResult = {
@@ -49,25 +49,25 @@ class StandardScheduler2(layerIndex: Int, context: StandardSchedulingContext2)
         Set(MemoryTag.DRAM1, MemoryTag.DRAM0)
       )
 
-    emitLoadConsts(
+    lowerLoadConsts(
       segmentsByKind(BackendSegmentKey.Init).segmentLir,
       localAllocator,
       nodes
     )
 
-    emitLoadVars(
+    lowerLoadVars(
       segmentsByKind(BackendSegmentKey.Load).segmentLir,
       localAllocator,
       nodes
     )
 
-    emitCompute(
+    lowerCompute(
       segmentsByKind(BackendSegmentKey.Compute).segmentLir,
       localAllocator,
       nodes
     )
 
-    emitSaveVars(
+    lowerSaveVars(
       segmentsByKind(BackendSegmentKey.Save).segmentLir,
       localAllocator,
       nodes

@@ -16,7 +16,7 @@ class MemorySpanAllocator() {
   def reportSpans(): Unit = {
     val tp = new TablePrinter(Some("MEMORY SPANS"))
 
-    for ((ref, allocatedSpan) <- allocatedSpans)
+    for ((ref, allocatedSpan) <- allocatedSpans.toSeq.sortBy(_._2.head.raw))
       tp.addNamedLine(
         ref.toString(),
         allocatedSpan.size,

@@ -349,10 +349,6 @@ object Compiler {
       macs = layerSchedulerResults.map(_.macs).sum
       macEfficiency = Stats.macEfficiency(backendStats, options.arch, macs)
 
-      // TODO: fix leaks
-      // mm.reportObjects()
-      // mm.reportSpans()
-
       val programSizeBytes =
         backend.instructionsCount * layout.instructionSizeBytes
       val stats =

@@ -28,11 +28,12 @@ class MemoryObjectAllocator(
   def reportObjects(): Unit = {
     val tp = new TablePrinter(Some("MEMORY OBJECTS"))
 
-    for ((name, allocation) <- allocations)
+    for ((name, allocation) <- allocations.toSeq.sortBy(_._2.obj.span.head.raw))
       tp.addNamedLine(
         name,
         allocation.obj.dims,
-        allocation.consumers.toIndexedSeq
+        allocation.consumers.toIndexedSeq,
+        s"${allocation.obj.span.head.raw}..${allocation.obj.span.last.raw}"
       )
 
     print(tp)

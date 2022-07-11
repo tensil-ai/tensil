@@ -11,15 +11,15 @@ import org.tensorflow.framework.graph.GraphDef
 import org.tensorflow.framework.node_def.NodeDef
 import org.tensorflow.framework.types.DataType
 
-import _root_.tensil.tools.{
+import tensil.tools.{
   CompilerException,
   TracepointCondition,
   CompilerOptions,
   CompilerInputShapesHelper
 }
-import _root_.tensil.tools.data.{Shape, TensorData}
-import _root_.tensil.tools.util
-import _root_.tensil.{TablePrinter, Architecture}
+import tensil.tools.data.{Shape, TensorData}
+import tensil.tools.util
+import tensil.{TablePrinter, Architecture}
 import tensil.tools.GraphPrinter
 
 object TfFrontend {
@@ -489,7 +489,7 @@ class TfFrontend(
       nextNode: Option[NodeDef]
   ): Seq[String] =
     if (context.outputNames.contains(name))
-      Seq("pin") // TODO: we need another mechanism to pin output objects
+      Seq(MemoryManager.ReservedConsumers.Output)
     else
       inputOutputs.get(name) match {
         case Some(outputs) =>

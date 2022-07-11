@@ -7,14 +7,17 @@ import java.io._
 import scala.collection.mutable
 import org.tensorflow.framework.types.DataType
 
-import _root_.tensil.tools.data.{Shape, TensorData}
-import _root_.tensil.tools.util
-import _root_.tensil.tools.{
-  CompilerException,
-  TraceContext,
-  TracepointCondition
+import tensil.tools.data.{Shape, TensorData}
+import tensil.tools.util
+import tensil.tools.{CompilerException, TraceContext, TracepointCondition}
+import tensil.{Architecture, ArchitectureDataType}
+
+object MemoryManager {
+  object ReservedConsumers {
+    val Output = "~output~"
+    val Consts = "~consts~"
+  }
 }
-import _root_.tensil.{Architecture, ArchitectureDataType}
 
 class MemoryManager(
     constsStream: OutputStream,
@@ -116,7 +119,8 @@ class MemoryManager(
   def outputObjects = outputObjectsBuffer.toSeq
 
   def emitOutputObject(name: String): (MemoryObject, Option[MemoryObject]) = {
-    val outputObj = consumeObject(name, Nil) // TODO: consume pinned object
+    val outputObj =
+      consumeObject(name, Seq(MemoryManager.ReservedConsumers.Output))
 
     val (nonFinal, finalOutputObj) =
       if (outputObj.span(0).tag == MemoryTag.Local) {
@@ -196,9 +200,8 @@ class MemoryManager(
       .resolveRefToObject(ref)
       .orElse(tempAllocator.resolveRefToObject(ref))
 
-  def consumeObject(name: String, consumers: Seq[String]): MemoryObject = {
+  def consumeObject(name: String, consumers: Seq[String]): MemoryObject =
     allocator.consumeObject(name, consumers)
-  }
 
   def allocateTempObject(
       name: String,
@@ -308,7 +311,7 @@ class MemoryManager(
       dram1Space,
       name,
       dims,
-      Seq("pin") // TODO: we need another mechanism to pin constant objects
+      Seq(MemoryManager.ReservedConsumers.Consts)
     )
 
     emitInitialTracepoints(constObj)

@@ -9,15 +9,15 @@ import scala.collection.mutable
 
 import onnx.onnx.{NodeProto, ModelProto, TensorProto, ValueInfoProto}
 
-import _root_.tensil.tools.{
+import tensil.tools.{
   CompilerException,
   TracepointCondition,
   CompilerOptions,
   CompilerInputShapesHelper
 }
-import _root_.tensil.tools.data.{Shape, TensorData}
-import _root_.tensil.tools.util
-import _root_.tensil.{TablePrinter, Architecture}
+import tensil.tools.data.{Shape, TensorData}
+import tensil.tools.util
+import tensil.{TablePrinter, Architecture}
 import com.google.protobuf.CodedInputStream
 import onnx.onnx.TensorShapeProto
 import tensil.tools.GraphPrinter
@@ -520,7 +520,7 @@ class OnnxFrontend(
       nextNode: Option[NodeProto]
   ): Seq[String] =
     if (context.outputNames.contains(outputName))
-      Seq("pin") // TODO: we need another mechanism to pin output objects
+      Seq(MemoryManager.ReservedConsumers.Output)
     else
       (inputNodeNames
         .get(outputName)
@@ -2395,8 +2395,8 @@ class OnnxFrontend(
         (offset.data(i) - mean.data(i) * inferenceScale(i)).toFloat
     }
 
-    val scaleName  = s"${normProto.name}+Scale"
-    val offsetName = s"${normProto.name}+Offset"
+    val scaleName  = s"${normProto.name.get}+Scale"
+    val offsetName = s"${normProto.name.get}+Offset"
 
     context.mm.addPendingConst(
       scaleName,

@@ -22,6 +22,12 @@ object MemoryManager {
 }
 
 class MemoryManager(
+    tempSpace: MemorySpace,
+    tempAllocator: MemoryObjectAllocator,
+    ioSpace: MemorySpace,
+    varsSpace: MemorySpace,
+    constsSpace: MemorySpace,
+    freeableAllocator: MemoryObjectAllocator,
     constsStream: OutputStream,
     dataType: ArchitectureDataType,
     arch: Architecture,
@@ -29,25 +35,7 @@ class MemoryManager(
     traceContext: TraceContext,
     tracepointConditions: Seq[TracepointCondition]
 ) {
-
-  private val tempSpace =
-    ArenaMemorySpace("Temp", MemoryTag.Temp, Long.MaxValue)
-  private val tempAllocator = new MemoryObjectAllocator(
-    new MemorySpanAllocator()
-  )
-
-  val dram0Space =
-    HeapMemorySpace("DRAM0", MemoryTag.DRAM0, arch.dram0Depth)
-  val dram1Space =
-    HeapMemorySpace("DRAM1", MemoryTag.DRAM1, arch.dram1Depth)
-  val localSpace =
-    HeapMemorySpace("Local", MemoryTag.Local, arch.threadLocalDepth)
-
-  private val spacesToFree = Seq(dram0Space, dram1Space, localSpace)
-
-  private val allocator = new MemoryObjectAllocator(
-    new MemorySpanAllocator()
-  )
+  private val freeableSpaces = Seq(ioSpace, varsSpace, constsSpace).distinct
 
   private abstract class PendingConsts {
     def add(
@@ -127,8 +115,8 @@ class MemoryManager(
       if (outputObj.span(0).tag == MemoryTag.Local) {
         (
           true,
-          allocator.allocateObject(
-            dram0Space,
+          freeableAllocator.allocateObject(
+            ioSpace,
             name,
             outputObj.dims,
             Seq(MemoryManager.ReservedConsumers.Output)
@@ -147,8 +135,8 @@ class MemoryManager(
       dims: MemoryDimensions,
       consumers: Seq[String]
   ): MemoryObject = {
-    val inputObj = allocator.allocateObject(
-      dram0Space,
+    val inputObj = freeableAllocator.allocateObject(
+      ioSpace,
       name,
       dims,
       consumers
@@ -166,9 +154,8 @@ class MemoryManager(
       dims: MemoryDimensions,
       consumers: Seq[String]
   ): MemoryObject =
-    allocator.allocateObject(
-      //localSpace,
-      dram0Space,
+    freeableAllocator.allocateObject(
+      varsSpace,
       name,
       dims,
       consumers
@@ -181,7 +168,7 @@ class MemoryManager(
       blendeeNames: Seq[String],
       blendedAddresses: MemorySpan
   ): MemoryObject = {
-    val obj = allocator.blendObjects(
+    val obj = freeableAllocator.blendObjects(
       name,
       dims,
       consumers,
@@ -194,18 +181,18 @@ class MemoryManager(
     obj
   }
 
-  def hasObject(name: String): Boolean = allocator.hasObject(name)
+  def hasObject(name: String): Boolean = freeableAllocator.hasObject(name)
 
   def resolveRefToObject(ref: MemoryRef): Option[MemoryObject] =
-    allocator
+    freeableAllocator
       .resolveRefToObject(ref)
       .orElse(tempAllocator.resolveRefToObject(ref))
 
   def consumeObject(name: String, consumers: Seq[String]): MemoryObject =
-    allocator.consumeObject(name, consumers)
+    freeableAllocator.consumeObject(name, consumers)
 
   def consumeAllObjects(consumers: Seq[String]): Unit =
-    allocator.consumeAllObjects(consumers)
+    freeableAllocator.consumeAllObjects(consumers)
 
   def allocateTempObject(
       name: String,
@@ -214,11 +201,11 @@ class MemoryManager(
     tempAllocator.allocateObject(tempSpace, name, dims, Nil)
 
   def freeConsumedObjects(): Unit = {
-    allocator.freeConsumedObjects(spacesToFree)
+    freeableAllocator.freeConsumedObjects(freeableSpaces)
   }
 
-  def reportObjects() = allocator.reportObjects()
-  def reportSpans()   = allocator.reportSpans()
+  def reportObjects() = freeableAllocator.reportObjects()
+  def reportSpans()   = freeableAllocator.reportSpans()
 
   def getOrEmitWeightsAndBiasObjects(
       weightsName: String,
@@ -228,9 +215,9 @@ class MemoryManager(
       if (biasName.isDefined) {
         val resolvedBiasName = biasName.get
 
-        if (allocator.hasObject(resolvedBiasName))
+        if (freeableAllocator.hasObject(resolvedBiasName))
           Some(
-            allocator.consumeObject(resolvedBiasName, Nil)
+            freeableAllocator.consumeObject(resolvedBiasName, Nil)
           )
         else
           Some(mkConstObject(resolvedBiasName, constsDataStream))
@@ -241,8 +228,8 @@ class MemoryManager(
     val resolvedWeightsName = weightsName
 
     val weightsObject =
-      if (allocator.hasObject(resolvedWeightsName))
-        allocator.consumeObject(
+      if (freeableAllocator.hasObject(resolvedWeightsName))
+        freeableAllocator.consumeObject(
           resolvedWeightsName,
           Nil
         )
@@ -257,8 +244,8 @@ class MemoryManager(
       broadcastDims: Option[MemoryDimensions] = None
   ): MemoryObject = {
     val constObject =
-      if (allocator.hasObject(name))
-        allocator.consumeObject(name, Nil)
+      if (freeableAllocator.hasObject(name))
+        freeableAllocator.consumeObject(name, Nil)
       else
         mkConstObject(name, constsDataStream, broadcastDims)
 
@@ -311,8 +298,8 @@ class MemoryManager(
 
     addConstSize(dims.sizeScalars, dims.sizeVectors)
 
-    val constObj = allocator.allocateObject(
-      dram1Space,
+    val constObj = freeableAllocator.allocateObject(
+      constsSpace,
       name,
       dims,
       Seq(MemoryManager.ReservedConsumers.Consts)

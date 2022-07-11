@@ -22,6 +22,10 @@ import tensil.tools.compiler.{
   OnnxFrontend,
   EmitContext,
   MemoryManager,
+  ArenaMemorySpace,
+  HeapMemorySpace,
+  MemoryObjectAllocator,
+  MemorySpanAllocator,
   StrideStats,
   MemoryObject,
   MemoryTag,
@@ -264,7 +268,29 @@ object Compiler {
           s"No frontend to support ${modelSourceType}"
         )
 
+    val tempSpace =
+      ArenaMemorySpace("Temp", MemoryTag.Temp, Long.MaxValue)
+    val tempAllocator = new MemoryObjectAllocator(
+      new MemorySpanAllocator()
+    )
+
+    val dram0Space =
+      HeapMemorySpace("DRAM0", MemoryTag.DRAM0, options.arch.dram0Depth)
+    val dram1Space =
+      HeapMemorySpace("DRAM1", MemoryTag.DRAM1, options.arch.dram1Depth)
+    val localSpace =
+      HeapMemorySpace("Local", MemoryTag.Local, options.arch.threadLocalDepth)
+    val freeableAllocator = new MemoryObjectAllocator(
+      new MemorySpanAllocator()
+    )
+
     val mm = new MemoryManager(
+      tempSpace = tempSpace,
+      tempAllocator = tempAllocator,
+      ioSpace = dram0Space,
+      varsSpace = dram0Space,
+      constsSpace = dram1Space,
+      freeableAllocator = freeableAllocator,
       constsStream = constsStream,
       dataType = options.arch.dataType,
       arch = options.arch,
@@ -357,8 +383,8 @@ object Compiler {
         backend.instructionsCount * layout.instructionSizeBytes
       val stats =
         CompilerStats(
-          constsUsedSize = mm.dram1Space.maxSize,
-          varsUsedSize = mm.dram0Space.maxSize,
+          constsUsedSize = dram1Space.maxSize,
+          varsUsedSize = dram0Space.maxSize,
           layersNumber = layerSchedulerResults.size,
           programSizeBytes = programSizeBytes,
           constsScalarSize = mm.constsScalarSize,
@@ -385,37 +411,41 @@ object Compiler {
 
         tb.addNamedLine("Model", modelName)
         layout.addTableLines(tb)
-        tb.addNamedLine(
-          "DRAM0 maximum usage (vectors/scalars)",
-          mm.dram0Space.maxSize,
-          mm.dram0Space.maxSize * options.arch.arraySize
-        )
-        tb.addNamedLine(
-          "DRAM0 aggregate usage (vectors/scalars)",
-          mm.dram0Space.aggSize,
-          mm.dram0Space.aggSize * options.arch.arraySize
-        )
-        tb.addNamedLine(
-          "DRAM1 maximum usage (vectors/scalars)",
-          mm.dram1Space.maxSize,
-          mm.dram1Space.maxSize * options.arch.arraySize
-        )
-        tb.addNamedLine(
-          "DRAM1 aggregate usage (vectors/scalars)",
-          mm.dram1Space.aggSize,
-          mm.dram1Space.aggSize * options.arch.arraySize
-        )
-        if (mm.localSpace.maxSize != 0)
+        if (dram0Space.maxSize != 0)
+          tb.addNamedLine(
+            "DRAM0 maximum usage (vectors/scalars)",
+            dram0Space.maxSize,
+            dram0Space.maxSize * options.arch.arraySize
+          )
+        if (dram0Space.aggSize != 0)
+          tb.addNamedLine(
+            "DRAM0 aggregate usage (vectors/scalars)",
+            dram0Space.aggSize,
+            dram0Space.aggSize * options.arch.arraySize
+          )
+        if (dram1Space.maxSize != 0)
+          tb.addNamedLine(
+            "DRAM1 maximum usage (vectors/scalars)",
+            dram1Space.maxSize,
+            dram1Space.maxSize * options.arch.arraySize
+          )
+        if (dram1Space.aggSize != 0)
+          tb.addNamedLine(
+            "DRAM1 aggregate usage (vectors/scalars)",
+            dram1Space.aggSize,
+            dram1Space.aggSize * options.arch.arraySize
+          )
+        if (localSpace.maxSize != 0)
           tb.addNamedLine(
             "Local memory maximum usage (vectors/scalars)",
-            mm.localSpace.maxSize,
-            mm.localSpace.maxSize * options.arch.arraySize
+            localSpace.maxSize,
+            localSpace.maxSize * options.arch.arraySize
           )
-        if (mm.localSpace.aggSize != 0)
+        if (localSpace.aggSize != 0)
           tb.addNamedLine(
             "Local memory aggregate usage (vectors/scalars)",
-            mm.localSpace.aggSize,
-            mm.localSpace.aggSize * options.arch.arraySize
+            localSpace.aggSize,
+            localSpace.aggSize * options.arch.arraySize
           )
         tb.addNamedLine("Number of layers", layerSchedulerResults.size)
         Stats.printSummary(

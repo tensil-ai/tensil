@@ -16,6 +16,8 @@ object MemoryManager {
   object ReservedConsumers {
     val Output = "~output~"
     val Consts = "~consts~"
+
+    val All = Seq(Output, Consts)
   }
 }
 
@@ -119,8 +121,7 @@ class MemoryManager(
   def outputObjects = outputObjectsBuffer.toSeq
 
   def emitOutputObject(name: String): (MemoryObject, Option[MemoryObject]) = {
-    val outputObj =
-      consumeObject(name, Seq(MemoryManager.ReservedConsumers.Output))
+    val outputObj = consumeObject(name, Nil)
 
     val (nonFinal, finalOutputObj) =
       if (outputObj.span(0).tag == MemoryTag.Local) {
@@ -130,7 +131,7 @@ class MemoryManager(
             dram0Space,
             name,
             outputObj.dims,
-            Nil
+            Seq(MemoryManager.ReservedConsumers.Output)
           )
         )
       } else
@@ -203,6 +204,9 @@ class MemoryManager(
   def consumeObject(name: String, consumers: Seq[String]): MemoryObject =
     allocator.consumeObject(name, consumers)
 
+  def consumeAllObjects(consumers: Seq[String]): Unit =
+    allocator.consumeAllObjects(consumers)
+
   def allocateTempObject(
       name: String,
       dims: MemoryDimensions
@@ -227,7 +231,7 @@ class MemoryManager(
         if (allocator.hasObject(resolvedBiasName))
           Some(
             allocator.consumeObject(resolvedBiasName, Nil)
-          ) // TODO: consume pinned object
+          )
         else
           Some(mkConstObject(resolvedBiasName, constsDataStream))
 
@@ -241,7 +245,7 @@ class MemoryManager(
         allocator.consumeObject(
           resolvedWeightsName,
           Nil
-        ) // TODO: consume pinned object
+        )
       else
         mkConstObject(resolvedWeightsName, constsDataStream)
 
@@ -254,7 +258,7 @@ class MemoryManager(
   ): MemoryObject = {
     val constObject =
       if (allocator.hasObject(name))
-        allocator.consumeObject(name, Nil) // TODO: consume pinned object
+        allocator.consumeObject(name, Nil)
       else
         mkConstObject(name, constsDataStream, broadcastDims)
 

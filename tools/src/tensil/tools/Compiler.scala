@@ -338,6 +338,10 @@ object Compiler {
         }
       }
 
+      mm.consumeAllObjects(MemoryManager.ReservedConsumers.All)
+      mm.freeConsumedObjects()
+      mm.reportObjects()
+
       if (frontend.graphPrinter.isDefined) frontend.graphPrinter.get.endPrint
 
       backend.writeSegments(

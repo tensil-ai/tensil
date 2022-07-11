@@ -147,7 +147,7 @@ object Main extends App {
 
     val constsStream = new FileInputStream(model.consts(0).fileName)
 
-    emulator.writeDRAM1(
+    emulator.writeDRAM1( //writeLocal(
       model.consts(0).size,
       constsStream
     )

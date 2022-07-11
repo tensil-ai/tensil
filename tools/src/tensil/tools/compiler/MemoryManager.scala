@@ -27,6 +27,7 @@ class MemoryManager(
     ioSpace: MemorySpace,
     varsSpace: MemorySpace,
     constsSpace: MemorySpace,
+    freeableSpaces: Seq[MemorySpace],
     freeableAllocator: MemoryObjectAllocator,
     constsStream: OutputStream,
     dataType: ArchitectureDataType,
@@ -35,8 +36,6 @@ class MemoryManager(
     traceContext: TraceContext,
     tracepointConditions: Seq[TracepointCondition]
 ) {
-  private val freeableSpaces = Seq(ioSpace, varsSpace, constsSpace).distinct
-
   private abstract class PendingConsts {
     def add(
         name: String,
@@ -253,19 +252,21 @@ class MemoryManager(
   }
 
   def constsUtilization =
-    if (constsUtilizations.isEmpty) 0f
+    if (constsSizesBuffer.isEmpty) 0f
     else
-      constsUtilizations.sum / constsUtilizations.size.toFloat
+      constsSizesBuffer
+        .map(p => p._1.toFloat / (p._2 * arch.arraySize).toFloat)
+        .sum / constsSizesBuffer.size.toFloat
 
-  def constsScalarSize = constsScalarSizes.sum
+  def constsScalarSize = constsSizesBuffer.map(_._1).sum
+  def constsVectorSize = constsSizesBuffer.map(_._2).sum
 
-  private var constsUtilizations = mutable.ArrayBuffer.empty[Float]
-  private var constsScalarSizes  = mutable.ArrayBuffer.empty[Long]
+  private var constsUtilizationBuffer = mutable.ArrayBuffer.empty[Float]
+  private var constsSizesBuffer       = mutable.ArrayBuffer.empty[(Long, Long)]
 
   private def addConstSize(scalarSize: Long, vectorSize: Long): Unit =
     if (scalarSize != 0 && vectorSize != 0) {
-      constsUtilizations += scalarSize.toFloat / (vectorSize * arch.arraySize).toFloat
-      constsScalarSizes += scalarSize
+      constsSizesBuffer += ((scalarSize, vectorSize))
     }
 
   private def mkConstObject(

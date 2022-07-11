@@ -35,12 +35,12 @@ import tensil.tools.compiler.{
   StandardSchedulingContext,
   StandardSchedulingContext2
 }
+import tensil.tools.compiler.NilHIR
 
 class CompilerException(message: String) extends Exception(message) {}
 
 case class CompilerStats(
-    constsUsedSize: Long,
-    varsUsedSize: Long,
+    constsVectorSize: Long,
     layersNumber: Int,
     programSizeBytes: Long,
     constsScalarSize: Long,
@@ -195,7 +195,7 @@ object Compiler {
         ConstsEntry(
           fileName = constsFileName,
           base = 0,
-          size = result.stats.constsUsedSize
+          size = result.stats.constsVectorSize
         )
       ),
       inputs = objectsToEntries(result.inputObjects),
@@ -284,12 +284,43 @@ object Compiler {
       new MemorySpanAllocator()
     )
 
-    val mm = new MemoryManager(
+    val layout =
+      InstructionLayout(options.arch)
+
+    var layerSchedulerResults = mutable.ArrayBuffer.empty[SchedulerResult]
+    var macs                  = 0L
+    var macEfficiency         = 0f
+    val backendStats          = new Stats()
+
+    if (options.printProgress)
+      println(
+        s"Traversing from output node(s): ${outputNames.mkString(",")} ..."
+      )
+
+    val flowNodeNames = frontend.traverse(outputNames)
+
+    if (options.printProgress) {
+      println(s"Found ${flowNodeNames.size} node(s)")
+      println(s"Rewriting emitters ...")
+    }
+
+    val flowEmitters = frontend.rewrite(flowNodeNames)
+
+    if (options.printProgress) {
+      println(s"Rewritten to ${flowEmitters.size} emitter(s)")
+    }
+
+    var nextLayerIndex    = 0
+    val schedulingContext = new StandardSchedulingContext(options)
+    //new StandardSchedulingContext2(options, localSpace)
+
+    val mm1 = new MemoryManager(
       tempSpace = tempSpace,
       tempAllocator = tempAllocator,
       ioSpace = dram0Space,
       varsSpace = dram0Space,
       constsSpace = dram1Space,
+      freeableSpaces = Seq(dram0Space, dram1Space),
       freeableAllocator = freeableAllocator,
       constsStream = constsStream,
       dataType = options.arch.dataType,
@@ -299,295 +330,311 @@ object Compiler {
       tracepointConditions = options.tracepointConditions
     )
 
-    val layout =
-      InstructionLayout(options.arch)
+    /*val mm1 = new MemoryManager(
+      tempSpace = tempSpace,
+      tempAllocator = tempAllocator,
+      ioSpace = tempSpace,
+      varsSpace = tempSpace,
+      constsSpace = localSpace,
+      freeableSpaces = Seq(localSpace),
+      freeableAllocator = freeableAllocator,
+      constsStream = constsStream,
+      dataType = options.arch.dataType,
+      arch = options.arch,
+      mkConstsDimensions = frontend.mkConstsDimensions,
+      traceContext = traceContext,
+      tracepointConditions = options.tracepointConditions
+    )
+
+    if (options.printProgress) {
+      println("Pass 1")
+    }
+
+    for (emitter <- flowEmitters) {
+      emitter(
+        EmitContext(
+          hir = new NilHIR(),
+          mm = mm1,
+          outputNames = outputNames
+        )
+      )
+
+      mm1.freeConsumedObjects()
+    }
+
+    val mm2 = new MemoryManager(
+      tempSpace = tempSpace,
+      tempAllocator = tempAllocator,
+      ioSpace = dram0Space,
+      varsSpace = localSpace,
+      constsSpace = tempSpace,
+      freeableSpaces = Seq(dram0Space, localSpace),
+      freeableAllocator = freeableAllocator,
+      constsStream = constsStream,
+      dataType = options.arch.dataType,
+      arch = options.arch,
+      mkConstsDimensions = frontend.mkConstsDimensions,
+      traceContext = traceContext,
+      tracepointConditions = options.tracepointConditions
+    )
+
+    if (options.printProgress) {
+      println("Pass 2")
+    }*/
+
+    val mm2 = mm1
+
     val backend = new Backend(
       layout = layout,
       tracepointConditions = options.tracepointConditions,
-      resolveRefToObject = mm.resolveRefToObject(_),
+      resolveRefToObject = mm2.resolveRefToObject(_),
       traceContext = traceContext
     )
 
-    var layerSchedulerResults = mutable.ArrayBuffer.empty[SchedulerResult]
-    var macs                  = 0L
-    var macEfficiency         = 0f
-    val backendStats          = new Stats()
-
-    try {
-      if (options.printProgress)
-        println(
-          s"Traversing from output node(s): ${outputNames.mkString(",")} ..."
+    for (emitter <- flowEmitters) {
+      if (frontend.graphPrinter.isDefined)
+        frontend.graphPrinter.get.startLayer(
+          s"layer_${nextLayerIndex}"
         )
 
-      val flowNodeNames = frontend.traverse(outputNames)
+      val scheduler = schedulingContext.mkScheduler(nextLayerIndex)
 
-      if (options.printProgress) {
-        println(s"Found ${flowNodeNames.size} node(s)")
-        println(s"Rewriting emitters ...")
-      }
-
-      val flowEmitters = frontend.rewrite(flowNodeNames)
-
-      if (options.printProgress) {
-        println(s"Rewritten to ${flowEmitters.size} emitter(s)")
-      }
-
-      var nextLayerIndex    = 0
-      val schedulingContext = new StandardSchedulingContext(options)
-      //new StandardSchedulingContext2(options, mm.localSpace)
-
-      for (emitter <- flowEmitters) {
-        if (frontend.graphPrinter.isDefined)
-          frontend.graphPrinter.get.startLayer(
-            s"layer_${nextLayerIndex}"
-          )
-
-        val scheduler = schedulingContext.mkScheduler(nextLayerIndex)
-
-        emitter(
-          EmitContext(
-            hir = scheduler,
-            mm = mm,
-            outputNames = outputNames
-          )
+      emitter(
+        EmitContext(
+          hir = scheduler,
+          mm = mm2,
+          outputNames = outputNames
         )
-
-        if (frontend.graphPrinter.isDefined)
-          frontend.graphPrinter.get.endLayer()
-
-        val r = scheduler.lower(backend)
-        mm.freeConsumedObjects()
-
-        if (r.numberOfStages != 0) {
-          nextLayerIndex += 1
-          layerSchedulerResults += r
-        }
-      }
-
-      mm.consumeAllObjects(MemoryManager.ReservedConsumers.All)
-      mm.freeConsumedObjects()
-      mm.reportObjects()
-
-      if (frontend.graphPrinter.isDefined) frontend.graphPrinter.get.endPrint
-
-      backend.writeSegments(
-        programStream,
-        programAssemblyFilePath,
-        Some(backendStats)
       )
 
-      macs = layerSchedulerResults.map(_.macs).sum
-      macEfficiency = Stats.macEfficiency(backendStats, options.arch, macs)
+      if (frontend.graphPrinter.isDefined)
+        frontend.graphPrinter.get.endLayer()
 
-      val programSizeBytes =
-        backend.instructionsCount * layout.instructionSizeBytes
-      val stats =
-        CompilerStats(
-          constsUsedSize = dram1Space.maxSize,
-          varsUsedSize = dram0Space.maxSize,
-          layersNumber = layerSchedulerResults.size,
-          programSizeBytes = programSizeBytes,
-          constsScalarSize = mm.constsScalarSize,
-          constsUtilization = mm.constsUtilization,
-          cycles = backendStats.executionCycles,
-          energy = backendStats.executionEnergy,
-          macs = macs,
-          macEfficiency = macEfficiency
-        )
+      val r = scheduler.lower(backend)
+      mm2.freeConsumedObjects()
 
-      CompilerResult(
-        arch = options.arch,
-        inputObjects = mm.inputObjects,
-        outputObjects = mm.outputObjects,
-        stats = stats
+      if (r.numberOfStages != 0) {
+        nextLayerIndex += 1
+        layerSchedulerResults += r
+      }
+    }
+
+    mm2.consumeAllObjects(MemoryManager.ReservedConsumers.All)
+    mm2.freeConsumedObjects()
+
+    require(freeableAllocator.isEmpty)
+
+    if (frontend.graphPrinter.isDefined) frontend.graphPrinter.get.endPrint
+
+    backend.writeSegments(
+      programStream,
+      programAssemblyFilePath,
+      Some(backendStats)
+    )
+
+    macs = layerSchedulerResults.map(_.macs).sum
+    macEfficiency = Stats.macEfficiency(backendStats, options.arch, macs)
+
+    val programSizeBytes =
+      backend.instructionsCount * layout.instructionSizeBytes
+    val stats =
+      CompilerStats(
+        constsVectorSize = mm1.constsVectorSize,
+        layersNumber = layerSchedulerResults.size,
+        programSizeBytes = programSizeBytes,
+        constsScalarSize = mm1.constsScalarSize,
+        constsUtilization = mm1.constsUtilization,
+        cycles = backendStats.executionCycles,
+        energy = backendStats.executionEnergy,
+        macs = macs,
+        macEfficiency = macEfficiency
       )
-    } finally {
-      val endTime = System.nanoTime()
 
-      if (graphStream.isDefined) graphStream.get.close()
+    val endTime = System.nanoTime()
 
-      if (options.printSummary) {
-        val tb = new TablePrinter(Some("COMPILER SUMMARY"))
+    if (graphStream.isDefined) graphStream.get.close()
 
-        tb.addNamedLine("Model", modelName)
-        layout.addTableLines(tb)
-        if (dram0Space.maxSize != 0)
-          tb.addNamedLine(
-            "DRAM0 maximum usage (vectors/scalars)",
-            dram0Space.maxSize,
-            dram0Space.maxSize * options.arch.arraySize
-          )
-        if (dram0Space.aggSize != 0)
-          tb.addNamedLine(
-            "DRAM0 aggregate usage (vectors/scalars)",
-            dram0Space.aggSize,
-            dram0Space.aggSize * options.arch.arraySize
-          )
-        if (dram1Space.maxSize != 0)
-          tb.addNamedLine(
-            "DRAM1 maximum usage (vectors/scalars)",
-            dram1Space.maxSize,
-            dram1Space.maxSize * options.arch.arraySize
-          )
-        if (dram1Space.aggSize != 0)
-          tb.addNamedLine(
-            "DRAM1 aggregate usage (vectors/scalars)",
-            dram1Space.aggSize,
-            dram1Space.aggSize * options.arch.arraySize
-          )
-        if (localSpace.maxSize != 0)
-          tb.addNamedLine(
-            "Local memory maximum usage (vectors/scalars)",
-            localSpace.maxSize,
-            localSpace.maxSize * options.arch.arraySize
-          )
-        if (localSpace.aggSize != 0)
-          tb.addNamedLine(
-            "Local memory aggregate usage (vectors/scalars)",
-            localSpace.aggSize,
-            localSpace.aggSize * options.arch.arraySize
-          )
-        tb.addNamedLine("Number of layers", layerSchedulerResults.size)
-        Stats.printSummary(
-          backendStats,
-          tb,
-          options.arch,
-          Some(macs)
-        )
+    if (options.printSummary) {
+      val tb = new TablePrinter(Some("COMPILER SUMMARY"))
+
+      tb.addNamedLine("Model", modelName)
+      layout.addTableLines(tb)
+      if (dram0Space.maxSize != 0)
         tb.addNamedLine(
-          "Total number of instructions",
-          backend.instructionsCount
+          "DRAM0 maximum usage (vectors/scalars)",
+          dram0Space.maxSize,
+          dram0Space.maxSize * options.arch.arraySize
         )
+      if (dram0Space.aggSize != 0)
         tb.addNamedLine(
-          "Compilation time (seconds)",
-          (endTime - startTime).toFloat / 1e9f
+          "DRAM0 aggregate usage (vectors/scalars)",
+          dram0Space.aggSize,
+          dram0Space.aggSize * options.arch.arraySize
         )
-        tb.addNamedLine("True consts scalar size", mm.constsScalarSize)
-        tb.addNamedLine("Consts utilization (%)", mm.constsUtilization * 100f)
+      if (dram1Space.maxSize != 0)
+        tb.addNamedLine(
+          "DRAM1 maximum usage (vectors/scalars)",
+          dram1Space.maxSize,
+          dram1Space.maxSize * options.arch.arraySize
+        )
+      if (dram1Space.aggSize != 0)
+        tb.addNamedLine(
+          "DRAM1 aggregate usage (vectors/scalars)",
+          dram1Space.aggSize,
+          dram1Space.aggSize * options.arch.arraySize
+        )
+      if (localSpace.maxSize != 0)
+        tb.addNamedLine(
+          "Local memory maximum usage (vectors/scalars)",
+          localSpace.maxSize,
+          localSpace.maxSize * options.arch.arraySize
+        )
+      if (localSpace.aggSize != 0)
+        tb.addNamedLine(
+          "Local memory aggregate usage (vectors/scalars)",
+          localSpace.aggSize,
+          localSpace.aggSize * options.arch.arraySize
+        )
+      tb.addNamedLine("Number of layers", layerSchedulerResults.size)
+      Stats.printSummary(
+        backendStats,
+        tb,
+        options.arch,
+        Some(macs)
+      )
+      tb.addNamedLine(
+        "Total number of instructions",
+        backend.instructionsCount
+      )
+      tb.addNamedLine(
+        "Compilation time (seconds)",
+        (endTime - startTime).toFloat / 1e9f
+      )
+      tb.addNamedLine("True consts scalar size", mm1.constsScalarSize)
+      tb.addNamedLine("Consts utilization (%)", mm1.constsUtilization * 100f)
+      val (macsLetter, macsDivisor) =
+        Stats.getUnitsLetterAndDivisor(macs)
+      tb.addNamedLine(
+        s"True MACs (${macsLetter}MAC)",
+        macs.toFloat / macsDivisor
+      )
+      tb.addNamedLine("MAC efficiency (%)", macEfficiency * 100f)
+      print(tb)
+    }
+
+    if (options.printLayersSummary) {
+      val layerSchedulerResultsWithIndex =
+        layerSchedulerResults.zipWithIndex
+
+      for (
+        groupResultsWithIndex <- layerSchedulerResultsWithIndex.grouped(32)
+      ) {
+        val tb = new TablePrinter(Some("LAYERS SUMMARY"), true)
+        tb.addLine(
+          new TableLine(
+            List("Layer:") ++ groupResultsWithIndex.map(_._2)
+          )
+        )
+        tb.addLine(
+          new TableLine(
+            List(
+              "Number of stages:"
+            ) ++ groupResultsWithIndex
+              .map(_._1.numberOfStages)
+          )
+        )
+        tb.addLine(
+          new TableLine(
+            List(
+              "Number of combined stages:"
+            ) ++ groupResultsWithIndex
+              .map(_._1.numberOfCombinedStages)
+          )
+        )
+        tb.addLine(
+          new TableLine(
+            List(
+              "Number of partitions:"
+            ) ++ groupResultsWithIndex.map(_._1.numberOfPartitions)
+          )
+        )
+        val (cyclesLetter, cyclesDivisor) =
+          Stats.getUnitsLetterAndDivisor(
+            groupResultsWithIndex
+              .map(_._1.cycles)
+              .max
+          )
+        tb.addLine(
+          new TableLine(
+            List(
+              s"Latency (${cyclesLetter}Cycles):"
+            ) ++ groupResultsWithIndex
+              .map(_._1.cycles.toFloat)
+              .map(_ / cyclesDivisor)
+              .map(f => f"$f%.3f")
+          )
+        )
+        val (energyLetter, energyDivisor) =
+          Stats.getUnitsLetterAndDivisor(
+            groupResultsWithIndex
+              .map(_._1.energy)
+              .max
+          )
+        tb.addLine(
+          new TableLine(
+            List(
+              s"Energy (${energyLetter}Units):"
+            ) ++ groupResultsWithIndex
+              .map(_._1.energy.toFloat)
+              .map(_ / energyDivisor)
+              .map(f => f"$f%.3f")
+          )
+        )
         val (macsLetter, macsDivisor) =
-          Stats.getUnitsLetterAndDivisor(macs)
-        tb.addNamedLine(
-          s"True MACs (${macsLetter}MAC)",
-          macs.toFloat / macsDivisor
+          Stats.getUnitsLetterAndDivisor(
+            groupResultsWithIndex
+              .map(_._1.macs)
+              .max
+          )
+        tb.addLine(
+          new TableLine(
+            List(
+              s"True MACs (${macsLetter}MAC):"
+            ) ++ groupResultsWithIndex
+              .map(_._1.macs.toFloat)
+              .map(_ / macsDivisor)
+              .map(f => f"$f%.3f")
+          )
         )
-        tb.addNamedLine("MAC efficiency (%)", macEfficiency * 100f)
+        tb.addLine(
+          new TableLine(
+            List(
+              "MAC efficiency (%):"
+            ) ++ groupResultsWithIndex
+              .map(_._1.macEfficiency)
+              .map(_ * 100f)
+              .map(f => f"$f%.1f")
+          )
+        )
+        tb.addLine(
+          new TableLine(
+            List(
+              "Accumulator utilization (%):"
+            ) ++ groupResultsWithIndex
+              .map(_._1.accumulatorUtilization)
+              .map(_ * 100f)
+              .map(f => f"$f%.1f")
+          )
+        )
+        tb.addLine(
+          new TableLine(
+            List("Local utilization (%):") ++ groupResultsWithIndex
+              .map(_._1.localUtilization)
+              .map(_ * 100f)
+              .map(f => f"$f%.1f")
+          )
+        )
         print(tb)
-      }
-
-      if (options.printLayersSummary) {
-        val layerSchedulerResultsWithIndex =
-          layerSchedulerResults.zipWithIndex
-
-        for (
-          groupResultsWithIndex <- layerSchedulerResultsWithIndex.grouped(32)
-        ) {
-          val tb = new TablePrinter(Some("LAYERS SUMMARY"), true)
-          tb.addLine(
-            new TableLine(
-              List("Layer:") ++ groupResultsWithIndex.map(_._2)
-            )
-          )
-          tb.addLine(
-            new TableLine(
-              List(
-                "Number of stages:"
-              ) ++ groupResultsWithIndex
-                .map(_._1.numberOfStages)
-            )
-          )
-          tb.addLine(
-            new TableLine(
-              List(
-                "Number of combined stages:"
-              ) ++ groupResultsWithIndex
-                .map(_._1.numberOfCombinedStages)
-            )
-          )
-          tb.addLine(
-            new TableLine(
-              List(
-                "Number of partitions:"
-              ) ++ groupResultsWithIndex.map(_._1.numberOfPartitions)
-            )
-          )
-          val (cyclesLetter, cyclesDivisor) =
-            Stats.getUnitsLetterAndDivisor(
-              groupResultsWithIndex
-                .map(_._1.cycles)
-                .max
-            )
-          tb.addLine(
-            new TableLine(
-              List(
-                s"Latency (${cyclesLetter}Cycles):"
-              ) ++ groupResultsWithIndex
-                .map(_._1.cycles.toFloat)
-                .map(_ / cyclesDivisor)
-                .map(f => f"$f%.3f")
-            )
-          )
-          val (energyLetter, energyDivisor) =
-            Stats.getUnitsLetterAndDivisor(
-              groupResultsWithIndex
-                .map(_._1.energy)
-                .max
-            )
-          tb.addLine(
-            new TableLine(
-              List(
-                s"Energy (${energyLetter}Units):"
-              ) ++ groupResultsWithIndex
-                .map(_._1.energy.toFloat)
-                .map(_ / energyDivisor)
-                .map(f => f"$f%.3f")
-            )
-          )
-          val (macsLetter, macsDivisor) =
-            Stats.getUnitsLetterAndDivisor(
-              groupResultsWithIndex
-                .map(_._1.macs)
-                .max
-            )
-          tb.addLine(
-            new TableLine(
-              List(
-                s"True MACs (${macsLetter}MAC):"
-              ) ++ groupResultsWithIndex
-                .map(_._1.macs.toFloat)
-                .map(_ / macsDivisor)
-                .map(f => f"$f%.3f")
-            )
-          )
-          tb.addLine(
-            new TableLine(
-              List(
-                "MAC efficiency (%):"
-              ) ++ groupResultsWithIndex
-                .map(_._1.macEfficiency)
-                .map(_ * 100f)
-                .map(f => f"$f%.1f")
-            )
-          )
-          tb.addLine(
-            new TableLine(
-              List(
-                "Accumulator utilization (%):"
-              ) ++ groupResultsWithIndex
-                .map(_._1.accumulatorUtilization)
-                .map(_ * 100f)
-                .map(f => f"$f%.1f")
-            )
-          )
-          tb.addLine(
-            new TableLine(
-              List("Local utilization (%):") ++ groupResultsWithIndex
-                .map(_._1.localUtilization)
-                .map(_ * 100f)
-                .map(f => f"$f%.1f")
-            )
-          )
-          print(tb)
-        }
       }
 
       if (options.printInstructionsSummary) {
@@ -628,5 +675,12 @@ object Compiler {
 
       options.arch.dataType.reportAndResetOverUnderflowStats()
     }
+
+    CompilerResult(
+      arch = options.arch,
+      inputObjects = mm2.inputObjects,
+      outputObjects = mm2.outputObjects,
+      stats = stats
+    )
   }
 }

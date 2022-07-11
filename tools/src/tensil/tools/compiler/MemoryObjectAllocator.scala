@@ -25,6 +25,8 @@ class MemoryObjectAllocator(
   private val allocations = mutable.Map.empty[String, Allocation]
   private val refs        = mutable.ArrayBuffer.empty[Allocation]
 
+  def isEmpty = allocations.isEmpty
+
   def reportObjects(): Unit = {
     val tp = new TablePrinter(Some("MEMORY OBJECTS"))
 

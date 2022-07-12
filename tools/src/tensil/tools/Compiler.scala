@@ -385,9 +385,11 @@ object Compiler {
       }
     }
 
-    val (mmPass2, freeableSpaces) = options.strategy match {
-      case CompilerStrategy.LocalIsolated | CompilerStrategy.LocalVars =>
+    val (mmPass2, spacesToFree) = options.strategy match {
+      case CompilerStrategy.LocalIsolated =>
         (mmPass1, Seq(dram0Space, dram1Space))
+      case CompilerStrategy.LocalVars =>
+        (mmPass1, Seq(dram0Space, dram1Space, localSpace))
       case CompilerStrategy.LocalConsts =>
         (
           new MemoryManager(
@@ -456,7 +458,7 @@ object Compiler {
         frontend.graphPrinter.get.endLayer()
 
       val r = scheduler.lower(backend)
-      freeableAllocator.freeConsumedObjects(freeableSpaces)
+      freeableAllocator.freeConsumedObjects(spacesToFree)
 
       if (r.numberOfStages != 0) {
         nextLayerIndex += 1
@@ -465,7 +467,7 @@ object Compiler {
     }
 
     freeableAllocator.consumeAllObjects(MemoryManager.ReservedConsumers.All)
-    freeableAllocator.freeConsumedObjects(freeableSpaces)
+    freeableAllocator.freeConsumedObjects(spacesToFree)
 
     require(freeableAllocator.isEmpty)
 

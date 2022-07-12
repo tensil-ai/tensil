@@ -127,15 +127,17 @@ object Top extends App {
     opt[Int]('d', "dram-axi-width")
       .valueName("32|64|128|256")
       .validate(x =>
-        if (Seq(32, 64, 128, 256).contains(x)) success
-        else failure("Value must be 32, 64, 128 or 256")
+        if (Seq(32, 64, 128, 256, 512, 1024).contains(x)) success
+        else failure("Value must be 32, 64, 128, 256, 512 or 1024")
       )
       .action((x, c) =>
         c.copy(dramAxiConfig = x match {
-          case 32  => axi.Config.Xilinx
-          case 64  => axi.Config.Xilinx64
-          case 128 => axi.Config.Xilinx128
-          case 256 => axi.Config.Xilinx256
+          case 32   => axi.Config.Xilinx
+          case 64   => axi.Config.Xilinx64
+          case 128  => axi.Config.Xilinx128
+          case 256  => axi.Config.Xilinx256
+          case 512  => axi.Config.Xilinx512
+          case 1024 => axi.Config.Xilinx1024
         })
       )
       .text("Optional DRAM0 and DRAM1 AXI width, defaults to 64")

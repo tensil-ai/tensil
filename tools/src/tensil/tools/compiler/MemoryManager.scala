@@ -27,7 +27,6 @@ class MemoryManager(
     ioSpace: MemorySpace,
     varsSpace: MemorySpace,
     constsSpace: MemorySpace,
-    freeableSpaces: Seq[MemorySpace],
     freeableAllocator: MemoryObjectAllocator,
     constsStream: OutputStream,
     dataType: ArchitectureDataType,
@@ -182,29 +181,14 @@ class MemoryManager(
 
   def hasObject(name: String): Boolean = freeableAllocator.hasObject(name)
 
-  def resolveRefToObject(ref: MemoryRef): Option[MemoryObject] =
-    freeableAllocator
-      .resolveRefToObject(ref)
-      .orElse(tempAllocator.resolveRefToObject(ref))
-
   def consumeObject(name: String, consumers: Seq[String]): MemoryObject =
     freeableAllocator.consumeObject(name, consumers)
-
-  def consumeAllObjects(consumers: Seq[String]): Unit =
-    freeableAllocator.consumeAllObjects(consumers)
 
   def allocateTempObject(
       name: String,
       dims: MemoryDimensions
   ): MemoryObject =
     tempAllocator.allocateObject(tempSpace, name, dims, Nil)
-
-  def freeConsumedObjects(): Unit = {
-    freeableAllocator.freeConsumedObjects(freeableSpaces)
-  }
-
-  def reportObjects() = freeableAllocator.reportObjects()
-  def reportSpans()   = freeableAllocator.reportSpans()
 
   def getOrEmitWeightsAndBiasObjects(
       weightsName: String,
@@ -313,7 +297,10 @@ class MemoryManager(
 
   private def emitInitialTracepoints(obj: MemoryObject): Unit = {
     val writer =
-      new TracepointsWriter(tracepointConditions, resolveRefToObject(_))
+      new TracepointsWriter(
+        tracepointConditions,
+        freeableAllocator.resolveRefToObject(_)
+      )
     obj.span.foreach(writer.write(_))
     traceContext.emitTracepoints(-InstructionAddress.One, writer.toMap)
   }

@@ -320,7 +320,6 @@ object Compiler {
       ioSpace = dram0Space,
       varsSpace = dram0Space,
       constsSpace = dram1Space,
-      freeableSpaces = Seq(dram0Space, dram1Space),
       freeableAllocator = freeableAllocator,
       constsStream = constsStream,
       dataType = options.arch.dataType,
@@ -336,7 +335,6 @@ object Compiler {
       ioSpace = tempSpace,
       varsSpace = tempSpace,
       constsSpace = localSpace,
-      freeableSpaces = Seq(localSpace),
       freeableAllocator = freeableAllocator,
       constsStream = constsStream,
       dataType = options.arch.dataType,
@@ -358,8 +356,6 @@ object Compiler {
           outputNames = outputNames
         )
       )
-
-      mm1.freeConsumedObjects()
     }
 
     val mm2 = new MemoryManager(
@@ -367,8 +363,7 @@ object Compiler {
       tempAllocator = tempAllocator,
       ioSpace = dram0Space,
       varsSpace = localSpace,
-      constsSpace = tempSpace,
-      freeableSpaces = Seq(dram0Space, localSpace),
+      constsSpace = localSpace,
       freeableAllocator = freeableAllocator,
       constsStream = constsStream,
       dataType = options.arch.dataType,
@@ -377,17 +372,22 @@ object Compiler {
       traceContext = traceContext,
       tracepointConditions = options.tracepointConditions
     )
+    val freeableSpaces = Seq(dram0Space, localSpace)
 
     if (options.printProgress) {
       println("Pass 2")
     }*/
 
-    val mm2 = mm1
+    val mm2            = mm1
+    val freeableSpaces = Seq(dram0Space, dram1Space)
 
     val backend = new Backend(
       layout = layout,
       tracepointConditions = options.tracepointConditions,
-      resolveRefToObject = mm2.resolveRefToObject(_),
+      resolveRefToObject = (ref) =>
+        freeableAllocator
+          .resolveRefToObject(ref)
+          .orElse(tempAllocator.resolveRefToObject(ref)),
       traceContext = traceContext
     )
 
@@ -411,7 +411,7 @@ object Compiler {
         frontend.graphPrinter.get.endLayer()
 
       val r = scheduler.lower(backend)
-      mm2.freeConsumedObjects()
+      freeableAllocator.freeConsumedObjects(freeableSpaces)
 
       if (r.numberOfStages != 0) {
         nextLayerIndex += 1
@@ -419,8 +419,8 @@ object Compiler {
       }
     }
 
-    mm2.consumeAllObjects(MemoryManager.ReservedConsumers.All)
-    mm2.freeConsumedObjects()
+    freeableAllocator.consumeAllObjects(MemoryManager.ReservedConsumers.All)
+    freeableAllocator.freeConsumedObjects(freeableSpaces)
 
     require(freeableAllocator.isEmpty)
 

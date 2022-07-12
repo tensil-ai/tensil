@@ -1945,6 +1945,15 @@ class CompilerSpec extends AnyFlatSpec {
     numberOfThreads = 2,
   )
 
+  val HugeResNetFp16bp8Architecture = Architecture.mkWithDefaults(
+    dataType = ArchitectureDataType.FP16BP8,
+    arraySize = 32,
+    accumulatorDepth = Kibi * 16,
+    localDepth = Kibi * 64,
+    stride0Depth = 8,
+    stride1Depth = 8,
+  )
+
   it should "Compile TF float ResNet20V2 (CIFAR)" taggedAs (Slow) in {
     val name         = "resnet20v2_cifar_8x8_float"
     val traceContext = new ExecutiveTraceContext()
@@ -2157,6 +2166,154 @@ class CompilerSpec extends AnyFlatSpec {
     EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
+      traceContext = traceContext
+    )
+  }
+
+  it should "Compile TF fixed16bp8-local-vars ResNet20V2 (CIFAR)" in {
+    val name         = "resnet20v2_cifar_8x8_fixed16bp8_local_vars"
+    val traceContext = new ExecutiveTraceContext()
+    val options = CompilerOptions(
+      arch = HugeResNetFp16bp8Architecture,
+      strategy = CompilerStrategy.LocalVars,
+      printSummary = true,
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/resnet20v2_cifar.pb",
+      List("Identity"),
+      options,
+      traceContext
+    )
+
+    EmulatorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize,
+      traceContext = traceContext
+    )
+  }
+
+  it should "Compile TF fixed16bp8-local-consts ResNet20V2 (CIFAR)" in {
+    val name         = "resnet20v2_cifar_8x8_fixed16bp8_local_consts"
+    val traceContext = new ExecutiveTraceContext()
+    val options = CompilerOptions(
+      arch = HugeResNetFp16bp8Architecture,
+      strategy = CompilerStrategy.LocalConsts,
+      printSummary = true,
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/resnet20v2_cifar.pb",
+      List("Identity"),
+      options,
+      traceContext
+    )
+
+    EmulatorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize,
+      localConsts = true,
+      traceContext = traceContext
+    )
+  }
+
+  it should "Compile TF fixed16bp8-local-vars-and-consts ResNet20V2 (CIFAR)" in {
+    val name         = "resnet20v2_cifar_8x8_fixed16bp8_local_vars_and_consts"
+    val traceContext = new ExecutiveTraceContext()
+    val options = CompilerOptions(
+      arch = HugeResNetFp16bp8Architecture,
+      strategy = CompilerStrategy.LocalVarsAndConsts,
+      printSummary = true,
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/resnet20v2_cifar.pb",
+      List("Identity"),
+      options,
+      traceContext
+    )
+
+    EmulatorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize,
+      localConsts = true,
+      traceContext = traceContext
+    )
+  }
+
+  it should "Compile ONNX fixed16bp8-local-vars ResNet20V2 (CIFAR)" in {
+    val name         = "resnet20v2_cifar_fixed16bp8_onnx_local_vars"
+    val traceContext = new ExecutiveTraceContext()
+    val options = CompilerOptions(
+      arch = HugeResNetFp16bp8Architecture,
+      strategy = CompilerStrategy.LocalVars,
+      printSummary = true,
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/resnet20v2_cifar.onnx",
+      List("Identity:0"),
+      options,
+      traceContext
+    )
+
+    EmulatorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize,
+      traceContext = traceContext
+    )
+  }
+
+  it should "Compile ONNX fixed16bp8-local-consts ResNet20V2 (CIFAR)" in {
+    val name         = "resnet20v2_cifar_fixed16bp8_onnx_local_consts"
+    val traceContext = new ExecutiveTraceContext()
+    val options = CompilerOptions(
+      arch = HugeResNetFp16bp8Architecture,
+      strategy = CompilerStrategy.LocalConsts,
+      printSummary = true,
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/resnet20v2_cifar.onnx",
+      List("Identity:0"),
+      options,
+      traceContext
+    )
+
+    EmulatorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize,
+      localConsts = true,
+      traceContext = traceContext
+    )
+  }
+
+  it should "Compile ONNX fixed16bp8-local-vars-and-consts ResNet20V2 (CIFAR)" in {
+    val name         = "resnet20v2_cifar_fixed16bp8_onnx_local_vars_and_consts"
+    val traceContext = new ExecutiveTraceContext()
+    val options = CompilerOptions(
+      arch = HugeResNetFp16bp8Architecture,
+      strategy = CompilerStrategy.LocalVarsAndConsts,
+      printSummary = true,
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/resnet20v2_cifar.onnx",
+      List("Identity:0"),
+      options,
+      traceContext
+    )
+
+    EmulatorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize,
+      localConsts = true,
       traceContext = traceContext
     )
   }

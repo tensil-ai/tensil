@@ -17,7 +17,7 @@ object CompilerStrategy extends Enumeration {
 
 case class CompilerOptions(
     arch: Architecture,
-    strategy: CompilerStrategy.Kind,
+    strategy: CompilerStrategy.Kind = CompilerStrategy.LocalIsolated,
     inputShapes: CompilerInputShapes = CompilerInputShapes.mkWithBatchSize(1),
     printSummary: Boolean = false,
     printLayersSummary: Boolean = false,

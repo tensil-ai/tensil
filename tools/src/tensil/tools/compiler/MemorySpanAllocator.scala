@@ -5,8 +5,8 @@ package tensil.tools.compiler
 
 import scala.collection.mutable
 
-import _root_.tensil.tools.CompilerException
-import _root_.tensil.TablePrinter
+import tensil.tools.CompilerException
+import tensil.TablePrinter
 
 class MemorySpanAllocator() {
   private val allocatedSpans = mutable.Map.empty[MemoryRef, MemorySpan]

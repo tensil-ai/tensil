@@ -34,6 +34,7 @@ case class Args(
     inputFiles: Seq[File] = Nil,
     outputFiles: Seq[File] = Nil,
     numberOfRuns: Int = 1,
+    localConsts: Boolean = false,
 )
 
 object Main extends App {
@@ -61,6 +62,11 @@ object Main extends App {
       .valueName("<integer>")
       .action((x, c) => c.copy(numberOfRuns = x))
       .text("Number of runs")
+
+    opt[Boolean]("local-consts")
+      .valueName("true|false")
+      .action((x, c) => c.copy(localConsts = x))
+      .text("Preload consts to local memory, defaults to false")
   }
 
   argParser.parse(args, Args()) match {
@@ -81,6 +87,7 @@ object Main extends App {
             args.inputFiles,
             args.outputFiles,
             args.numberOfRuns,
+            args.localConsts,
             traceContext
           )
 
@@ -91,6 +98,7 @@ object Main extends App {
             args.inputFiles,
             args.outputFiles,
             args.numberOfRuns,
+            args.localConsts,
             traceContext
           )
 
@@ -101,6 +109,7 @@ object Main extends App {
             args.inputFiles,
             args.outputFiles,
             args.numberOfRuns,
+            args.localConsts,
             traceContext
           )
 
@@ -111,6 +120,7 @@ object Main extends App {
             args.inputFiles,
             args.outputFiles,
             args.numberOfRuns,
+            args.localConsts,
             traceContext
           )
 
@@ -121,6 +131,7 @@ object Main extends App {
             args.inputFiles,
             args.outputFiles,
             args.numberOfRuns,
+            args.localConsts,
             traceContext
           )
       }
@@ -135,6 +146,7 @@ object Main extends App {
       inputFiles: Seq[File],
       outputFiles: Seq[File],
       numberOfRuns: Int,
+      localConsts: Boolean,
       traceContext: ExecutiveTraceContext
   ): Unit = {
     require(model.inputs.size == inputFiles.size)
@@ -147,10 +159,16 @@ object Main extends App {
 
     val constsStream = new FileInputStream(model.consts(0).fileName)
 
-    emulator.writeDRAM1( //writeLocal(
-      model.consts(0).size,
-      constsStream
-    )
+    if (localConsts)
+      emulator.writeLocal(
+        model.consts(0).size,
+        constsStream
+      )
+    else
+      emulator.writeDRAM1(
+        model.consts(0).size,
+        constsStream
+      )
 
     constsStream.close()
 

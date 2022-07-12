@@ -4,7 +4,7 @@
 package tensil.tools.compiler
 
 import java.io._
-import _root_.tensil.tools.GraphPrinter
+import tensil.tools.GraphPrinter
 
 import org.tensorflow.framework.node_def.NodeDef
 

@@ -33,9 +33,9 @@ import tensil.tools.compiler.{
   SchedulerResult,
   Stats,
   IsolatedLocalSchedulingContext,
-  SharedLocalSchedulingContext
+  SharedLocalSchedulingContext,
+  NilHIR
 }
-import tensil.tools.compiler.NilHIR
 
 class CompilerException(message: String) extends Exception(message) {}
 
@@ -310,76 +310,121 @@ object Compiler {
       println(s"Rewritten to ${flowEmitters.size} emitter(s)")
     }
 
-    var nextLayerIndex    = 0
-    val schedulingContext = new IsolatedLocalSchedulingContext(options)
-    //new SharedLocalSchedulingContext(options, localSpace)
-
-    val mm1 = new MemoryManager(
-      tempSpace = tempSpace,
-      tempAllocator = tempAllocator,
-      ioSpace = dram0Space,
-      varsSpace = dram0Space,
-      constsSpace = dram1Space,
-      freeableAllocator = freeableAllocator,
-      constsStream = constsStream,
-      dataType = options.arch.dataType,
-      arch = options.arch,
-      mkConstsDimensions = frontend.mkConstsDimensions,
-      traceContext = traceContext,
-      tracepointConditions = options.tracepointConditions
-    )
-
-    /*val mm1 = new MemoryManager(
-      tempSpace = tempSpace,
-      tempAllocator = tempAllocator,
-      ioSpace = tempSpace,
-      varsSpace = tempSpace,
-      constsSpace = localSpace,
-      freeableAllocator = freeableAllocator,
-      constsStream = constsStream,
-      dataType = options.arch.dataType,
-      arch = options.arch,
-      mkConstsDimensions = frontend.mkConstsDimensions,
-      traceContext = traceContext,
-      tracepointConditions = options.tracepointConditions
-    )
-
-    if (options.printProgress) {
-      println("Pass 1")
+    var nextLayerIndex = 0
+    val schedulingContext = options.strategy match {
+      case CompilerStrategy.LocalIsolated =>
+        new IsolatedLocalSchedulingContext(options)
+      case CompilerStrategy.LocalConsts | CompilerStrategy.LocalVars |
+          CompilerStrategy.LocalVarsAndConsts =>
+        new SharedLocalSchedulingContext(options, localSpace)
     }
 
-    for (emitter <- flowEmitters) {
-      emitter(
-        EmitContext(
-          hir = new NilHIR(),
-          mm = mm1,
-          outputNames = outputNames
+    val mmPass1 = options.strategy match {
+      case CompilerStrategy.LocalIsolated =>
+        new MemoryManager(
+          tempSpace = tempSpace,
+          tempAllocator = tempAllocator,
+          ioSpace = dram0Space,
+          varsSpace = dram0Space,
+          constsSpace = dram1Space,
+          freeableAllocator = freeableAllocator,
+          constsStream = constsStream,
+          dataType = options.arch.dataType,
+          arch = options.arch,
+          mkConstsDimensions = frontend.mkConstsDimensions,
+          traceContext = traceContext,
+          tracepointConditions = options.tracepointConditions
         )
-      )
+      case CompilerStrategy.LocalVars =>
+        new MemoryManager(
+          tempSpace = tempSpace,
+          tempAllocator = tempAllocator,
+          ioSpace = dram0Space,
+          varsSpace = localSpace,
+          constsSpace = dram1Space,
+          freeableAllocator = freeableAllocator,
+          constsStream = constsStream,
+          dataType = options.arch.dataType,
+          arch = options.arch,
+          mkConstsDimensions = frontend.mkConstsDimensions,
+          traceContext = traceContext,
+          tracepointConditions = options.tracepointConditions
+        )
+      case CompilerStrategy.LocalConsts | CompilerStrategy.LocalVarsAndConsts =>
+        new MemoryManager(
+          tempSpace = tempSpace,
+          tempAllocator = tempAllocator,
+          ioSpace = tempSpace,
+          varsSpace = tempSpace,
+          constsSpace = localSpace,
+          freeableAllocator = freeableAllocator,
+          constsStream = constsStream,
+          dataType = options.arch.dataType,
+          arch = options.arch,
+          mkConstsDimensions = frontend.mkConstsDimensions,
+          traceContext = traceContext,
+          tracepointConditions = options.tracepointConditions
+        )
     }
 
-    val mm2 = new MemoryManager(
-      tempSpace = tempSpace,
-      tempAllocator = tempAllocator,
-      ioSpace = dram0Space,
-      varsSpace = localSpace,
-      constsSpace = localSpace,
-      freeableAllocator = freeableAllocator,
-      constsStream = constsStream,
-      dataType = options.arch.dataType,
-      arch = options.arch,
-      mkConstsDimensions = frontend.mkConstsDimensions,
-      traceContext = traceContext,
-      tracepointConditions = options.tracepointConditions
-    )
-    val freeableSpaces = Seq(dram0Space, localSpace)
+    if (
+      options.strategy == CompilerStrategy.LocalConsts || options.strategy == CompilerStrategy.LocalVarsAndConsts
+    ) {
+      if (options.printProgress) {
+        println("Allocating consts in local memory ...")
+      }
 
-    if (options.printProgress) {
-      println("Pass 2")
-    }*/
+      for (emitter <- flowEmitters) {
+        emitter(
+          EmitContext(
+            hir = new NilHIR(),
+            mm = mmPass1,
+            outputNames = outputNames
+          )
+        )
+      }
+    }
 
-    val mm2            = mm1
-    val freeableSpaces = Seq(dram0Space, dram1Space)
+    val (mmPass2, freeableSpaces) = options.strategy match {
+      case CompilerStrategy.LocalIsolated | CompilerStrategy.LocalVars =>
+        (mmPass1, Seq(dram0Space, dram1Space))
+      case CompilerStrategy.LocalConsts =>
+        (
+          new MemoryManager(
+            tempSpace = tempSpace,
+            tempAllocator = tempAllocator,
+            ioSpace = dram0Space,
+            varsSpace = dram0Space,
+            constsSpace = localSpace,
+            freeableAllocator = freeableAllocator,
+            constsStream = constsStream,
+            dataType = options.arch.dataType,
+            arch = options.arch,
+            mkConstsDimensions = frontend.mkConstsDimensions,
+            traceContext = traceContext,
+            tracepointConditions = options.tracepointConditions
+          ),
+          Seq(dram0Space, localSpace)
+        )
+      case CompilerStrategy.LocalVarsAndConsts =>
+        (
+          new MemoryManager(
+            tempSpace = tempSpace,
+            tempAllocator = tempAllocator,
+            ioSpace = dram0Space,
+            varsSpace = localSpace,
+            constsSpace = localSpace,
+            freeableAllocator = freeableAllocator,
+            constsStream = constsStream,
+            dataType = options.arch.dataType,
+            arch = options.arch,
+            mkConstsDimensions = frontend.mkConstsDimensions,
+            traceContext = traceContext,
+            tracepointConditions = options.tracepointConditions
+          ),
+          Seq(dram0Space, localSpace)
+        )
+    }
 
     val backend = new Backend(
       layout = layout,
@@ -402,7 +447,7 @@ object Compiler {
       emitter(
         EmitContext(
           hir = scheduler,
-          mm = mm2,
+          mm = mmPass2,
           outputNames = outputNames
         )
       )
@@ -439,11 +484,11 @@ object Compiler {
       backend.instructionsCount * layout.instructionSizeBytes
     val stats =
       CompilerStats(
-        constsVectorSize = mm1.constsVectorSize,
+        constsVectorSize = mmPass1.constsVectorSize,
         layersNumber = layerSchedulerResults.size,
         programSizeBytes = programSizeBytes,
-        constsScalarSize = mm1.constsScalarSize,
-        constsUtilization = mm1.constsUtilization,
+        constsScalarSize = mmPass1.constsScalarSize,
+        constsUtilization = mmPass1.constsUtilization,
         cycles = backendStats.executionCycles,
         energy = backendStats.executionEnergy,
         macs = macs,
@@ -510,8 +555,11 @@ object Compiler {
         "Compilation time (seconds)",
         (endTime - startTime).toFloat / 1e9f
       )
-      tb.addNamedLine("True consts scalar size", mm1.constsScalarSize)
-      tb.addNamedLine("Consts utilization (%)", mm1.constsUtilization * 100f)
+      tb.addNamedLine("True consts scalar size", mmPass1.constsScalarSize)
+      tb.addNamedLine(
+        "Consts utilization (%)",
+        mmPass1.constsUtilization * 100f
+      )
       val (macsLetter, macsDivisor) =
         Stats.getUnitsLetterAndDivisor(macs)
       tb.addNamedLine(
@@ -678,8 +726,8 @@ object Compiler {
 
     CompilerResult(
       arch = options.arch,
-      inputObjects = mm2.inputObjects,
-      outputObjects = mm2.outputObjects,
+      inputObjects = mmPass2.inputObjects,
+      outputObjects = mmPass2.outputObjects,
       stats = stats
     )
   }

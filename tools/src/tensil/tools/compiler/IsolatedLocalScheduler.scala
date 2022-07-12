@@ -10,8 +10,10 @@ import tensil.tools.compiler.scheduler._
 import tensil.{TablePrinter, TableLine}
 import tensil.tools.CompilerException
 
-class StandardScheduler(layerIndex: Int, context: StandardSchedulingContext)
-    extends Scheduler(layerIndex, context) {
+class IsolatedLocalScheduler(
+    layerIndex: Int,
+    context: IsolatedLocalSchedulingContext
+) extends Scheduler(layerIndex, context) {
 
   override protected def doLower(
       roots: Seq[MemoryAddress],

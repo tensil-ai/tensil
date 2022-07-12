@@ -32,8 +32,8 @@ import tensil.tools.compiler.{
   MemoryAddressHelper,
   SchedulerResult,
   Stats,
-  StandardSchedulingContext,
-  StandardSchedulingContext2
+  IsolatedLocalSchedulingContext,
+  SharedLocalSchedulingContext
 }
 import tensil.tools.compiler.NilHIR
 
@@ -311,8 +311,8 @@ object Compiler {
     }
 
     var nextLayerIndex    = 0
-    val schedulingContext = new StandardSchedulingContext(options)
-    //new StandardSchedulingContext2(options, localSpace)
+    val schedulingContext = new IsolatedLocalSchedulingContext(options)
+    //new SharedLocalSchedulingContext(options, localSpace)
 
     val mm1 = new MemoryManager(
       tempSpace = tempSpace,

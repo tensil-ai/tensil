@@ -5,8 +5,10 @@ package tensil.tools.compiler
 
 import tensil.TablePrinter
 
-class StandardScheduler2(layerIndex: Int, context: StandardSchedulingContext2)
-    extends Scheduler(layerIndex, context) {
+class SharedLocalScheduler(
+    layerIndex: Int,
+    context: SharedLocalSchedulingContext
+) extends Scheduler(layerIndex, context) {
 
   override protected def doLower(
       roots: Seq[MemoryAddress],

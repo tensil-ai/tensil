@@ -124,16 +124,17 @@ void tensil_dram_fill_bytes(uint8_t *bank_ptr, enum tensil_data_type type,
     Xil_DCacheFlushRange((UINTPTR)base_ptr, size_bytes);
 }
 
-int tensil_dram_compare_bytes(uint8_t *bank_ptr, enum tensil_data_type type,
-                              size_t offset0, size_t offset1, size_t size) {
-    uint8_t *base_ptr0 = bank_ptr + offset0 * tensil_dram_sizeof_scalar(type);
-    uint8_t *base_ptr1 = bank_ptr + offset1 * tensil_dram_sizeof_scalar(type);
+int tensil_dram_compare_bytes(uint8_t *bank0_ptr, uint8_t *bank1_ptr,
+                              enum tensil_data_type type, size_t offset0,
+                              size_t offset1, size_t size) {
+    uint8_t *base0_ptr = bank0_ptr + offset0 * tensil_dram_sizeof_scalar(type);
+    uint8_t *base1_ptr = bank1_ptr + offset1 * tensil_dram_sizeof_scalar(type);
     size_t size_bytes = size * tensil_dram_sizeof_scalar(type);
 
-    Xil_DCacheFlushRange((UINTPTR)base_ptr0, size_bytes);
-    Xil_DCacheFlushRange((UINTPTR)base_ptr1, size_bytes);
+    Xil_DCacheFlushRange((UINTPTR)base0_ptr, size_bytes);
+    Xil_DCacheFlushRange((UINTPTR)base1_ptr, size_bytes);
 
-    return memcmp((const void *)base_ptr0, (const void *)base_ptr1, size_bytes);
+    return memcmp((const void *)base0_ptr, (const void *)base1_ptr, size_bytes);
 }
 
 #ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM

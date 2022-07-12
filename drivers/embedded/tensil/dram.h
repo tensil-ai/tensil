@@ -30,8 +30,9 @@ void tensil_dram_fill_random(uint8_t *bank_ptr, enum tensil_data_type type,
 void tensil_dram_fill_bytes(uint8_t *bank_ptr, enum tensil_data_type type,
                             size_t offset, int byte, size_t size);
 
-int tensil_dram_compare_bytes(uint8_t *bank_ptr, enum tensil_data_type type,
-                              size_t offset0, size_t offset1, size_t size);
+int tensil_dram_compare_bytes(uint8_t *bank0_ptr, uint8_t *bank1_ptr,
+                              enum tensil_data_type type, size_t offset0,
+                              size_t offset1, size_t size);
 
 #ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
 

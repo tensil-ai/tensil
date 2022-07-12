@@ -162,14 +162,19 @@ static void fill_dram_vectors_with_bytes(struct tensil_driver *driver,
 }
 
 static int compare_dram_vectors_bytes(struct tensil_driver *driver,
-                                      enum tensil_dram_bank dram_bank,
+                                      enum tensil_dram_bank dram_bank0,
+                                      enum tensil_dram_bank dram_bank1,
                                       size_t offset0, size_t offset1,
                                       size_t size) {
-    uint8_t *bank_ptr = tensil_driver_get_dram_bank_base_ptr(driver, dram_bank);
+    uint8_t *bank0_ptr =
+        tensil_driver_get_dram_bank_base_ptr(driver, dram_bank0);
+    uint8_t *bank1_ptr =
+        tensil_driver_get_dram_bank_base_ptr(driver, dram_bank1);
 
     return tensil_dram_compare_bytes(
-        bank_ptr, driver->arch.data_type, offset0 * driver->arch.array_size,
-        offset1 * driver->arch.array_size, size * driver->arch.array_size);
+        bank0_ptr, bank1_ptr, driver->arch.data_type,
+        offset0 * driver->arch.array_size, offset1 * driver->arch.array_size,
+        size * driver->arch.array_size);
 }
 
 static tensil_error_t append_flush_instructions(struct tensil_driver *driver) {
@@ -204,8 +209,9 @@ static void wait_for_flush(struct tensil_driver *driver) {
     size_t probe_source_offset = driver->arch.dram0_depth - 1;
     size_t probe_target_offset = driver->arch.dram0_depth - 2;
 
-    while (compare_dram_vectors_bytes(driver, TENSIL_DRAM0, probe_source_offset,
-                                      probe_target_offset, 1) != 0)
+    while (compare_dram_vectors_bytes(driver, TENSIL_DRAM0, TENSIL_DRAM0,
+                                      probe_source_offset, probe_target_offset,
+                                      1) != 0)
         ;
 }
 
@@ -499,16 +505,42 @@ tensil_error_t tensil_driver_load_dram_vectors_from_file(
         size * driver->arch.array_size, file_name);
 }
 
+static tensil_error_t run_load_consts(struct tensil_driver *driver,
+                                      size_t offset, size_t size) {
+    tensil_error_t error = tensil_driver_setup_buffer_preamble(driver);
+
+    if (error)
+        return error;
+
+    error = tensil_buffer_append_instruction(
+        &driver->buffer, &driver->layout, TENSIL_OPCODE_DATA_MOVE,
+        TENSIL_DATA_MOVE_FLAG_DRAM1_TO_LOCAL, offset, offset, size - 1);
+
+    if (error)
+        return error;
+
+    error = tensil_buffer_append_instruction(
+        &driver->buffer, &driver->layout, TENSIL_OPCODE_DATA_MOVE,
+        TENSIL_DATA_MOVE_FLAG_LOCAL_TO_DRAM0, offset, offset, size - 1);
+
+    if (error)
+        return error;
+
+    error = tensil_driver_setup_buffer_postamble(driver);
+
+    if (error)
+        return error;
+
+    return tensil_driver_run(driver, NULL);
+}
+
 tensil_error_t tensil_driver_load_model(struct tensil_driver *driver,
                                         const struct tensil_model *model) {
     if (!tensil_architecture_is_compatible(&driver->arch, &model->arch))
         return TENSIL_DRIVER_ERROR(TENSIL_ERROR_DRIVER_INCOMPATIBLE_MODEL,
                                    "Incompatible model");
 
-    tensil_error_t error = tensil_driver_load_program_from_file(
-        driver, model->prog.size, model->prog.file_name);
-    if (error)
-        return error;
+    tensil_error_t error = TENSIL_ERROR_NONE;
 
     for (size_t i = 0; i < model->consts_size; i++) {
         error = tensil_driver_load_dram_vectors_from_file(
@@ -517,7 +549,25 @@ tensil_error_t tensil_driver_load_model(struct tensil_driver *driver,
 
         if (error)
             return error;
+
+        error = run_load_consts(driver, model->consts[i].base,
+                                model->consts[i].size);
+
+        if (error)
+            return error;
+
+        int r = compare_dram_vectors_bytes(
+            driver, TENSIL_DRAM0, TENSIL_DRAM1, model->consts[i].base,
+            model->consts[i].base, model->consts[i].size);
+
+        xil_printf("r=%d\r\n", r);
     }
+
+    error = tensil_driver_load_program_from_file(driver, model->prog.size,
+                                                 model->prog.file_name);
+
+    if (error)
+        return error;
 
     return TENSIL_ERROR_NONE;
 }

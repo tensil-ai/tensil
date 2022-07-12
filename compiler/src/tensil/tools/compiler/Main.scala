@@ -172,7 +172,9 @@ object Main extends App {
 
         print(tb)
       } catch {
-        case e: CompilerException => println(e.getMessage())
+        case e: CompilerException =>
+          println(s"Error: ${e.getMessage()}")
+          sys.exit(1)
       }
 
     case _ =>

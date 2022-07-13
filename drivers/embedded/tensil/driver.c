@@ -180,17 +180,20 @@ static int compare_dram_vectors_bytes(struct tensil_driver *driver,
 static tensil_error_t append_flush_instructions(struct tensil_driver *driver) {
     size_t probe_source_offset = driver->arch.dram0_depth - 1;
     size_t probe_target_offset = driver->arch.dram0_depth - 2;
+    size_t local_offset = driver->arch.local_depth - 1;
 
     tensil_error_t error = tensil_buffer_append_instruction(
         &driver->buffer, &driver->layout, TENSIL_OPCODE_DATA_MOVE,
-        TENSIL_DATA_MOVE_FLAG_DRAM0_TO_LOCAL, 0, probe_source_offset, 0);
+        TENSIL_DATA_MOVE_FLAG_DRAM0_TO_LOCAL, local_offset, probe_source_offset,
+        0);
 
     if (error)
         return error;
 
     error = tensil_buffer_append_instruction(
         &driver->buffer, &driver->layout, TENSIL_OPCODE_DATA_MOVE,
-        TENSIL_DATA_MOVE_FLAG_LOCAL_TO_DRAM0, 0, probe_target_offset, 0);
+        TENSIL_DATA_MOVE_FLAG_LOCAL_TO_DRAM0, local_offset, probe_target_offset,
+        0);
 
     return error;
 }
@@ -334,15 +337,6 @@ static tensil_error_t run_config(struct tensil_driver *driver) {
     error = tensil_buffer_append_config_instruction(
         &driver->buffer, &driver->layout,
         TENSIL_CONFIG_REGISTER_SAMPLE_INTERVAL, TENSIL_SAMPLE_INTERVAL_CYCLES);
-
-    if (error)
-        return error;
-#endif
-
-#ifdef TENSIL_PLATFORM_INSTRUCTION_AXI_DMA_DEVICE_ID
-    error = tensil_buffer_pad_to_alignment(
-        &driver->buffer, &driver->layout,
-        tensil_compute_unit_get_instructions_data_width_bytes(&driver->tcu));
 
     if (error)
         return error;
@@ -519,13 +513,6 @@ static tensil_error_t run_load_consts(struct tensil_driver *driver,
     if (error)
         return error;
 
-    error = tensil_buffer_append_instruction(
-        &driver->buffer, &driver->layout, TENSIL_OPCODE_DATA_MOVE,
-        TENSIL_DATA_MOVE_FLAG_LOCAL_TO_DRAM0, offset, offset, size - 1);
-
-    if (error)
-        return error;
-
     error = tensil_driver_setup_buffer_postamble(driver);
 
     if (error)
@@ -555,12 +542,6 @@ tensil_error_t tensil_driver_load_model(struct tensil_driver *driver,
 
         if (error)
             return error;
-
-        int r = compare_dram_vectors_bytes(
-            driver, TENSIL_DRAM0, TENSIL_DRAM1, model->consts[i].base,
-            model->consts[i].base, model->consts[i].size);
-
-        xil_printf("r=%d\r\n", r);
     }
 
     error = tensil_driver_load_program_from_file(driver, model->prog.size,

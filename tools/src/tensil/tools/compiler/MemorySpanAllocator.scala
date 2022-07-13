@@ -38,7 +38,7 @@ class MemorySpanAllocator() {
 
       case None =>
         throw new CompilerException(
-          s"Insufficient ${space.name} memory to allocate ${ref}"
+          s"Insufficient ${space.name} memory to allocate ${ref} of size ${size}"
         )
     }
   }

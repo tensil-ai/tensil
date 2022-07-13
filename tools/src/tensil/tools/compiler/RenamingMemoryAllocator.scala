@@ -46,7 +46,7 @@ class RenamingMemoryAllocator private (
 
             case None =>
               throw new CompilerException(
-                s"Insufficient ${space.name} memory to allocate ${refAddress}"
+                s"Insufficient ${space.name} memory to rename ${MemoryAddressHelper(refAddress)}"
               )
           }
       }

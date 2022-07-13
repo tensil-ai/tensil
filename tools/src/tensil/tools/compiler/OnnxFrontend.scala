@@ -166,15 +166,120 @@ class OnnxFrontend(
     }
   }
 
-  val graphPrinter: Option[OnnxFrontendGraphPrinter] =
-    graphStream.map(
-      new OnnxFrontendGraphPrinter(
-        _,
-        "model",
-        arch.arraySize,
-        outputNodeNames.mapValues(_.toArray).toMap
+  private implicit class GraphPrinterHelper(printer: FrontendGraphPrinter) {
+    private def beforePrintNode(): Unit =
+      if (printer.currentLayerName.isDefined)
+        printer.printStartSubGraph(
+          GraphPrinter.quoteName(s"cluster_${printer.currentLayerName.get}"),
+          GraphPrinter.quote(shortName(printer.currentLayerName.get))
+        )
+
+    private def afterPrintNode(): Unit =
+      if (printer.currentLayerName.isDefined)
+        printer.printEndSubGraph()
+
+    def printOp(
+        nodeProto: NodeProto,
+        outputs: Seq[MemoryObject],
+        inputs: Seq[MemoryObject] = Nil,
+        params: Seq[(String, MemoryObject)] = Nil
+    ): Unit = {
+      val name = nodeProto.name.get
+      val op   = nodeProto.opType.get
+
+      val slashParts = name.split("/")
+
+      val title = new StringBuffer(s"${shortName(name)}\\n\\nOp: $op")
+      for ((paramName, paramObj) <- params) {
+        title.append(s"\\n$paramName: ${paramObj.dims}")
+      }
+
+      def mkPort(obj: MemoryObject, i: Int) =
+        s"<${GraphPrinter.name(obj.name)}> #$i"
+
+      val inputPorts =
+        inputs.zipWithIndex
+          .map { case (obj, i) => mkPort(obj, i) }
+          .mkString("|")
+      val outputPorts =
+        outputs.zipWithIndex
+          .map { case (obj, i) => mkPort(obj, i) }
+          .mkString("|")
+
+      val colspan = Math.max(inputs.size, outputs.size)
+
+      beforePrintNode()
+
+      printer.printNode(
+        GraphPrinter.quoteName(name),
+        GraphPrinter.quote(s"{{$inputPorts}|$title|{$outputPorts}}"),
+        "record"
       )
-    )
+
+      afterPrintNode()
+
+      for (input <- inputs)
+        outputNodeNames.get(input.name) match {
+          case Some(outputNodeNames) =>
+            for (outputNodeName <- outputNodeNames)
+              printer.printEdge(
+                s"${GraphPrinter.quoteName(outputNodeName)}:${GraphPrinter
+                  .quoteName(input.name)}",
+                s"${GraphPrinter.quoteName(name)}:${GraphPrinter.quoteName(input.name)}",
+                GraphPrinter.quote(s"${input.name}\\n${input.dims}")
+              )
+
+          case None =>
+            printer.printEdge(
+              s"${GraphPrinter.quoteName(input.name)}",
+              s"${GraphPrinter.quoteName(name)}:${GraphPrinter.quoteName(input.name)}",
+              GraphPrinter.quote(s"${input.name}\\n${input.dims}")
+            )
+        }
+    }
+
+    def printInputPost(obj: MemoryObject): Unit = {
+      beforePrintNode()
+
+      printer.printNode(
+        GraphPrinter.quoteName(obj.name),
+        GraphPrinter.quote(""),
+        "circle"
+      )
+
+      afterPrintNode()
+    }
+
+    def printOutputPost(
+        obj: MemoryObject
+    ): Unit = {
+      beforePrintNode()
+
+      printer.printNode(
+        GraphPrinter.quoteName(obj.name),
+        GraphPrinter.quote(""),
+        "doublecircle"
+      )
+
+      afterPrintNode()
+
+      for (outputNodeName <- outputNodeNames(obj.name))
+        printer.printEdge(
+          s"${GraphPrinter.quoteName(outputNodeName)}:${GraphPrinter.quoteName(obj.name)}",
+          s"${GraphPrinter.quoteName(obj.name)}",
+          GraphPrinter.quote(s"${obj.name}\\n${obj.dims}")
+        )
+    }
+
+    private def shortName(name: String): String = {
+      val slashParts = name.split("/")
+
+      if (slashParts.size > 2)
+        slashParts(slashParts.size - 2)
+      else
+        name
+    }
+  }
 
   /*
    * Traverse function takes the names of the outputs representing
@@ -578,8 +683,8 @@ class OnnxFrontend(
         consumers
       )
 
-      if (graphPrinter.isDefined) {
-        graphPrinter.get.printInputPost(outputVars)
+      if (context.graphPrinter.isDefined) {
+        context.graphPrinter.get.printInputPost(outputVars)
       }
     }
   }
@@ -608,8 +713,8 @@ class OnnxFrontend(
       inputVars.span
     )
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         transposeProto,
         Seq(outputVars),
         Seq(inputVars)
@@ -645,8 +750,8 @@ class OnnxFrontend(
       inputVars.span
     )
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         squeezeProto,
         Seq(outputVars),
         Seq(inputVars)
@@ -871,8 +976,8 @@ class OnnxFrontend(
       paddedAddresses.toArray
     )
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         padProto,
         Seq(outputVars),
         Seq(inputVars)
@@ -886,8 +991,8 @@ class OnnxFrontend(
       val (finalOutputObj, nonFinalOutputObj) =
         context.mm.emitOutputObject(outputName)
 
-      if (graphPrinter.isDefined)
-        graphPrinter.get.printOutputPost(finalOutputObj)
+      if (context.graphPrinter.isDefined)
+        context.graphPrinter.get.printOutputPost(finalOutputObj)
 
       if (nonFinalOutputObj.isDefined) {
         context.hir.emitSave(
@@ -1041,8 +1146,8 @@ class OnnxFrontend(
       outputAddresses
     )
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         reshapeProto,
         Seq(outputVars),
         Seq(inputVars)
@@ -1213,8 +1318,8 @@ class OnnxFrontend(
       )
     }
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         splitProto,
         outputsVars.toSeq,
         Seq(inputVars)
@@ -1403,8 +1508,8 @@ class OnnxFrontend(
         outputAddresses
       )
 
-      if (graphPrinter.isDefined)
-        graphPrinter.get.printOp(
+      if (context.graphPrinter.isDefined)
+        context.graphPrinter.get.printOp(
           concatProto,
           Seq(outputVars),
           inputsVars.toSeq
@@ -1585,8 +1690,8 @@ class OnnxFrontend(
       )
     }
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         resizeProto,
         Seq(outputTemp),
         Seq(inputTemp)
@@ -1989,8 +2094,8 @@ class OnnxFrontend(
       )
     }
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         conv2DProto,
         Seq(outputTemp),
         Seq(inputVars),
@@ -2046,8 +2151,8 @@ class OnnxFrontend(
       pairs
     )
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         matMulProto,
         Seq(outputTemp),
         Seq(inputVars),
@@ -2096,8 +2201,8 @@ class OnnxFrontend(
       pairs
     )
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         matMulProto,
         Seq(outputTemp),
         Seq(inputVars),
@@ -2219,8 +2324,8 @@ class OnnxFrontend(
       )
     }
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         poolProto,
         Seq(outputTemp),
         Seq(inputTemp)
@@ -2288,8 +2393,8 @@ class OnnxFrontend(
       )
     }
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         globalPoolProto,
         Seq(outputTemp),
         Seq(inputTemp)
@@ -2353,8 +2458,8 @@ class OnnxFrontend(
       }
     }
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         activateProto,
         Seq(outputTemp),
         Seq(inputTemp)
@@ -2447,8 +2552,8 @@ class OnnxFrontend(
       )
     }
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         normProto,
         Seq(outputTemp),
         Seq(inputTemp),
@@ -2488,8 +2593,8 @@ class OnnxFrontend(
       outputTemp
     )
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         addProto,
         Seq(outputTemp),
         Seq(input1VarsOrConst, input0Temp)
@@ -2515,8 +2620,8 @@ class OnnxFrontend(
       outputTemp
     )
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         nodeProto,
         Seq(outputTemp),
         Seq(input0Temp, input1Temp)
@@ -2542,8 +2647,8 @@ class OnnxFrontend(
       outputTemp
     )
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         nodeProto,
         Seq(outputTemp),
         Seq(input0Temp, input1Temp)

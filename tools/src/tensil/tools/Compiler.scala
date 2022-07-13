@@ -34,7 +34,8 @@ import tensil.tools.compiler.{
   Stats,
   IsolatedLocalSchedulingContext,
   SharedLocalSchedulingContext,
-  NilHIR
+  NilHIR,
+  FrontendGraphPrinter
 }
 
 class CompilerException(message: String) extends Exception(message) {}
@@ -438,9 +439,14 @@ object Compiler {
       traceContext = traceContext
     )
 
+    val graphPrinter =
+      if (graphStream.isDefined)
+        Some(new FrontendGraphPrinter(graphStream.get, "model"))
+      else None
+
     for (emitter <- flowEmitters) {
-      if (frontend.graphPrinter.isDefined)
-        frontend.graphPrinter.get.startLayer(
+      if (graphPrinter.isDefined)
+        graphPrinter.get.startLayer(
           s"layer_${nextLayerIndex}"
         )
 
@@ -450,12 +456,12 @@ object Compiler {
         EmitContext(
           hir = scheduler,
           mm = mmPass2,
-          outputNames = outputNames
+          outputNames = outputNames,
+          graphPrinter = graphPrinter
         )
       )
 
-      if (frontend.graphPrinter.isDefined)
-        frontend.graphPrinter.get.endLayer()
+      if (graphPrinter.isDefined) graphPrinter.get.endLayer()
 
       val r = scheduler.lower(backend)
       freeableAllocator.freeConsumedObjects(spacesToFree)
@@ -466,12 +472,12 @@ object Compiler {
       }
     }
 
+    if (graphPrinter.isDefined) graphPrinter.get.endPrint
+
     freeableAllocator.consumeAllObjects(MemoryManager.ReservedConsumers.All)
     freeableAllocator.freeConsumedObjects(spacesToFree)
 
     require(freeableAllocator.isEmpty)
-
-    if (frontend.graphPrinter.isDefined) frontend.graphPrinter.get.endPrint
 
     backend.writeSegments(
       programStream,

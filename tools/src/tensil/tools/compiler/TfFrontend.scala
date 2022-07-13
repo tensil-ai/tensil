@@ -150,8 +150,128 @@ class TfFrontend(
     }
   }
 
-  val graphPrinter: Option[TfFrontendGraphPrinter] =
-    graphStream.map(new TfFrontendGraphPrinter(_, "model", arch.arraySize))
+  private implicit class GraphPrinterHelper(printer: FrontendGraphPrinter) {
+    private def beforePrintNode(): Unit =
+      if (printer.currentLayerName.isDefined)
+        printer.printStartSubGraph(
+          GraphPrinter.quoteName(s"cluster_${printer.currentLayerName.get}"),
+          GraphPrinter.quote(shortName(printer.currentLayerName.get))
+        )
+
+    private def afterPrintNode(): Unit =
+      if (printer.currentLayerName.isDefined)
+        printer.printEndSubGraph()
+
+    def printOp(
+        nodeDef: NodeDef,
+        outputs: Seq[MemoryObject],
+        inputs: Seq[MemoryObject] = Nil,
+        params: Seq[(String, MemoryObject)] = Nil
+    ): Unit = {
+      val name = nodeDef.name
+      val op   = nodeDef.op
+
+      val subTitle = new StringBuffer(s"Op: $op")
+      for ((paramName, paramObj) <- params) {
+        subTitle.append(s"<BR/>$paramName: ${paramObj.dims}")
+      }
+
+      def mkOutputPort(obj: MemoryObject, i: Int): String = {
+        val colonParts = obj.name.split(":")
+        val port       = if (colonParts.size != 2) "0" else colonParts(1)
+
+        s"""<TD PORT="$port"><I>#$i</I></TD>"""
+      }
+
+      val ouputPorts = outputs.zipWithIndex.map {
+        case (obj, i) => mkOutputPort(obj, i)
+      }.mkString
+
+      beforePrintNode()
+
+      printer.printNode(
+        GraphPrinter.quote(name),
+        GraphPrinter.html(
+          s"""<TABLE PORT="in" BORDER="0" CELLBORDER="1" CELLSPACING="0"><TR><TD COLSPAN="${outputs.size}"><B>${shortName(
+            name
+          )}</B></TD></TR><TR><TD COLSPAN="${outputs.size}">$subTitle</TD></TR><TR>$ouputPorts</TR></TABLE>"""
+        ),
+        "plaintext"
+      )
+
+      afterPrintNode()
+
+      for (input <- inputs) {
+        val (edgeName, edgePort) = parseEdgePort(input.name)
+
+        printer.printEdge(
+          s"${GraphPrinter.quote(edgeName)}:${GraphPrinter.quote(edgePort)}",
+          s"${GraphPrinter.quote(name)}:${GraphPrinter.quote("in")}",
+          GraphPrinter.quote(s"${input.name}\\n${input.dims}")
+        )
+      }
+    }
+
+    def printInputPost(obj: MemoryObject): Unit = {
+      val inputPostName = s"Input/${obj.name}"
+
+      beforePrintNode()
+
+      printer.printNode(
+        GraphPrinter.quote(inputPostName),
+        GraphPrinter.quote(""),
+        "circle"
+      )
+
+      afterPrintNode()
+
+      printer.printEdge(
+        GraphPrinter.quote(inputPostName),
+        GraphPrinter.quote(obj.name),
+        GraphPrinter.quote(s"${obj.name}\\n${obj.dims}")
+      )
+    }
+
+    def printOutputPost(
+        obj: MemoryObject
+    ): Unit = {
+      val outputPostName = s"Output/${obj.name}"
+
+      beforePrintNode()
+
+      printer.printNode(
+        GraphPrinter.quote(outputPostName),
+        GraphPrinter.quote(""),
+        "doublecircle"
+      )
+
+      afterPrintNode()
+
+      val (edgeName, edgePort) = parseEdgePort(obj.name)
+
+      printer.printEdge(
+        s"${GraphPrinter.quote(edgeName)}:${GraphPrinter.quote(edgePort)}",
+        GraphPrinter.quote(outputPostName),
+        GraphPrinter.quote(s"${obj.name}\\n${obj.dims}")
+      )
+    }
+
+    private def parseEdgePort(name: String): (String, String) = {
+      val colonParts = name.split(":")
+
+      if (colonParts.size != 2) (name, "0")
+      else (colonParts(0), colonParts(1))
+    }
+
+    private def shortName(name: String): String = {
+      val slashParts = name.split("/")
+
+      if (slashParts.size > 2)
+        slashParts(slashParts.size - 2)
+      else
+        name
+    }
+  }
 
   /*
    * Traverse function takes the names of the TF output representing
@@ -515,8 +635,8 @@ class TfFrontend(
         inputVars.span
       )
 
-      if (graphPrinter.isDefined)
-        graphPrinter.get.printOp(
+      if (context.graphPrinter.isDefined)
+        context.graphPrinter.get.printOp(
           identifyDef,
           Seq(outputVars),
           Seq(inputVars)
@@ -545,12 +665,12 @@ class TfFrontend(
       findInterLayerOutputs(context, placeholderDef.name, None)
     )
 
-    if (graphPrinter.isDefined) {
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined) {
+      context.graphPrinter.get.printOp(
         placeholderDef,
         Seq(placeholderVars)
       )
-      graphPrinter.get.printInputPost(placeholderVars)
+      context.graphPrinter.get.printInputPost(placeholderVars)
     }
   }
 
@@ -561,8 +681,8 @@ class TfFrontend(
       val (finalOutputObj, nonFinalOutputObj) =
         context.mm.emitOutputObject(outputName)
 
-      if (graphPrinter.isDefined)
-        graphPrinter.get.printOutputPost(finalOutputObj)
+      if (context.graphPrinter.isDefined)
+        context.graphPrinter.get.printOutputPost(finalOutputObj)
 
       if (nonFinalOutputObj.isDefined) {
 
@@ -953,8 +1073,8 @@ class TfFrontend(
       outputAddresses
     )
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         reshapeDef,
         Seq(outputVars),
         Seq(inputVars)
@@ -1039,8 +1159,8 @@ class TfFrontend(
       paddedAddresses.toArray
     )
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         padDef,
         Seq(outputVars),
         Seq(inputVars)
@@ -1233,8 +1353,8 @@ class TfFrontend(
       )
     }
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         splitDef,
         outputsVars.toSeq,
         Seq(inputVars)
@@ -1407,8 +1527,8 @@ class TfFrontend(
       outputAddresses
     )
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         concatDef,
         Seq(outputVars),
         inputsVars.toSeq
@@ -1593,8 +1713,8 @@ class TfFrontend(
       )
     }
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         resizeImageDef,
         Seq(outputTemp),
         Seq(inputTemp)
@@ -1860,8 +1980,8 @@ class TfFrontend(
       )
     }
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         biasDef.getOrElse(conv2DDef),
         Seq(outputTemp),
         Seq(inputVars),
@@ -1906,8 +2026,8 @@ class TfFrontend(
       pairs
     )
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         biasDef.getOrElse(matMulDef),
         Seq(outputTemp),
         Seq(inputVars),
@@ -2054,8 +2174,8 @@ class TfFrontend(
       )
     }
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         poolDef,
         Seq(outputTemp),
         Seq(inputTemp)
@@ -2121,8 +2241,8 @@ class TfFrontend(
       }
     }
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         activateDef,
         Seq(outputTemp),
         Seq(inputTemp)
@@ -2233,8 +2353,8 @@ class TfFrontend(
       )
     }
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         normDef,
         Seq(outputTemp),
         Seq(inputTemp),
@@ -2266,8 +2386,8 @@ class TfFrontend(
       outputTemp
     )
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         addDef,
         Seq(outputTemp),
         Seq(input1Vars, input0Temp)
@@ -2345,8 +2465,8 @@ class TfFrontend(
       )
     }
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         meanDef,
         Seq(outputTemp),
         Seq(inputTemp)

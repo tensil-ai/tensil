@@ -13,16 +13,13 @@ object GraphPrinter {
   def html(s: String)      = "<" + s + ">"
 }
 
-abstract class GraphPrinter(stream: OutputStream, name: String) {
+class GraphPrinter(stream: OutputStream, name: String) {
   private val dataStream = new DataOutputStream(stream)
   private var depth      = 1;
 
   private def ident = " " * depth
 
   dataStream.writeBytes(s"digraph ${name} {\r\n")
-
-  def startLayer(name: String): Unit
-  def endLayer(): Unit
 
   def printStartSubGraph(name: String, label: String) = {
     dataStream.writeBytes(

@@ -15,6 +15,7 @@ Model = namedtuple(
         "inputs",  # List[Vars]
         "outputs",  # List[Vars]
         "arch",  # Architecture
+        "load_consts_to_local", # bool
     ],
 )
 

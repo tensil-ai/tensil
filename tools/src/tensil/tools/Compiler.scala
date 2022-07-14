@@ -201,7 +201,10 @@ object Compiler {
       ),
       inputs = objectsToEntries(result.inputObjects),
       outputs = objectsToEntries(result.outputObjects),
-      arch = options.arch
+      arch = options.arch,
+      loadConstsToLocal =
+        options.strategy == CompilerStrategy.LocalConsts ||
+          options.strategy == CompilerStrategy.LocalVarsAndConsts
     )
 
     val manifestStream = new FileOutputStream(manifestFilePath)

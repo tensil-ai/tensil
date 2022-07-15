@@ -537,11 +537,13 @@ tensil_error_t tensil_driver_load_model(struct tensil_driver *driver,
         if (error)
             return error;
 
-        error = run_load_consts(driver, model->consts[i].base,
-                                model->consts[i].size);
+        if (model->load_consts_to_local) {
+            error = run_load_consts(driver, model->consts[i].base,
+                                    model->consts[i].size);
 
-        if (error)
-            return error;
+            if (error)
+                return error;
+        }
     }
 
     error = tensil_driver_load_program_from_file(driver, model->prog.size,

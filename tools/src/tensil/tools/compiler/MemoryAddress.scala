@@ -18,8 +18,8 @@ object MemoryTag {
   val Temp: MemoryTag         = 0
   val Accumulators: MemoryTag = 1
   val Local: MemoryTag        = 2
-  val Consts: MemoryTag       = 3
-  val Vars: MemoryTag         = 4
+  val DRAM0: MemoryTag        = 3
+  val DRAM1: MemoryTag        = 4
 
   def toString(tag: MemoryTag) =
     tag match {
@@ -28,8 +28,8 @@ object MemoryTag {
       case MemoryTag.Temp         => "Temp"
       case MemoryTag.Accumulators => "Acc"
       case MemoryTag.Local        => "Local"
-      case MemoryTag.Consts       => "Consts"
-      case MemoryTag.Vars         => "Vars"
+      case MemoryTag.DRAM0        => "DRAM0"
+      case MemoryTag.DRAM1        => "DRAM1"
     }
 }
 

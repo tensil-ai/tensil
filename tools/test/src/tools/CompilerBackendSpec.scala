@@ -316,7 +316,7 @@ class CompilerBackendSpec extends AnyFlatSpec {
       0,
       MemoryAddress(MemoryTag.Local, MemoryRef.Invalid, 0x00012345L),
       1,
-      MemoryAddress(MemoryTag.Vars, MemoryRef.Invalid, 0x0089abcdL),
+      MemoryAddress(MemoryTag.DRAM0, MemoryRef.Invalid, 0x0089abcdL),
       0x00543210L
     )
     segment.segmentLir.emitDataMove(
@@ -325,7 +325,7 @@ class CompilerBackendSpec extends AnyFlatSpec {
       2,
       MemoryAddress(MemoryTag.Local, MemoryRef.Invalid, 0x00012345L),
       3,
-      MemoryAddress(MemoryTag.Vars, MemoryRef.Invalid, 0x0089abcdL),
+      MemoryAddress(MemoryTag.DRAM0, MemoryRef.Invalid, 0x0089abcdL),
       0x00543210L
     )
     segment.segmentLir.emitDataMove(
@@ -334,7 +334,7 @@ class CompilerBackendSpec extends AnyFlatSpec {
       3,
       MemoryAddress(MemoryTag.Local, MemoryRef.Invalid, 0x00012345L),
       2,
-      MemoryAddress(MemoryTag.Consts, MemoryRef.Invalid, 0x0089abcdL),
+      MemoryAddress(MemoryTag.DRAM1, MemoryRef.Invalid, 0x0089abcdL),
       0x00543210L
     )
     segment.segmentLir.emitDataMove(
@@ -343,7 +343,7 @@ class CompilerBackendSpec extends AnyFlatSpec {
       1,
       MemoryAddress(MemoryTag.Local, MemoryRef.Invalid, 0x00012345L),
       0,
-      MemoryAddress(MemoryTag.Consts, MemoryRef.Invalid, 0x0089abcdL),
+      MemoryAddress(MemoryTag.DRAM1, MemoryRef.Invalid, 0x0089abcdL),
       0x00543210L
     )
     segment.segmentLir.emitDataMove(

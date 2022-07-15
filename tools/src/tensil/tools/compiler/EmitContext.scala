@@ -4,7 +4,8 @@
 package tensil.tools.compiler
 
 case class EmitContext(
-    backend: Backend,
+    hir: HIR,
     mm: MemoryManager,
-    outputNames: Seq[String]
+    outputNames: Seq[String],
+    graphPrinter: Option[FrontendGraphPrinter] = None
 )

@@ -30,16 +30,16 @@ object StreamGen {
     if (toLocal)
       tag match {
         case MemoryTag.Accumulators => DataMoveFlags.AccumulatorToLocal
-        case MemoryTag.Vars         => DataMoveFlags.DRAM0ToLocal
-        case MemoryTag.Consts       => DataMoveFlags.DRAM1ToLocal
+        case MemoryTag.DRAM0         => DataMoveFlags.DRAM0ToLocal
+        case MemoryTag.DRAM1       => DataMoveFlags.DRAM1ToLocal
       }
     else
       tag match {
         case MemoryTag.Accumulators =>
           if (accumulate) DataMoveFlags.LocalToAccumulatorAccumulate
           else DataMoveFlags.LocalToAccumulator
-        case MemoryTag.Vars   => DataMoveFlags.LocalToDRAM0
-        case MemoryTag.Consts => DataMoveFlags.LocalToDRAM1
+        case MemoryTag.DRAM0   => DataMoveFlags.LocalToDRAM0
+        case MemoryTag.DRAM1 => DataMoveFlags.LocalToDRAM1
       }
 }
 
@@ -168,7 +168,7 @@ class StreamGen(
       localAddress.tag == MemoryTag.Local
     )
     require(
-      address.tag == MemoryTag.Accumulators || address.tag == MemoryTag.Vars || address.tag == MemoryTag.Consts
+      address.tag == MemoryTag.Accumulators || address.tag == MemoryTag.DRAM0 || address.tag == MemoryTag.DRAM1
     )
 
     val flags = StreamGen.mkDataMoveFlags(toLocal, accumulate, address.tag)
@@ -179,10 +179,10 @@ class StreamGen(
       case MemoryTag.Accumulators =>
         emitAccumulatorStrideAddressOperand1(stride, address.raw)
         emitLocalAndAccumulatorSizeOperand2(size)
-      case MemoryTag.Vars =>
+      case MemoryTag.DRAM0 =>
         emitDRAM0StrideAddressOperand1(stride, address.raw)
         emitLocalAndDRAM0SizeOperand2(size)
-      case MemoryTag.Consts =>
+      case MemoryTag.DRAM1 =>
         emitDRAM1StrideAddressOperand1(stride, address.raw)
         emitLocalAndDRAM1SizeOperand2(size)
     }

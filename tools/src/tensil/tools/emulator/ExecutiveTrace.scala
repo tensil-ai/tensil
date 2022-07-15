@@ -48,8 +48,8 @@ class ExecutiveTrace(context: ExecutiveTraceContext) {
             executive.peekAccumulator(address.raw)
           case MemoryTag.Local =>
             executive.peekLocal(address.raw)
-          case MemoryTag.Vars => executive.peekDRAM0(address.raw)
-          case MemoryTag.Consts =>
+          case MemoryTag.DRAM0 => executive.peekDRAM0(address.raw)
+          case MemoryTag.DRAM1 =>
             executive.peekDRAM1(address.raw)
         }
 

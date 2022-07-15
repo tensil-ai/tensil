@@ -29,9 +29,6 @@ case class Architecture(
   override def toString() =
     s"Architecture($dataType, ${arraySize}x${arraySize}, acc=$accumulatorDepth, loc=$localDepth, drams=[$dram0Depth,$dram1Depth], strides=[$stride0Depth,$stride1Depth], simdRegs=$simdRegistersDepth)"
 
-  def varsDepth   = dram0Depth
-  def constsDepth = dram1Depth
-
   def threadLocalDepth = localDepth / numberOfThreads
 
   def writeDriverArchitectureParams(fileName: String): Unit = {

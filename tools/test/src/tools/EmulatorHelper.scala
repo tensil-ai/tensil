@@ -20,6 +20,7 @@ object EmulatorHelper {
   def test(
       modelName: String,
       inputBatchSize: Int = 1,
+      localConsts: Boolean = false,
       traceContext: ExecutiveTraceContext = ExecutiveTraceContext.default
   ): Unit = {
     val modelStream = new FileInputStream(s"$modelName.tmodel")
@@ -34,6 +35,7 @@ object EmulatorHelper {
           ArchitectureDataType.FLOAT32,
           model,
           inputBatchSize,
+          localConsts,
           traceContext
         )
 
@@ -42,6 +44,7 @@ object EmulatorHelper {
           ArchitectureDataType.FP32BP16,
           model,
           inputBatchSize,
+          localConsts,
           traceContext
         )
 
@@ -50,6 +53,7 @@ object EmulatorHelper {
           ArchitectureDataType.FP18BP10,
           model,
           inputBatchSize,
+          localConsts,
           traceContext
         )
 
@@ -58,6 +62,7 @@ object EmulatorHelper {
           ArchitectureDataType.FP16BP8,
           model,
           inputBatchSize,
+          localConsts,
           traceContext
         )
 
@@ -66,6 +71,7 @@ object EmulatorHelper {
           ArchitectureDataType.FP8BP4,
           model,
           inputBatchSize,
+          localConsts,
           traceContext
         )
     }
@@ -206,6 +212,7 @@ object EmulatorHelper {
       dataType: ArchitectureDataTypeWithBase[T],
       model: Model,
       inputBatchSize: Int,
+      localConsts: Boolean,
       traceContext: ExecutiveTraceContext
   ): Unit = {
     val emulator = new Emulator(
@@ -215,10 +222,16 @@ object EmulatorHelper {
 
     val constsStream = new FileInputStream(model.consts(0).fileName)
 
-    emulator.writeDRAM1(
-      model.consts(0).size,
-      constsStream
-    )
+    if (localConsts)
+      emulator.writeLocal(
+        model.consts(0).size,
+        constsStream
+      )
+    else
+      emulator.writeDRAM1(
+        model.consts(0).size,
+        constsStream
+      )
 
     constsStream.close()
 

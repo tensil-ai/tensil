@@ -108,15 +108,15 @@ case class InstructionLayout(
     tb.addNamedLine("Data type", arch.dataType.name)
     tb.addNamedLine("Array size", arch.arraySize)
     tb.addNamedLine(
-      "Consts memory size (vectors/scalars/bits)",
-      arch.constsDepth,
-      arch.constsDepth * arch.arraySize,
+      "DRAM0 memory size (vectors/scalars/bits)",
+      arch.dram0Depth,
+      arch.dram0Depth * arch.arraySize,
       dram1OperandSizeBits
     )
     tb.addNamedLine(
-      "Vars memory size (vectors/scalars/bits)",
-      arch.varsDepth,
-      arch.varsDepth * arch.arraySize,
+      "DRAM1 memory size (vectors/scalars/bits)",
+      arch.dram1Depth,
+      arch.dram1Depth * arch.arraySize,
       dram1OperandSizeBits
     )
     tb.addNamedLine(

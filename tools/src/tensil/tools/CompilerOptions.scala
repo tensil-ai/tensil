@@ -10,8 +10,14 @@ case class TracepointCondition(
     prefix: String,
 )
 
+object CompilerStrategy extends Enumeration {
+  type Kind = Value
+  val LocalIsolated, LocalVars, LocalConsts, LocalVarsAndConsts = Value
+}
+
 case class CompilerOptions(
     arch: Architecture,
+    strategy: CompilerStrategy.Kind = CompilerStrategy.LocalIsolated,
     inputShapes: CompilerInputShapes = CompilerInputShapes.mkWithBatchSize(1),
     printSummary: Boolean = false,
     printLayersSummary: Boolean = false,

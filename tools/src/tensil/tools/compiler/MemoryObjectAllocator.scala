@@ -5,8 +5,8 @@ package tensil.tools.compiler
 
 import scala.collection.mutable
 
-import _root_.tensil.tools.{CompilerException}
-import _root_.tensil.TablePrinter
+import tensil.tools.{CompilerException}
+import tensil.{TableLine, TablePrinter}
 
 class MemoryObjectAllocator(
     val allocator: MemorySpanAllocator,
@@ -25,14 +25,21 @@ class MemoryObjectAllocator(
   private val allocations = mutable.Map.empty[String, Allocation]
   private val refs        = mutable.ArrayBuffer.empty[Allocation]
 
+  def isEmpty = allocations.isEmpty
+
   def reportObjects(): Unit = {
     val tp = new TablePrinter(Some("MEMORY OBJECTS"))
 
-    for ((name, allocation) <- allocations)
-      tp.addNamedLine(
-        name,
-        allocation.obj.dims,
-        allocation.consumers.toIndexedSeq
+    for ((name, allocation) <- allocations.toSeq.sortBy(_._2.obj.span.head.raw))
+      tp.addLine(
+        new TableLine(
+          Seq(
+            name,
+            allocation.obj.dims,
+            allocation.consumers.toIndexedSeq,
+            s"${allocation.obj.span.head.raw}..${allocation.obj.span.last.raw}"
+          )
+        )
       )
 
     print(tp)
@@ -82,6 +89,11 @@ class MemoryObjectAllocator(
       case None =>
         throw new CompilerException(s"Unresolved memory object ${name}")
     }
+  }
+
+  def consumeAllObjects(consumers: Seq[String]): Unit = {
+    for (allocation <- allocations.values)
+      allocation.currentConsumers --= consumers
   }
 
   def freeConsumedObjects(spaces: Seq[MemorySpace]): Unit = {

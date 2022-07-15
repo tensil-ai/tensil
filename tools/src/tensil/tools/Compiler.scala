@@ -320,6 +320,21 @@ object Compiler {
         new SharedLocalSchedulingContext(options, localSpace)
     }
 
+    /**
+      * For strategies with consts loaded into local memory
+      * before running the program we need to allocate consts
+      * before any of the vars are allocated to insure they
+      * occupy continous memory space that will match the
+      * artifact data file. To do this we execute frontend
+      * emitters in two passes. First pass is used solely to
+      * allocate consts in local memory and to write the
+      * corresponding artifact data file. The second pass is
+      * where the program is emitted, but unlike single-pass
+      * compilation, it relies on previously allocated consts,
+      * so no new consts are allocated or written out in the
+      * artifact.
+      */
+
     val mmPass1 = options.strategy match {
       case CompilerStrategy.LocalIsolated =>
         new MemoryManager(

@@ -63,6 +63,6 @@ class HeapMemorySpace private (
     )
   }
 
-  def maxSize: MemoryAddressRaw = maxSizeVar
-  def aggSize: MemoryAddressRaw = aggSizeVar
+  override def maxSize: MemoryAddressRaw = maxSizeVar
+  override def aggSize: MemoryAddressRaw = aggSizeVar
 }

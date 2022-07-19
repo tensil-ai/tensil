@@ -49,4 +49,7 @@ class ArenaMemorySpace private (
 
   override def clone(): MemorySpace =
     new ArenaMemorySpace(name, tag, depth, next)
+
+  override def maxSize: MemoryAddressRaw = next
+  override def aggSize: MemoryAddressRaw = next
 }

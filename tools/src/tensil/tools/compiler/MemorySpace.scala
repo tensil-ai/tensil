@@ -14,4 +14,7 @@ trait MemorySpace extends mutable.Cloneable[MemorySpace] {
   ): Option[MemorySpan]
 
   def free(span: MemorySpan): Unit
+
+  def maxSize: MemoryAddressRaw
+  def aggSize: MemoryAddressRaw
 }

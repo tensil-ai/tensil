@@ -46,14 +46,14 @@ class IsolatedLocalScheduler(
       .sortBy(_._1.firstConstAddressValue)
       .map(_._2.seq.toSeq)
 
-    case class UsageInfo(
+    case class EstimatedUsageInfo(
         accumulatorSize: Int,
         localSize: Int,
     )
 
     case class PartitionInfo(
         roots: Option[Seq[MemoryAddress]],
-        usage: UsageInfo
+        estimatedUsage: EstimatedUsageInfo
     )
 
     case class CombinedStageInfo(
@@ -95,14 +95,14 @@ class IsolatedLocalScheduler(
             ): Seq[PartitionInfo] = {
               case class MaximumPartitionSizeInfo(
                   n: Option[Int],
-                  usage: UsageInfo
+                  estimatedUsage: EstimatedUsageInfo
               )
 
               def findNextMaximumPartitionSize(
                   roots: Seq[MemoryAddress],
                   n: Int = 1,
                   powerOfTwoPass: Boolean = true,
-                  prevUsage: Option[UsageInfo] = None
+                  prevEstimatedUsage: Option[EstimatedUsageInfo] = None
               ): MaximumPartitionSizeInfo = {
                 require(roots.size > 0)
 
@@ -115,7 +115,7 @@ class IsolatedLocalScheduler(
                     includeNonReusableConsts = true,
                     includeVars = true
                   ) + reusableConsts.size
-                val usage = UsageInfo(
+                val estimatedUsage = EstimatedUsageInfo(
                   accumulatorSize = accumulatorSize,
                   localSize = localSize
                 )
@@ -131,7 +131,7 @@ class IsolatedLocalScheduler(
                       */
                     MaximumPartitionSizeInfo(
                       n = None,
-                      usage = usage
+                      estimatedUsage = estimatedUsage
                     )
                   else {
                     if (powerOfTwoPass)
@@ -139,18 +139,18 @@ class IsolatedLocalScheduler(
                         roots,
                         (n / 2) + 1,
                         false,
-                        prevUsage
+                        prevEstimatedUsage
                       )
                     else
                       MaximumPartitionSizeInfo(
                         n = Some(n - 1),
-                        usage = prevUsage.get
+                        estimatedUsage = prevEstimatedUsage.get
                       )
                   }
                 } else if (n >= roots.size)
                   MaximumPartitionSizeInfo(
                     n = Some(roots.size),
-                    usage = usage
+                    estimatedUsage = estimatedUsage
                   )
                 else {
                   if (powerOfTwoPass)
@@ -158,21 +158,21 @@ class IsolatedLocalScheduler(
                       roots,
                       n * 2,
                       true,
-                      Some(usage)
+                      Some(estimatedUsage)
                     )
                   else
                     findNextMaximumPartitionSize(
                       roots,
                       n + 1,
                       false,
-                      Some(usage)
+                      Some(estimatedUsage)
                     )
                 }
               }
 
               if (!roots.isEmpty) {
                 findNextMaximumPartitionSize(roots) match {
-                  case MaximumPartitionSizeInfo(None, usage) =>
+                  case MaximumPartitionSizeInfo(None, estimatedUsage) =>
                     /**
                       * When cannot find a partition that is fitting the
                       * memories return roots as None and usage that is
@@ -180,16 +180,16 @@ class IsolatedLocalScheduler(
                       */
                     partitions :+ PartitionInfo(
                       roots = None,
-                      usage = usage
+                      estimatedUsage = estimatedUsage
                     )
-                  case MaximumPartitionSizeInfo(Some(n), usage) =>
+                  case MaximumPartitionSizeInfo(Some(n), estimatedUsage) =>
                     val (partition, rest) = roots.splitAt(n)
 
                     partitionRoots(
                       rest,
                       partitions :+ PartitionInfo(
                         roots = Some(partition),
-                        usage = usage
+                        estimatedUsage = estimatedUsage
                       )
                     )
 
@@ -214,9 +214,9 @@ class IsolatedLocalScheduler(
       combinationCandidateStages
         .map(_.partitions.last)
         .filter(!_.roots.isDefined)
-        .map(_.usage)
+        .map(_.estimatedUsage)
         .headOption match {
-        case Some(UsageInfo(accumulatorSize, localSize)) =>
+        case Some(EstimatedUsageInfo(accumulatorSize, localSize)) =>
           if (prevStages.isDefined)
             prevStages.get
           else {
@@ -261,8 +261,8 @@ class IsolatedLocalScheduler(
     val partitions             = stages.map(_.partitions).flatten
     val numberOfPartitions     = partitions.size
     val maximumRootsSize       = partitions.map(_.roots.get.size).max
-    val accumulatorSize        = partitions.map(_.usage.accumulatorSize).max
-    val localSize              = partitions.map(_.usage.localSize).max
+    val accumulatorSize        = partitions.map(_.estimatedUsage.accumulatorSize).max
+    val localSize              = partitions.map(_.estimatedUsage.localSize).max
 
     val accumulatorUtilization =
       accumulatorSize.toFloat / context.options.arch.accumulatorDepth.toFloat

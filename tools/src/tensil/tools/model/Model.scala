@@ -13,7 +13,8 @@ case class Model(
     @key("consts") consts: Seq[ConstsEntry],
     @key("inputs") inputs: Seq[InputOutputEntry],
     @key("outputs") outputs: Seq[InputOutputEntry],
-    @key("arch") arch: Architecture
+    @key("arch") arch: Architecture,
+    @key("load_consts_to_local") loadConstsToLocal: Boolean
 )
 
 object Model {

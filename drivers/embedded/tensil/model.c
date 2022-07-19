@@ -134,6 +134,9 @@ void tensil_model_parse(struct tensil_model *model, const cJSON *json) {
 
         tensil_architecture_parse(
             &model->arch, cJSON_GetObjectItemCaseSensitive(json, "arch"));
+
+        tensil_config_parse_object_item_as_bool(json, "load_consts_to_local",
+                                                &model->load_consts_to_local);
     }
 }
 

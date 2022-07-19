@@ -189,6 +189,17 @@ class Driver:
         self.write_instructions(program)
         self.wait_for_flush()
 
+    def run_load_consts(self, offset, size):
+        program = [
+            self.layout.data_move(
+                DataMoveFlag.dram1_to_memory,
+                offset,
+                offset,
+                size - 1)
+        ] + self.prepare_flush_probe()
+        self.write_instructions(program)
+        self.wait_for_flush()
+
     def load_model(self, model_filename):
         self.model_filename = model_filename
         with open(self.model_filename, "r") as f:
@@ -210,6 +221,8 @@ class Driver:
                     * self.dram1.data_type_numpy_size_bytes,
                     f.read(),
                 )
+            if self.model.load_consts_to_local:
+                self.run_load_consts(const.base, const.size)
         with open(d + self.model.prog.file_name, "rb") as f:
             self.program = f.read()
 
@@ -220,6 +233,7 @@ class Driver:
         # initialize flush probe
         self.probe_source_address = self.arch.dram0_depth - 1
         self.probe_target_address = self.arch.dram0_depth - 2
+        self.local_address = self.arch.local_depth - 1
         self.probe_source = np.full(
             self.arch.array_size,
             np.iinfo(data_type_numpy(self.arch.data_type)).max,
@@ -241,12 +255,12 @@ class Driver:
         return [
             self.layout.data_move(
                 DataMoveFlag.dram0_to_memory,
-                0,
+                self.local_address,
                 self.probe_source_address,
                 0),
             self.layout.data_move(
                 DataMoveFlag.memory_to_dram0,
-                0,
+                self.local_address,
                 self.probe_target_address,
                 0)
         ]

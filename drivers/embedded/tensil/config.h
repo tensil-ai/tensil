@@ -4,6 +4,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "cJSON.h"
 
@@ -18,3 +19,6 @@ void tensil_config_parse_object_item_as_uint16(const cJSON *json,
 
 void tensil_config_parse_object_item_as_string(const cJSON *json,
                                                const char *name, char *target);
+
+void tensil_config_parse_object_item_as_bool(const cJSON *json,
+                                             const char *name, bool *target);

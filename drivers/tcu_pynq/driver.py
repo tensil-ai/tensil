@@ -221,7 +221,7 @@ class Driver:
                     * self.dram1.data_type_numpy_size_bytes,
                     f.read(),
                 )
-            if (self.model.load_consts_to_local)
+            if self.model.load_consts_to_local:
                 self.run_load_consts(const.base, const.size)
         with open(d + self.model.prog.file_name, "rb") as f:
             self.program = f.read()

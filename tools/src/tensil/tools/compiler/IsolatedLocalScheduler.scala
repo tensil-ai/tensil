@@ -310,7 +310,9 @@ class IsolatedLocalScheduler(
           val partitionSegmentAndStats = stage.partitions.zipWithIndex.par
             .map({
               case (partition, j) =>
-                val partitionLocalAllocator = initLocalAllocator.clone()
+                val partitionLocalSpace = localSpace.fork()
+                val partitionLocalAllocator =
+                  initLocalAllocator.fork(partitionLocalSpace)
                 val kinds = Seq(
                   BackendSegmentKey.Load,
                   BackendSegmentKey.Compute,
@@ -342,7 +344,7 @@ class IsolatedLocalScheduler(
                   nodes
                 )
 
-                lowerCompute(
+                val accumulatorUsage = lowerCompute(
                   segmentsByKind(BackendSegmentKey.Compute).segmentLir,
                   partitionLocalAllocator,
                   nodes
@@ -479,8 +481,8 @@ class IsolatedLocalScheduler(
       numberOfPartitions = numberOfPartitions,
       cycles = stats.aggregateCycles,
       energy = stats.aggregateEnergy,
-      accumulatorUtilization = accumulatorUtilization,
-      localUtilization = localUtilization,
+      //accumulatorUtilization = accumulatorUtilization,
+      //localUtilization = localUtilization,
       macs = macs,
       macEfficiency = macEfficiency,
     )

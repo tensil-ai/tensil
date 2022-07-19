@@ -19,7 +19,7 @@ class RenamingMemoryAllocator private (
     space: MemorySpace,
     refTags: Set[MemoryTag],
     private val renameMap: mutable.Map[MemoryAddress, MemoryAddress]
-) extends mutable.Cloneable[RenamingMemoryAllocator] {
+) {
   def locate(refAddress: MemoryAddress): MemoryAddress =
     if (refTags.contains(refAddress.tag)) renameMap(refAddress) else refAddress
 
@@ -57,6 +57,6 @@ class RenamingMemoryAllocator private (
     renameMap.clear()
   }
 
-  override def clone(): RenamingMemoryAllocator =
-    new RenamingMemoryAllocator(space.clone(), refTags, renameMap.clone())
+  def fork(space: MemorySpace): RenamingMemoryAllocator =
+    new RenamingMemoryAllocator(space, refTags, renameMap.clone())
 }

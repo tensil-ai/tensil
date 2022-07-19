@@ -31,8 +31,8 @@ case class SchedulerResult(
     numberOfPartitions: Int = 0,
     cycles: Long = 0,
     energy: Long = 0,
-    accumulatorUtilization: Float = 0,
-    localUtilization: Float = 0,
+    accumulatorUsage: MemoryUsage = MemoryUsage(0, 0),
+    localUsage: MemoryUsage = MemoryUsage(0, 0),
     macs: Long = 0,
     macEfficiency: Float = Float.NaN
 ) {}
@@ -620,7 +620,7 @@ abstract class Scheduler(
       lir: LIR,
       localAllocator: RenamingMemoryAllocator,
       nodes: Seq[Node]
-  ): Unit = {
+  ): MemoryUsage = {
     val accumulatorSpace = ArenaMemorySpace(
       "Accumulator",
       MemoryTag.Accumulators,
@@ -1174,6 +1174,8 @@ abstract class Scheduler(
     }
 
     saveAccRollup.finalEmit()
+
+    accumulatorSpace.usage
   }
 
   protected def lowerSaveVars(

@@ -63,7 +63,7 @@ class SharedLocalScheduler(
       nodes
     )
 
-    lowerCompute(
+    val accumulatorUsage = lowerCompute(
       segmentsByKind(BackendSegmentKey.Compute).segmentLir,
       localAllocator,
       nodes
@@ -155,8 +155,7 @@ class SharedLocalScheduler(
       numberOfPartitions = 1,
       cycles = stats.aggregateCycles,
       energy = stats.aggregateEnergy,
-      accumulatorUtilization = accumulatorUtilization,
-      localUtilization = localUtilization,
+      accumulatorUsage = accumulatorUsage,
       macs = macs,
       macEfficiency = macEfficiency,
     )

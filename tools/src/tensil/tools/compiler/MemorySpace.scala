@@ -5,7 +5,12 @@ package tensil.tools.compiler
 
 import scala.collection.mutable
 
-trait MemorySpace extends mutable.Cloneable[MemorySpace] {
+case class MemoryUsage(
+    maxSize: MemoryAddressRaw,
+    aggSize: MemoryAddressRaw
+)
+
+trait MemorySpace {
   val name: String
 
   def allocate(
@@ -15,6 +20,7 @@ trait MemorySpace extends mutable.Cloneable[MemorySpace] {
 
   def free(span: MemorySpan): Unit
 
-  def maxSize: MemoryAddressRaw
-  def aggSize: MemoryAddressRaw
+  def fork(): MemorySpace
+
+  def usage: MemoryUsage
 }

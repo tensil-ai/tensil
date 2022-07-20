@@ -590,6 +590,16 @@ object Compiler {
           accumulatorUsage.aggSize * options.arch.arraySize
         )
       tb.addNamedLine("Number of layers", layerSchedulerResults.size)
+      if (!layerSchedulerResults.isEmpty) {
+        tb.addNamedLine(
+          "Maximum number of combined stages",
+          layerSchedulerResults.map(_.numberOfCombinedStages).max
+        )
+        tb.addNamedLine(
+          "Maximum number of partitions",
+          layerSchedulerResults.map(_.numberOfPartitions).max
+        )
+      }
       Stats.printSummary(
         backendStats,
         tb,
@@ -719,7 +729,7 @@ object Compiler {
               "Accumulator utilization (%):"
             ) ++ groupResultsWithIndex
               .map(
-                _._1.accumulatorUsage.maxSize / options.arch.accumulatorDepth
+                _._1.accumulatorUsage.maxSize.toFloat / options.arch.accumulatorDepth.toFloat
               )
               .map(_ * 100f)
               .map(f => f"$f%.1f")
@@ -728,7 +738,9 @@ object Compiler {
         tb.addLine(
           new TableLine(
             List("Local utilization (%):") ++ groupResultsWithIndex
-              .map(_._1.localUsage.maxSize / options.arch.threadLocalDepth)
+              .map(
+                _._1.localUsage.maxSize.toFloat / options.arch.threadLocalDepth.toFloat
+              )
               .map(_ * 100f)
               .map(f => f"$f%.1f")
           )

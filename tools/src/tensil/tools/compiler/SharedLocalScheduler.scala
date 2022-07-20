@@ -151,7 +151,6 @@ class SharedLocalScheduler(
 
     SchedulerResult(
       numberOfStages = 1,
-      numberOfCombinedStages = 1,
       numberOfPartitions = 1,
       cycles = stats.aggregateCycles,
       energy = stats.aggregateEnergy,

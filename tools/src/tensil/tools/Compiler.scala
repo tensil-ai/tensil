@@ -592,8 +592,8 @@ object Compiler {
       tb.addNamedLine("Number of layers", layerSchedulerResults.size)
       if (!layerSchedulerResults.isEmpty) {
         tb.addNamedLine(
-          "Maximum number of combined stages",
-          layerSchedulerResults.map(_.numberOfCombinedStages).max
+          "Maximum number of stages",
+          layerSchedulerResults.map(_.numberOfStages).max
         )
         tb.addNamedLine(
           "Maximum number of partitions",
@@ -648,14 +648,6 @@ object Compiler {
               "Number of stages:"
             ) ++ groupResultsWithIndex
               .map(_._1.numberOfStages)
-          )
-        )
-        tb.addLine(
-          new TableLine(
-            List(
-              "Number of combined stages:"
-            ) ++ groupResultsWithIndex
-              .map(_._1.numberOfCombinedStages)
           )
         )
         tb.addLine(

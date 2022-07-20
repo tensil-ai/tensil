@@ -254,15 +254,14 @@ class IsolatedLocalScheduler(
       }
     }
 
-    val name                   = s"LAYER $layerIndex"
-    val numberOfStages         = rootsByStages.size
-    val stages                 = combineStages()
-    val numberOfCombinedStages = stages.size
-    val partitions             = stages.map(_.partitions).flatten
-    val numberOfPartitions     = partitions.size
-    val maximumRootsSize       = partitions.map(_.roots.get.size).max
-    val accumulatorSize        = partitions.map(_.estimatedUsage.accumulatorSize).max
-    val localSize              = partitions.map(_.estimatedUsage.localSize).max
+    val name               = s"LAYER $layerIndex"
+    val stages             = combineStages()
+    val numberOfStages     = stages.size
+    val partitions         = stages.map(_.partitions).flatten
+    val numberOfPartitions = partitions.size
+    val maximumRootsSize   = partitions.map(_.roots.get.size).max
+    val accumulatorSize    = partitions.map(_.estimatedUsage.accumulatorSize).max
+    val localSize          = partitions.map(_.estimatedUsage.localSize).max
 
     val accumulatorUtilization =
       accumulatorSize.toFloat / context.options.arch.accumulatorDepth.toFloat
@@ -273,7 +272,7 @@ class IsolatedLocalScheduler(
 
     if (context.options.printProgress) {
       println(
-        s"HIR scheduled onto ${numberOfCombinedStages} stage(s) and ${numberOfPartitions} partition(s)"
+        s"HIR scheduled onto ${numberOfStages} stage(s) and ${numberOfPartitions} partition(s)"
       )
     }
 
@@ -450,7 +449,6 @@ class IsolatedLocalScheduler(
     if (context.options.printSchedulerSummary) {
       val tb = new TablePrinter(Some(s"$name SCHEDULER SUMMARY"))
       tb.addNamedLine("Stages", numberOfStages)
-      tb.addNamedLine("Combined Stages", numberOfCombinedStages)
       tb.addNamedLine("Partitions", numberOfPartitions)
       tb.addNamedLine("Partition results size", maximumRootsSize)
       tb.addNamedLine("Partition accumulator size", accumulatorSize)
@@ -526,7 +524,6 @@ class IsolatedLocalScheduler(
 
     SchedulerResult(
       numberOfStages = numberOfStages,
-      numberOfCombinedStages = numberOfCombinedStages,
       numberOfPartitions = numberOfPartitions,
       cycles = stats.aggregateCycles,
       energy = stats.aggregateEnergy,

@@ -26,7 +26,6 @@ import tensil.tools.util
 import tensil.{TablePrinter, TableLine, Architecture}
 
 case class SchedulerResult(
-    numberOfCombinedStages: Int = 0,
     numberOfStages: Int = 0,
     numberOfPartitions: Int = 0,
     cycles: Long = 0,

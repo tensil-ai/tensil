@@ -3,13 +3,6 @@
 
 package tensil.tools.compiler
 
-import scala.collection.mutable
-
-case class MemoryUsage(
-    maxSize: MemoryAddressRaw,
-    aggSize: MemoryAddressRaw
-)
-
 trait MemorySpace {
   val name: String
 

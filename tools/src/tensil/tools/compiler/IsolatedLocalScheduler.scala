@@ -277,17 +277,24 @@ class IsolatedLocalScheduler(
       )
     }
 
-    val instructionsCounts = stages.zipWithIndex.par
+    case class StageLoweringResult(
+        initInstructionsCount: InstructionAddress,
+        partitionInstructionsCounts: Seq[InstructionAddress],
+        accumulatorUsage: MemoryUsage,
+        localUsage: MemoryUsage
+    )
+
+    val stageLoweringResults = stages.zipWithIndex.par
       .map({
         case (stage, i) =>
-          val localSpace =
+          val initLocalSpace =
             ArenaMemorySpace(
               "Local",
               MemoryTag.Local,
               context.options.arch.threadLocalDepth
             )
           val initLocalAllocator = RenamingMemoryAllocator(
-            localSpace,
+            initLocalSpace,
             Set(MemoryTag.DRAM1, MemoryTag.DRAM0)
           )
 
@@ -307,96 +314,138 @@ class IsolatedLocalScheduler(
 
           initSegment.segmentLir.endEmit()
 
-          val partitionSegmentAndStats = stage.partitions.zipWithIndex.par
-            .map({
-              case (partition, j) =>
-                val partitionLocalSpace = localSpace.fork()
-                val partitionLocalAllocator =
-                  initLocalAllocator.fork(partitionLocalSpace)
-                val kinds = Seq(
-                  BackendSegmentKey.Load,
-                  BackendSegmentKey.Compute,
-                  BackendSegmentKey.Save
-                )
-                val statsByKind = kinds.map(kind => kind -> new Stats()).toMap
-                val segmentsByKind = kinds
-                  .map(kind =>
-                    kind -> backend.mkSegment(
-                      BackendSegmentKey(layerIndex, i, j, kind),
-                      Some(statsByKind(kind))
-                    )
+          case class SegmentLoweringResult(
+              segment: BackendSegment,
+              stats: Stats
+          )
+
+          case class PartitionLoweringResult(
+              segmentLoweringResults: Seq[SegmentLoweringResult],
+              accumulatorUsage: MemoryUsage,
+              localUsage: MemoryUsage
+          )
+
+          val partitionLoweringResults =
+            stage.partitions.zipWithIndex.par
+              .map({
+                case (partition, j) =>
+                  val partitionLocalSpace = initLocalSpace.fork()
+                  val partitionLocalAllocator =
+                    initLocalAllocator.fork(partitionLocalSpace)
+                  val kinds = Seq(
+                    BackendSegmentKey.Load,
+                    BackendSegmentKey.Compute,
+                    BackendSegmentKey.Save
                   )
-                  .toMap
+                  val statsByKind = kinds.map(kind => kind -> new Stats()).toMap
+                  val segmentsByKind = kinds
+                    .map(kind =>
+                      kind -> backend.mkSegment(
+                        BackendSegmentKey(layerIndex, i, j, kind),
+                        Some(statsByKind(kind))
+                      )
+                    )
+                    .toMap
 
-                val nodes = traverseRoots(partition.roots.get)
+                  val nodes = traverseRoots(partition.roots.get)
 
-                lowerLoadConsts(
-                  segmentsByKind(BackendSegmentKey.Load).segmentLir,
-                  partitionLocalAllocator,
-                  nodes,
-                  includeReusableConsts = false,
-                  includeNonReusableConsts = true
-                )
+                  lowerLoadConsts(
+                    segmentsByKind(BackendSegmentKey.Load).segmentLir,
+                    partitionLocalAllocator,
+                    nodes,
+                    includeReusableConsts = false,
+                    includeNonReusableConsts = true
+                  )
 
-                lowerLoadVars(
-                  segmentsByKind(BackendSegmentKey.Load).segmentLir,
-                  partitionLocalAllocator,
-                  nodes
-                )
+                  lowerLoadVars(
+                    segmentsByKind(BackendSegmentKey.Load).segmentLir,
+                    partitionLocalAllocator,
+                    nodes
+                  )
 
-                val accumulatorUsage = lowerCompute(
-                  segmentsByKind(BackendSegmentKey.Compute).segmentLir,
-                  partitionLocalAllocator,
-                  nodes
-                )
+                  val accumulatorUsage = lowerCompute(
+                    segmentsByKind(BackendSegmentKey.Compute).segmentLir,
+                    partitionLocalAllocator,
+                    nodes
+                  )
 
-                lowerSaveVars(
-                  segmentsByKind(BackendSegmentKey.Save).segmentLir,
-                  partitionLocalAllocator,
-                  nodes
-                )
+                  lowerSaveVars(
+                    segmentsByKind(BackendSegmentKey.Save).segmentLir,
+                    partitionLocalAllocator,
+                    nodes
+                  )
 
-                segmentsByKind.values.foreach(_.segmentLir.endEmit())
-                segmentsByKind.map {
-                  case (kind, segment) => (segment, statsByKind(kind))
-                }
-            })
-            .seq
+                  segmentsByKind.values.foreach(_.segmentLir.endEmit())
 
-          (initSegment, initStats, partitionSegmentAndStats)
+                  PartitionLoweringResult(
+                    segmentLoweringResults = segmentsByKind.map {
+                      case (kind, segment) =>
+                        SegmentLoweringResult(
+                          segment = segment,
+                          stats = statsByKind(kind)
+                        )
+                    }.toSeq,
+                    accumulatorUsage = accumulatorUsage,
+                    localUsage = partitionLocalSpace.usage
+                  )
+              })
+              .seq
+
+          (
+            PartitionLoweringResult(
+              segmentLoweringResults = Seq(
+                SegmentLoweringResult(segment = initSegment, stats = initStats)
+              ),
+              accumulatorUsage = MemoryUsage(0, 0),
+              localUsage = initLocalSpace.usage
+            ),
+            partitionLoweringResults
+          )
       })
       .seq
       .map({
-        case ((initSegment, initStats, partitionSegmentAndStats)) => {
-          backend.emitSegment(initSegment)
+        case ((initLoweringResult, partitionLoweringResults)) => {
+          val initAndPartitionsLoweringResults =
+            initLoweringResult +: partitionLoweringResults
 
-          stats.add(initStats)
+          for (r <- initAndPartitionsLoweringResults) {
+            r.segmentLoweringResults.foreach(r => stats.add(r.stats))
 
-          val instructionsCounts =
-            partitionSegmentAndStats.map(segmentAndStats => {
-              segmentAndStats.foreach(v => stats.add(v._2))
+            for (r <- r.segmentLoweringResults) {
+              backend.emitSegment(r.segment)
 
-              for ((partitionSegment, partitionStats) <- segmentAndStats)
-                yield {
-                  backend.emitSegment(partitionSegment)
+              r.segment.instructionsCount
+            }
+          }
 
-                  partitionSegment.instructionsCount
-                }
-            })
-
-          (initSegment.instructionsCount, instructionsCounts.flatten)
+          StageLoweringResult(
+            initInstructionsCount = initLoweringResult
+              .segmentLoweringResults(0)
+              .segment
+              .instructionsCount,
+            partitionInstructionsCounts = partitionLoweringResults.map(r =>
+              r.segmentLoweringResults.map(_.segment.instructionsCount).sum
+            ),
+            accumulatorUsage = MemoryUsage(
+              initAndPartitionsLoweringResults.map(_.accumulatorUsage)
+            ),
+            localUsage =
+              MemoryUsage(initAndPartitionsLoweringResults.map(_.localUsage)),
+          )
         }
       })
 
     if (context.options.printProgress) {
       println(
-        s"LIR emitted for ${instructionsCounts.map(pair => pair._1 + pair._2.sum).sum} instruction(s)"
+        s"LIR emitted for ${stageLoweringResults.map(r => r.initInstructionsCount + r.partitionInstructionsCounts.sum).sum} instruction(s)"
       )
     }
 
-    val stageInitInstructionCounts = instructionsCounts.map(_._1)
-    val partitionInstructionCounts = instructionsCounts.map(_._2).flatten
-    val macEfficiency              = Stats.macEfficiency(stats, context.options.arch, macs)
+    val stageInitInstructionCounts =
+      stageLoweringResults.map(_.initInstructionsCount)
+    val partitionInstructionCounts =
+      stageLoweringResults.map(_.partitionInstructionsCounts).flatten
+    val macEfficiency = Stats.macEfficiency(stats, context.options.arch, macs)
 
     if (context.options.printSchedulerSummary) {
       val tb = new TablePrinter(Some(s"$name SCHEDULER SUMMARY"))
@@ -481,8 +530,10 @@ class IsolatedLocalScheduler(
       numberOfPartitions = numberOfPartitions,
       cycles = stats.aggregateCycles,
       energy = stats.aggregateEnergy,
-      //accumulatorUtilization = accumulatorUtilization,
-      //localUtilization = localUtilization,
+      accumulatorUsage = MemoryUsage(
+        stageLoweringResults.map(_.accumulatorUsage)
+      ),
+      localUsage = MemoryUsage(stageLoweringResults.map(_.localUsage)),
       macs = macs,
       macEfficiency = macEfficiency,
     )

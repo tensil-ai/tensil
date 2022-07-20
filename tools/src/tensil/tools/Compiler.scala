@@ -534,14 +534,12 @@ object Compiler {
 
       val dram0SpaceUsage = dram0Space.usage
       val dram1SpaceUsage = dram1Space.usage
-      val accumulatorUsage =
-        if (!layerSchedulerResults.isEmpty)
-          new MemoryUsage(
-            maxSize = layerSchedulerResults.map(_.accumulatorUsage.maxSize).max,
-            aggSize = layerSchedulerResults.map(_.accumulatorUsage.aggSize).sum
-          )
-        else MemoryUsage(0, 0)
-      val localUsage = localSpace.usage
+      val accumulatorUsage = MemoryUsage(
+        layerSchedulerResults.map(_.accumulatorUsage)
+      )
+      val localUsage = MemoryUsage(
+        localSpace.usage +: layerSchedulerResults.map(_.localUsage)
+      )
 
       if (dram0SpaceUsage.maxSize != 0)
         tb.addNamedLine(

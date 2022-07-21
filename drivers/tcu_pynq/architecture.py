@@ -63,3 +63,17 @@ zcu104 = Architecture(
     number_of_threads=1,
     thread_queue_depth=8,
 )
+
+zcu104_uram = Architecture(
+    data_type=DataType.FP16BP8,
+    array_size=32,
+    dram0_depth=2097152,
+    dram1_depth=2097152,
+    local_depth=49152,
+    accumulator_depth=20480,
+    simd_registers_depth=1,
+    stride0_depth=8,
+    stride1_depth=8,
+    number_of_threads=1,
+    thread_queue_depth=8,
+)

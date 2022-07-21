@@ -123,7 +123,7 @@ static void parse_outputs(struct tensil_model *model, const cJSON *json) {
 }
 
 void tensil_model_parse(struct tensil_model *model, const cJSON *json) {
-    memset(model, 0, sizeof(struct tensil_model));
+    memset((void *)model, 0, sizeof(struct tensil_model));
 
     if (cJSON_IsObject(json)) {
         parse_prog(&model->prog,
@@ -154,8 +154,6 @@ tensil_error_t tensil_model_from_file(struct tensil_model *model,
     tensil_error_t error = TENSIL_ERROR_NONE;
     char *buffer = NULL;
     cJSON *json = NULL;
-
-    memset((void *)model, 0, sizeof(struct tensil_model));
 
     memset(&fno, 0, sizeof(FILINFO));
     res = f_stat(file_name, &fno);
@@ -195,6 +193,17 @@ tensil_error_t tensil_model_from_file(struct tensil_model *model,
         error = TENSIL_DRIVER_ERROR(TENSIL_ERROR_DRIVER_INVALID_MODEL,
                                     "Invalid model in %s", file_name);
         goto cleanup;
+    }
+
+    const char *file_name_ptr = file_name;
+    const char *file_name_slash_ptr = NULL;
+    size_t i = 0;
+    while ((file_name_slash_ptr = strchr(file_name_ptr, '/'))) {
+        while (file_name_ptr <= file_name_slash_ptr) {
+            model->path[i] = *file_name_ptr;
+            i++;
+            file_name_ptr++;
+        }
     }
 
 cleanup:

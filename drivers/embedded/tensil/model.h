@@ -52,6 +52,10 @@ struct tensil_model {
     struct tensil_architecture arch;
 
     bool load_consts_to_local;
+
+#ifdef TENSIL_PLATFORM_ENABLE_FILE_SYSTEM
+    char path[FF_MAX_LFN];
+#endif
 };
 
 bool tensil_model_is_valid(const struct tensil_model *model);

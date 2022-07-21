@@ -50,6 +50,8 @@ struct tensil_model {
 
     struct tensil_program prog;
     struct tensil_architecture arch;
+
+    bool load_consts_to_local;
 };
 
 bool tensil_model_is_valid(const struct tensil_model *model);

@@ -8,49 +8,45 @@ import java.io.{
   ObjectOutputStream,
   FileInputStream,
   ObjectInputStream,
-  EOFException
+  EOFException,
+  DataOutputStream
 }
 
 import scala.collection.mutable
 import scala.util.hashing.MurmurHash3
 
-import _root_.tensil.tools.{
+import tensil.tools.{
   CompilerException,
   CompilerOptions,
   TraceContext,
   TracepointCondition,
 }
-import _root_.tensil.tools.compiler.scheduler._
-import _root_.tensil.tools.util
-import _root_.tensil.{TablePrinter, TableLine, Architecture}
-import java.io.DataOutputStream
+import tensil.tools.compiler.scheduler._
+import tensil.tools.util
+import tensil.{TablePrinter, TableLine, Architecture}
 
 case class SchedulerResult(
-    numberOfCombinedStages: Int,
-    numberOfStages: Int,
-    numberOfPartitions: Int,
-    cycles: Long,
-    energy: Long,
-    accumulatorUtilization: Float,
-    localUtilization: Float,
-    macs: Long,
-    macEfficiency: Float
+    numberOfCombinedStages: Int = 0,
+    numberOfStages: Int = 0,
+    numberOfPartitions: Int = 0,
+    cycles: Long = 0,
+    energy: Long = 0,
+    accumulatorUtilization: Float = 0,
+    localUtilization: Float = 0,
+    macs: Long = 0,
+    macEfficiency: Float = Float.NaN
 ) {}
 
-class Scheduler(
+abstract class Scheduler(
     layerIndex: Int,
-    arch: Architecture,
-    options: CompilerOptions
+    context: SchedulingContext
 ) extends HIR {
-  if (options.printProgress) {
-    println(s"LAYER $layerIndex, emitting HIR ...")
-  }
-
-  private var tempOutputNodes =
+  private var tempOutputNodesByOutput =
     mutable.Map.empty[MemoryAddress, TempOutputNode]
-  private var varOutputNodes = mutable.Map.empty[MemoryAddress, VarOutputNode]
+  private var varOutputNodesByInput =
+    mutable.Map.empty[MemoryAddress, mutable.ArrayBuffer[VarOutputNode]]
 
-  private var macs = 0L
+  protected var macs = 0L
 
   private def countMacs(
       weightsObj: MemoryObject,
@@ -75,7 +71,10 @@ class Scheduler(
       )
 
     val weightsHeight =
-      util.divCeil(weightsObj.dims.heightVectors, arch.arraySize)
+      util.divCeil(
+        weightsObj.dims.heightVectors,
+        context.options.arch.arraySize
+      )
 
     for (pair <- inputOutputPairs) {
       if (
@@ -112,9 +111,9 @@ class Scheduler(
         }
 
         val weights =
-          for (k <- 0 until arch.arraySize)
+          for (k <- 0 until context.options.arch.arraySize)
             yield weightsObj.mkAddress(
-              i + (k + j * arch.arraySize) * weightsObj.dims.widthVectors
+              i + (k + j * context.options.arch.arraySize) * weightsObj.dims.widthVectors
             )
 
         val weightsAndBias = weights.reverse :+ bias
@@ -147,14 +146,14 @@ class Scheduler(
         case (output, g) => (output, g.map(_._2))
       }
     ) {
-      val matMulNode = tempOutputNodes
+      val matMulNode = tempOutputNodesByOutput
         .getOrElseUpdate(
           output,
           new MatMulNode(Vector.empty[MatMulInput], output)
         )
         .asInstanceOf[MatMulNode]
 
-      tempOutputNodes(output) =
+      tempOutputNodesByOutput(output) =
         new MatMulNode(matMulNode.inputs ++ matMulInputs, output)
     }
   }
@@ -166,8 +165,8 @@ class Scheduler(
     require(inputObj.dims.sizeVectors == outputObj.dims.sizeVectors)
     for (i <- 0 until outputObj.dims.sizeVectors) {
       val output = outputObj.mkAddress(i)
-      require(!tempOutputNodes.contains(output))
-      tempOutputNodes(output) = new LoadNode(
+      require(!tempOutputNodesByOutput.contains(output))
+      tempOutputNodesByOutput(output) = new LoadNode(
         inputObj.mkAddress(i),
         output
       )
@@ -183,8 +182,8 @@ class Scheduler(
     require(input1Obj.dims.sizeVectors == outputObj.dims.sizeVectors)
     for (i <- 0 until outputObj.dims.sizeVectors) {
       val output = outputObj.mkAddress(i)
-      require(!tempOutputNodes.contains(output))
-      tempOutputNodes(output) = new AddNode(
+      require(!tempOutputNodesByOutput.contains(output))
+      tempOutputNodesByOutput(output) = new AddNode(
         input0Obj.mkAddress(i),
         input1Obj.mkAddress(i),
         output
@@ -201,8 +200,8 @@ class Scheduler(
     require(input1Obj.dims.sizeVectors == outputObj.dims.sizeVectors)
     for (i <- 0 until outputObj.dims.sizeVectors) {
       val output = outputObj.mkAddress(i)
-      require(!tempOutputNodes.contains(output))
-      tempOutputNodes(output) = new BinarySIMDNode(
+      require(!tempOutputNodesByOutput.contains(output))
+      tempOutputNodesByOutput(output) = new BinarySIMDNode(
         SIMDOp.Subtract,
         input0Obj.mkAddress(i),
         input1Obj.mkAddress(i),
@@ -220,8 +219,8 @@ class Scheduler(
     require(input1Obj.dims.sizeVectors == outputObj.dims.sizeVectors)
     for (i <- 0 until outputObj.dims.sizeVectors) {
       val output = outputObj.mkAddress(i)
-      require(!tempOutputNodes.contains(output))
-      tempOutputNodes(output) = new BinarySIMDNode(
+      require(!tempOutputNodesByOutput.contains(output))
+      tempOutputNodesByOutput(output) = new BinarySIMDNode(
         SIMDOp.Multiply,
         input0Obj.mkAddress(i),
         input1Obj.mkAddress(i),
@@ -237,8 +236,8 @@ class Scheduler(
     require(inputObj.dims.sizeVectors == outputObj.dims.sizeVectors)
     for (i <- 0 until outputObj.dims.sizeVectors) {
       val output = outputObj.mkAddress(i)
-      require(!tempOutputNodes.contains(output))
-      tempOutputNodes(output) = new ReluNode(
+      require(!tempOutputNodesByOutput.contains(output))
+      tempOutputNodesByOutput(output) = new ReluNode(
         inputObj.mkAddress(i),
         output
       )
@@ -252,8 +251,8 @@ class Scheduler(
     require(inputObj.dims.sizeVectors == outputObj.dims.sizeVectors)
     for (i <- 0 until outputObj.dims.sizeVectors) {
       val output = outputObj.mkAddress(i)
-      require(!tempOutputNodes.contains(output))
-      tempOutputNodes(output) = new SoftmaxNode(
+      require(!tempOutputNodesByOutput.contains(output))
+      tempOutputNodesByOutput(output) = new SoftmaxNode(
         inputObj.mkAddress(i),
         output
       )
@@ -269,8 +268,8 @@ class Scheduler(
     require(alphaObj.dims.sizeVectors == 1)
     for (i <- 0 until outputObj.dims.sizeVectors) {
       val output = outputObj.mkAddress(i)
-      require(!tempOutputNodes.contains(output))
-      tempOutputNodes(output) = new LeakyReluNode(
+      require(!tempOutputNodesByOutput.contains(output))
+      tempOutputNodesByOutput(output) = new LeakyReluNode(
         alphaObj.mkAddress(0),
         inputObj.mkAddress(i),
         output
@@ -288,8 +287,8 @@ class Scheduler(
     require(!multiplierObj.isDefined || multiplierObj.get.dims.sizeVectors == 1)
     for (i <- 0 until outputObj.dims.sizeVectors) {
       val output = outputObj.mkAddress(i)
-      require(!tempOutputNodes.contains(output))
-      val node = tempOutputNodes(output) = new PoolNode(
+      require(!tempOutputNodesByOutput.contains(output))
+      val node = tempOutputNodesByOutput(output) = new PoolNode(
         op,
         output,
         inputObjs.map(_.mkAddress(i)).toVector,
@@ -309,8 +308,8 @@ class Scheduler(
     require(offsetObj.dims.sizeVectors == outputObj.dims.sizeVectors)
     for (i <- 0 until outputObj.dims.sizeVectors) {
       val output = outputObj.mkAddress(i)
-      require(!tempOutputNodes.contains(output))
-      tempOutputNodes(output) = new NormNode(
+      require(!tempOutputNodesByOutput.contains(output))
+      tempOutputNodesByOutput(output) = new NormNode(
         inputObj.mkAddress(i),
         scaleObj.mkAddress(i),
         offsetObj.mkAddress(i),
@@ -328,8 +327,8 @@ class Scheduler(
     require(scaleObjs.forall(_.dims.sizeVectors == outputObj.dims.sizeVectors))
     for (i <- 0 until outputObj.dims.sizeVectors) {
       val output = outputObj.mkAddress(i)
-      require(!tempOutputNodes.contains(output))
-      tempOutputNodes(output) = new InterpolateNode(
+      require(!tempOutputNodesByOutput.contains(output))
+      tempOutputNodesByOutput(output) = new InterpolateNode(
         output,
         inputObjs.map(_.mkAddress(i)).toVector,
         scaleObjs.map(_.mkAddress(i)).toVector
@@ -343,16 +342,93 @@ class Scheduler(
   ): Unit = {
     require(inputObj.dims.sizeVectors == outputObj.dims.sizeVectors)
     for (i <- 0 until outputObj.dims.sizeVectors) {
-      val output = outputObj.mkAddress(i)
-      require(!tempOutputNodes.contains(output))
-      varOutputNodes(output) = new SaveNode(
-        inputObj.mkAddress(i),
-        output
+      val input = inputObj.mkAddress(i)
+      val nodes = varOutputNodesByInput.getOrElseUpdate(
+        input,
+        mutable.ArrayBuffer.empty[VarOutputNode]
+      )
+      nodes += new SaveNode(
+        input,
+        outputObj.mkAddress(i)
       )
     }
   }
 
-  private def inputsToLoad(
+  def saveGraph(fileName: String): Unit = {
+    val stream = new ObjectOutputStream(new FileOutputStream(fileName))
+
+    for (node <- varOutputNodesByInput.values)
+      stream.writeObject(node)
+
+    for (node <- tempOutputNodesByOutput.values)
+      stream.writeObject(node)
+
+    stream.close()
+  }
+
+  def loadGraph(fileName: String): Unit = {
+    val stream = new ObjectInputStream(new FileInputStream(fileName))
+
+    try {
+      while (true) {
+        val node = stream.readObject()
+
+        if (node.isInstanceOf[VarOutputNode]) {
+          val varOutputNode = node.asInstanceOf[VarOutputNode]
+          for (temp <- varOutputNode.inputTemps) {
+            val nodes = varOutputNodesByInput.getOrElseUpdate(
+              temp,
+              mutable.ArrayBuffer.empty[VarOutputNode]
+            )
+            nodes += varOutputNode
+          }
+        } else if (node.isInstanceOf[TempOutputNode]) {
+          val tempOutputNode = node.asInstanceOf[TempOutputNode]
+          tempOutputNodesByOutput(tempOutputNode.output) = tempOutputNode
+        }
+      }
+    } catch {
+      case _: EOFException =>
+    }
+
+    stream.close()
+  }
+
+  def lower(backend: Backend): SchedulerResult = {
+    val tempInputTemps =
+      tempOutputNodesByOutput.values.map(_.inputTemps).flatten.toSet
+    val varInputTemps = varOutputNodesByInput.keys.toSet
+
+    /**
+      * Roots are temporary memory addresses that are the input to at
+      * least one `VarOutputNode` and are not the the input to any of
+      * the `TempOutputNode`s. In other words, roots are computation
+      * results not used in any other computation within the current
+      * layer.
+      */
+    val roots = (varInputTemps -- tempInputTemps).toSeq
+
+    if (!roots.isEmpty) {
+      if (context.options.printProgress) {
+        println(
+          s"---------------------- Layer ${layerIndex} ----------------------"
+        )
+        println(
+          s"HIR emitted with ${roots.size} root and ${(varOutputNodesByInput.size + tempOutputNodesByOutput.size) - roots.size} non-root node(s)"
+        )
+      }
+
+      doLower(roots, backend)
+    } else
+      SchedulerResult()
+  }
+
+  protected def doLower(
+      roots: Seq[MemoryAddress],
+      backend: Backend
+  ): SchedulerResult
+
+  protected def inputsToLoad(
       nodes: Seq[Node],
       inputs: Node => Seq[MemoryAddress]
   ): Seq[MemoryAddress] = {
@@ -399,519 +475,41 @@ class Scheduler(
       )
   }
 
-  def saveGraph(fileName: String): Unit = {
-    val stream = new ObjectOutputStream(new FileOutputStream(fileName))
-
-    for (node <- varOutputNodes.values)
-      stream.writeObject(node)
-
-    for (node <- tempOutputNodes.values)
-      stream.writeObject(node)
-
-    stream.close()
-  }
-
-  def loadGraph(fileName: String): Unit = {
-    val stream = new ObjectInputStream(new FileInputStream(fileName))
-
-    try {
-      while (true) {
-        val node = stream.readObject()
-
-        if (node.isInstanceOf[VarOutputNode]) {
-          val varOutputNode = node.asInstanceOf[VarOutputNode]
-          varOutputNodes(varOutputNode.output) = varOutputNode
-        } else if (node.isInstanceOf[TempOutputNode]) {
-          val tempOutputNode = node.asInstanceOf[TempOutputNode]
-          tempOutputNodes(tempOutputNode.output) = tempOutputNode
-        }
-      }
-    } catch {
-      case _: EOFException =>
+  protected def findVarOutputNodesByInput(
+      inputTemp: MemoryAddress
+  ): Seq[VarOutputNode] =
+    varOutputNodesByInput.get(inputTemp) match {
+      case None        => Nil
+      case Some(nodes) => nodes
     }
 
-    stream.close()
-  }
-
-  def emit(
-      backend: Backend,
-      backendBufferSize: Int = 256 * 1024
-  ): SchedulerResult = {
-    if (options.printProgress) {
-      println(
-        s"Emitted ${varOutputNodes.size} root and ${tempOutputNodes.size} non-root node(s)"
-      )
-      println(s"Planning stages and partition ...")
-    }
-
-    /** Root's stage signature is a combination of the address
-      * value for the first stage const (the first weight vector)
-      * and the hash of all address values for stage consts.
-      */
-    case class StageSignature(
-        firstConstAddressValue: Option[MemoryAddressRaw],
-        constAddressValuesHash: Int
-    )
-
-    def rootStageSignature(root: VarOutputNode) = {
-      val constValues =
-        inputsToLoad(traverseRoots(Seq(root)), _.inputStageConsts)
-          .map(_.raw)
-      StageSignature(
-        firstConstAddressValue = constValues.headOption,
-        constAddressValuesHash = MurmurHash3.unorderedHash(constValues)
-      )
-    }
-
-    val rootsByStages = varOutputNodes.values.par
-      .groupBy(rootStageSignature(_))
-      .seq
-      .toSeq
-      .sortBy(_._1.firstConstAddressValue)
-      .map(_._2.seq.toSeq)
-
-    case class UsageInfo(
-        accumulatorSize: Int,
-        localSize: Int,
-    )
-
-    case class PartitionInfo(
-        roots: Option[Seq[VarOutputNode]],
-        usage: UsageInfo
-    )
-
-    case class CombinedStageInfo(
-        constsToLoad: Seq[MemoryAddress],
-        partitions: Seq[PartitionInfo]
-    )
-
-    def combineStages(
-        order: Int = 0,
-        prevStages: Option[Seq[CombinedStageInfo]] = None
-    ): Seq[CombinedStageInfo] = {
-
-      val size                       = 1 << order
-      val combinationCandidateStages =
-        /** We want to combine the stages in strides in order to
-          * retain roll-up opportunities. For this we use interleave.
-          *
-          * For example, when we have stages (0,1,2,3,4,5,6,7) and size=2,
-          * the group seqs will be (0,1), (2,3), (4,5), (6,7). Then,
-          * interleaved, the combination candidates will be (0,2,4,6)
-          * and (1,3,5,7).
-          */
-        util
-          .interleave(
-            rootsByStages
-              .grouped(util.divCeil(rootsByStages.size, size))
-              .toSeq
-          )
-          .par
-          .map(combinationCandidateStagedRoots => {
-            val consts = inputsToLoad(
-              traverseRoots(combinationCandidateStagedRoots.map(_.head)),
-              _.inputStageConsts
-            )
-
-            def partitionRoots(
-                roots: Seq[VarOutputNode],
-                partitions: Seq[PartitionInfo] = Nil
-            ): Seq[PartitionInfo] = {
-              case class MaximumPartitionSizeInfo(
-                  n: Option[Int],
-                  usage: UsageInfo
-              )
-
-              def findNextMaximumPartitionSize(
-                  roots: Seq[VarOutputNode],
-                  n: Int = 1,
-                  powerOfTwoPass: Boolean = true,
-                  prevUsage: Option[UsageInfo] = None
-              ): MaximumPartitionSizeInfo = {
-                require(roots.size > 0)
-
-                val nodes           = traverseRoots(roots.take(n))
-                val accumulatorSize = estimatePartitionAccumulatorSize(nodes)
-                val localSize =
-                  estimatePartitionLocalSize(nodes) + consts.size
-                val usage = UsageInfo(
-                  accumulatorSize = accumulatorSize,
-                  localSize = localSize
-                )
-
-                if (
-                  accumulatorSize > arch.accumulatorDepth || localSize > arch.threadLocalDepth
-                ) {
-                  if (n == 1)
-                    /**
-                      * When a single root is not fitting the memories
-                      * return n as None and usage that is greater than
-                      * depth.
-                      */
-                    MaximumPartitionSizeInfo(
-                      n = None,
-                      usage = usage
-                    )
-                  else {
-                    if (powerOfTwoPass)
-                      findNextMaximumPartitionSize(
-                        roots,
-                        (n / 2) + 1,
-                        false,
-                        prevUsage
-                      )
-                    else
-                      MaximumPartitionSizeInfo(
-                        n = Some(n - 1),
-                        usage = prevUsage.get
-                      )
-                  }
-                } else if (n >= roots.size)
-                  MaximumPartitionSizeInfo(
-                    n = Some(roots.size),
-                    usage = usage
-                  )
-                else {
-                  if (powerOfTwoPass)
-                    findNextMaximumPartitionSize(
-                      roots,
-                      n * 2,
-                      true,
-                      Some(usage)
-                    )
-                  else
-                    findNextMaximumPartitionSize(
-                      roots,
-                      n + 1,
-                      false,
-                      Some(usage)
-                    )
-                }
-              }
-
-              if (!roots.isEmpty) {
-                findNextMaximumPartitionSize(roots) match {
-                  case MaximumPartitionSizeInfo(None, usage) =>
-                    /**
-                      * When cannot find a partition that is fitting the
-                      * memories return roots as None and usage that is
-                      * greater than depth.
-                      */
-                    partitions :+ PartitionInfo(
-                      roots = None,
-                      usage = usage
-                    )
-                  case MaximumPartitionSizeInfo(Some(n), usage) =>
-                    val (partition, rest) = roots.splitAt(n)
-
-                    partitionRoots(
-                      rest,
-                      partitions :+ PartitionInfo(
-                        roots = Some(partition),
-                        usage = usage
-                      )
-                    )
-
-                }
-              } else partitions
-            }
-
-            val partitions =
-              partitionRoots(
-                combinationCandidateStagedRoots.flatten
-                  .sortBy(_.output.raw)
-              )
-
-            CombinedStageInfo(consts, partitions)
-          })
-          .seq
-
-      /**
-        * Try finding the usage for at least one stage with
-        * the last partition not fitting the memories.
-        */
-      combinationCandidateStages
-        .map(_.partitions.last)
-        .filter(!_.roots.isDefined)
-        .map(_.usage)
-        .headOption match {
-        case Some(UsageInfo(accumulatorSize, localSize)) =>
-          if (prevStages.isDefined)
-            prevStages.get
-          else {
-            if (accumulatorSize > arch.accumulatorDepth)
-              throw new CompilerException(
-                s"Insufficient accumulators, required at least ${accumulatorSize} for a single root"
-              )
-            else
-              throw new CompilerException(
-                s"Insufficient local memory, required at least ${localSize} for a single root"
-              )
-          }
-
-        case None =>
-          /**
-            * All stages are fitting the memories.
-            *
-            * Check if any of the stages has more than one partition.
-            *
-            * If so, stop the combination process and return previously
-            * combined stages if available or the initial non-combined
-            * stages otherwise.
-            *
-            * If otherwise, and there is still an opportunity for
-            * combination try combining twice as many stages.
-            */
-          if (combinationCandidateStages.map(_.partitions.size).max > 1) {
-            if (prevStages.isDefined)
-              prevStages.get
-            else combinationCandidateStages
-          } else if (size < rootsByStages.size)
-            combineStages(order + 1, Some(combinationCandidateStages))
-          else
-            combinationCandidateStages
-      }
-    }
-
-    val name                   = s"LAYER $layerIndex"
-    val numberOfStages         = rootsByStages.size
-    val stages                 = combineStages()
-    val numberOfCombinedStages = stages.size
-    val partitions             = stages.map(_.partitions).flatten
-    val numberOfPartitions     = partitions.size
-    val maximumRootsSize       = partitions.map(_.roots.get.size).max
-    val accumulatorSize        = partitions.map(_.usage.accumulatorSize).max
-    val localSize              = partitions.map(_.usage.localSize).max
-
-    val accumulatorUtilization =
-      accumulatorSize.toFloat / arch.accumulatorDepth.toFloat
-    val localUtilization = localSize.toFloat / arch.localDepth.toFloat
-
-    val stats = new Stats()
-
-    if (options.printProgress) {
-      println(
-        s"Planned ${numberOfCombinedStages} stage(s) and ${numberOfPartitions} partition(s)"
-      )
-      println(s"Emitting LIR ...")
-    }
-
-    val instructionsCounts = stages.zipWithIndex.par
-      .map({
-        case (stage, i) =>
-          val initKey =
-            BackendSegmentKey(layerIndex, i, 0, BackendSegmentKey.Init)
-          val initStats = new Stats()
-          val initSegment = backend.mkSegment(
-            initKey,
-            Some(initStats)
-          )
-          val stageInit =
-            emitStageInit(initSegment.segmentLir, stage.constsToLoad)
-
-          val partitionSegmentAndStats = stage.partitions.zipWithIndex.par
-            .map({
-              case (partition, j) =>
-                val loadKey = BackendSegmentKey(
-                  layerIndex,
-                  i,
-                  j,
-                  BackendSegmentKey.Load
-                )
-                val computeKey = BackendSegmentKey(
-                  layerIndex,
-                  i,
-                  j,
-                  BackendSegmentKey.Compute
-                )
-                val saveKey = BackendSegmentKey(
-                  layerIndex,
-                  i,
-                  j,
-                  BackendSegmentKey.Save
-                )
-
-                val (loadStats, computeStats, saveStats) =
-                  (new Stats(), new Stats(), new Stats())
-
-                val (loadSegment, computeSegment, saveSegment) =
-                  (
-                    backend.mkSegment(
-                      loadKey,
-                      Some(loadStats)
-                    ),
-                    backend.mkSegment(
-                      computeKey,
-                      Some(computeStats)
-                    ),
-                    backend.mkSegment(
-                      saveKey,
-                      Some(saveStats)
-                    )
-                  )
-
-                emitStagePartition(
-                  loadSegment.segmentLir,
-                  computeSegment.segmentLir,
-                  saveSegment.segmentLir,
-                  stageInit,
-                  traverseRoots(partition.roots.get)
-                )
-
-                Seq(
-                  (loadSegment, loadStats),
-                  (computeSegment, computeStats),
-                  (saveSegment, saveStats)
-                )
-            })
-            .seq
-
-          (initSegment, initStats, partitionSegmentAndStats)
-      })
-      .seq
-      .map({
-        case ((initSegment, initStats, partitionSegmentAndStats)) => {
-          backend.emitSegment(initSegment)
-
-          stats.add(initStats)
-
-          val instructionsCounts =
-            partitionSegmentAndStats.map(segmentAndStats => {
-              segmentAndStats.foreach(v => stats.add(v._2))
-
-              for ((partitionSegment, partitionStats) <- segmentAndStats)
-                yield {
-                  backend.emitSegment(partitionSegment)
-
-                  partitionSegment.instructionsCount
-                }
-            })
-
-          (initSegment.instructionsCount, instructionsCounts.flatten)
-        }
-      })
-
-    if (options.printProgress) {
-      println(
-        s"Emitted ${instructionsCounts.map(pair => pair._1 + pair._2.sum).sum} instruction(s)"
-      )
-    }
-
-    val stageInitInstructionCounts = instructionsCounts.map(_._1)
-    val partitionInstructionCounts = instructionsCounts.map(_._2).flatten
-    val macEfficiency              = Stats.macEfficiency(stats, arch, macs)
-
-    if (options.printSchedulerSummary) {
-      val tb = new TablePrinter(Some(s"$name SCHEDULER SUMMARY"))
-      tb.addNamedLine("Stages", numberOfStages)
-      tb.addNamedLine("Combined Stages", numberOfCombinedStages)
-      tb.addNamedLine("Partitions", numberOfPartitions)
-      tb.addNamedLine("Partition results size", maximumRootsSize)
-      tb.addNamedLine("Partition accumulator size", accumulatorSize)
-      tb.addNamedLine("Partition local size", localSize)
-      tb.addNamedLine(
-        "Stage init maximum number of instructions",
-        stageInitInstructionCounts.max
-      )
-      tb.addNamedLine(
-        "Stage init average number of instructions",
-        stageInitInstructionCounts.sum / stageInitInstructionCounts.size
-      )
-      tb.addNamedLine(
-        "Partition maximum number of instructions",
-        partitionInstructionCounts.max
-      )
-      tb.addNamedLine(
-        "Partition average number of instructions",
-        partitionInstructionCounts.sum / partitionInstructionCounts.size
-      )
-      Stats.printSummary(stats, tb, arch, Some(macs))
-      tb.addNamedLine(
-        "Total number of instructions",
-        stageInitInstructionCounts.sum + partitionInstructionCounts.sum
-      )
-      tb.addNamedLine(
-        "Accumulator utilization (%)",
-        accumulatorUtilization * 100f
-      )
-      tb.addNamedLine("Local utilization (%)", localUtilization * 100f)
-      val (macsLetter, macsDivisor) =
-        Stats.getUnitsLetterAndDivisor(macs)
-      tb.addNamedLine(
-        s"True MACs (${macsLetter}MAC)",
-        macs.toFloat / macsDivisor
-      )
-      tb.addNamedLine("MAC efficiency (%)", macEfficiency * 100f)
-      print(tb)
-
-      if (options.printInstructionsSummary) {
-        Stats.printCompositionSummary(name, stats)
-        Stats.printCyclesSummary(name, stats)
-        Stats.printEnergySummary(name, stats)
-      }
-
-      if (options.printStridesSummary) {
-        def printStrideStats(
-            title: String,
-            select: StrideStats => Any
-        ): Unit = {
-          val tb = new TablePrinter(Some(title), true)
-          Stats.printStrideStats(
-            arch.stride0Depth,
-            arch.stride1Depth,
-            stats,
-            select,
-            tb
-          )
-          print(tb)
-        }
-
-        printStrideStats(s"$name STRIDES COUNT SUMMARY", stats => stats.count)
-        printStrideStats(
-          s"$name STRIDES MAX SIZE SUMMARY",
-          stats => stats.maxSize
-        )
-        printStrideStats(
-          s"$name STRIDES AVERAGE SIZE SUMMARY",
-          stats => Math.round(stats.totalSize.toFloat / stats.count.toFloat)
-        )
-      }
-    }
-
-    SchedulerResult(
-      numberOfStages = numberOfStages,
-      numberOfCombinedStages = numberOfCombinedStages,
-      numberOfPartitions = numberOfPartitions,
-      cycles = stats.aggregateCycles,
-      energy = stats.aggregateEnergy,
-      accumulatorUtilization = accumulatorUtilization,
-      localUtilization = localUtilization,
-      macs = macs,
-      macEfficiency = macEfficiency,
-    )
-  }
-
-  private def traverseRoots(
-      roots: Seq[VarOutputNode]
+  protected def traverseRoots(
+      roots: Seq[MemoryAddress]
   ): Seq[Node] = {
-    val traversedNodes = mutable.Map.empty[MemoryAddressRaw, Node]
+    val uniqueTempOutputNodes = mutable.Map.empty[MemoryAddressRaw, Node]
+    val uniqueVarOutputNodes  = mutable.Map.empty[MemoryAddressRaw, Seq[Node]]
 
-    for (root <- roots) {
-      def traverseNodes(node: Node) {
-        for (temp <- node.inputTemps) {
-          val node = tempOutputNodes(temp)
-          traversedNodes(temp.raw) = node
-          traverseNodes(node)
+    def traverseTemp(address: MemoryAddress) {
+      val tempOutputNode = tempOutputNodesByOutput.get(address)
+
+      if (tempOutputNode.isDefined) {
+        uniqueTempOutputNodes(address.raw) = tempOutputNode.get
+
+        for (temp <- tempOutputNode.get.inputTemps) {
+          traverseTemp(temp)
         }
       }
 
-      traverseNodes(root)
+      uniqueVarOutputNodes(address.raw) = findVarOutputNodesByInput(address)
     }
 
-    traversedNodes.values.toSeq ++ roots.asInstanceOf[Seq[Node]]
+    for (temp <- roots)
+      traverseTemp(temp)
+
+    uniqueTempOutputNodes.values.toSeq ++ uniqueVarOutputNodes.values.flatten.toSeq
   }
 
-  private def estimatePartitionAccumulatorSize(
+  protected def estimateAccumulatorSize(
       nodes: Seq[Node]
   ): Int = {
     val unique = mutable.Set.empty[MemoryAddressRaw]
@@ -927,8 +525,11 @@ class Scheduler(
     unique.size
   }
 
-  private def estimatePartitionLocalSize(
-      nodes: Seq[Node]
+  protected def estimateLocalSize(
+      nodes: Seq[Node],
+      includeReusableConsts: Boolean = true,
+      includeNonReusableConsts: Boolean = true,
+      includeVars: Boolean = true
   ): Int = {
     val unique = mutable.Set.empty[MemoryAddress]
 
@@ -938,8 +539,14 @@ class Scheduler(
           .filter(_.isInstanceOf[TempOutputNode])
           .map(_.asInstanceOf[TempOutputNode])
     ) {
-      unique ++= node.inputVars
-      unique ++= node.inputPartitionConsts
+      if (includeReusableConsts)
+        unique ++= node.inputReusableConsts
+
+      if (includeNonReusableConsts)
+        unique ++= node.inputNonReusableConsts
+
+      if (includeVars)
+        unique ++= node.inputVars
     }
 
     for (
@@ -953,149 +560,75 @@ class Scheduler(
     unique.size
   }
 
-  private case class StageInitInfo(
-      constsToLocalRenameMap: Map[MemoryAddressRaw, MemoryAddressRaw]
-  )
-
-  private def emitStageInit(
+  protected def lowerLoadConsts(
       lir: LIR,
-      constsToLoad: Seq[MemoryAddress]
-  ): StageInitInfo = {
-    var toLocalRenameNext: MemoryAddressRaw = 0
-    val constsToLocalRenameMap =
-      mutable.Map.empty[MemoryAddressRaw, MemoryAddressRaw]
-
-    val loadLocalRollup = new DoubleAddressRollup(
-      lir.emitDataMove(toLocal = true, accumulate = false, _, _, _, _, _),
-      arch
-    )
-
-    for (constAddress <- constsToLoad) {
-      require(constAddress.tag == MemoryTag.Consts)
-      require(!constsToLocalRenameMap.contains(constAddress.raw))
-
-      val localAddressValue = toLocalRenameNext
-      toLocalRenameNext += 1
-      constsToLocalRenameMap(constAddress.raw) = localAddressValue
-
-      loadLocalRollup.emit(
-        MemoryAddress(MemoryTag.Local, constAddress.ref, localAddressValue),
-        constAddress
+      localAllocator: RenamingMemoryAllocator,
+      nodes: Seq[Node],
+      includeReusableConsts: Boolean = true,
+      includeNonReusableConsts: Boolean = true,
+  ): Unit = {
+    if (includeReusableConsts)
+      allocateAndLoadMemory(
+        lir,
+        localAllocator,
+        inputsToLoad(nodes, _.inputReusableConsts)
       )
-    }
 
-    loadLocalRollup.finalEmit()
-    lir.endEmit()
-
-    StageInitInfo(constsToLocalRenameMap = constsToLocalRenameMap.toMap)
+    if (includeNonReusableConsts)
+      allocateAndLoadMemory(
+        lir,
+        localAllocator,
+        inputsToLoad(nodes, _.inputNonReusableConsts)
+      )
   }
 
-  private def emitStagePartition(
-      loadLir: LIR,
-      computeLir: LIR,
-      saveLir: LIR,
-      stage: StageInitInfo,
+  protected def lowerLoadVars(
+      lir: LIR,
+      localAllocator: RenamingMemoryAllocator,
       nodes: Seq[Node]
-  ): Unit = {
-    var accumulatorRenameNext: MemoryAddressRaw = 0L;
-    val accumulatorRenameMap =
-      mutable.Map.empty[MemoryAddressRaw, MemoryAddressRaw]
-
-    def allocateAccumulator(
-        tempAddress: MemoryAddress
-    ): MemoryAddress = {
-      require(tempAddress.tag == MemoryTag.Temp)
-
-      require(!accumulatorRenameMap.contains(tempAddress.raw))
-
-      val accAddressValue = accumulatorRenameNext
-      accumulatorRenameNext += 1
-      accumulatorRenameMap(tempAddress.raw) = accAddressValue
-      MemoryAddress(MemoryTag.Accumulators, tempAddress.ref, accAddressValue)
-    }
-
-    def locateAccumulator(
-        tempAddress: MemoryAddress
-    ): MemoryAddress = {
-      require(tempAddress.tag == MemoryTag.Temp)
-
-      MemoryAddress(
-        MemoryTag.Accumulators,
-        tempAddress.ref,
-        accumulatorRenameMap(tempAddress.raw)
-      )
-    }
-
-    var toLocalRenameNext: MemoryAddressRaw =
-      if (stage.constsToLocalRenameMap.isEmpty) 0
-      else stage.constsToLocalRenameMap.values.max + 1;
-    val varsToLocalRenameMap =
-      mutable.Map.empty[MemoryAddressRaw, MemoryAddressRaw]
-    val constsToLocalRenameMap =
-      mutable.Map.empty[
-        MemoryAddressRaw,
-        MemoryAddressRaw
-      ] ++ stage.constsToLocalRenameMap
-
-    def allocateLocal(varsOrConstsAddress: MemoryAddress): MemoryAddress = {
-      require(
-        varsOrConstsAddress.tag == MemoryTag.Vars || varsOrConstsAddress.tag == MemoryTag.Consts
-      )
-
-      val map = varsOrConstsAddress.tag match {
-        case MemoryTag.Vars   => varsToLocalRenameMap
-        case MemoryTag.Consts => constsToLocalRenameMap
-      }
-
-      require(!map.contains(varsOrConstsAddress.raw))
-
-      val localAddressValue = toLocalRenameNext
-      toLocalRenameNext += 1
-      map(varsOrConstsAddress.raw) = localAddressValue
-
-      MemoryAddress(
-        MemoryTag.Local,
-        varsOrConstsAddress.ref,
-        localAddressValue
-      ),
-    }
-
-    def locateLocal(varsOrConstsAddress: MemoryAddress): MemoryAddress = {
-      require(
-        varsOrConstsAddress.tag == MemoryTag.Vars || varsOrConstsAddress.tag == MemoryTag.Consts
-      )
-
-      val map = varsOrConstsAddress.tag match {
-        case MemoryTag.Vars   => varsToLocalRenameMap
-        case MemoryTag.Consts => constsToLocalRenameMap
-      }
-
-      MemoryAddress(
-        MemoryTag.Local,
-        varsOrConstsAddress.ref,
-        map(varsOrConstsAddress.raw)
-      )
-    }
-
-    val loadLocalRollup = new DoubleAddressRollup(
-      loadLir
-        .emitDataMove(toLocal = true, accumulate = false, _, _, _, _, _),
-      arch
+  ): Unit =
+    allocateAndLoadMemory(
+      lir,
+      localAllocator,
+      inputsToLoad(nodes, _.inputVars)
     )
 
-    for (constAddress <- inputsToLoad(nodes, _.inputPartitionConsts))
-      loadLocalRollup.emit(
-        allocateLocal(constAddress),
-        constAddress
-      )
+  protected def allocateAndLoadMemory(
+      lir: LIR,
+      localAllocator: RenamingMemoryAllocator,
+      addressesToLoad: Seq[MemoryAddress]
+  ): Unit = {
+    val loadLocalRollup = new DoubleAddressRollup(
+      lir.emitDataMove(toLocal = true, accumulate = false, _, _, _, _, _),
+      context.options.arch
+    )
 
-    for (varsAddress <- inputsToLoad(nodes, _.inputVars))
+    for (
+      address <- addressesToLoad.filter(a =>
+        a.tag == MemoryTag.DRAM0 || a.tag == MemoryTag.DRAM1
+      )
+    )
       loadLocalRollup.emit(
-        allocateLocal(varsAddress),
-        varsAddress
+        localAllocator.allocate(address),
+        address
       )
 
     loadLocalRollup.finalEmit()
+  }
+
+  protected def lowerCompute(
+      lir: LIR,
+      localAllocator: RenamingMemoryAllocator,
+      nodes: Seq[Node]
+  ): Unit = {
+    val accumulatorSpace = ArenaMemorySpace(
+      "Accumulator",
+      MemoryTag.Accumulators,
+      context.options.arch.accumulatorDepth
+    )
+
+    val accumulatorAllocator =
+      RenamingMemoryAllocator(accumulatorSpace, Set(MemoryTag.Temp))
 
     val groupedMatMulInputOutputs =
       mutable.Map.empty[Int, mutable.ArrayBuffer[
@@ -1121,7 +654,7 @@ class Scheduler(
           .map(_.asInstanceOf[MatMulNode])
           .sortBy(_.output)
     ) {
-      val outputAccAddress = allocateAccumulator(mmNode.output)
+      val outputAccAddress = accumulatorAllocator.allocate(mmNode.output)
 
       for (input <- mmNode.inputs) {
 
@@ -1147,7 +680,7 @@ class Scheduler(
 
           group += (
             (
-              locateLocal(input.input),
+              localAllocator.locate(input.input),
               outputAccAddress
             )
           )
@@ -1164,14 +697,14 @@ class Scheduler(
       (weightsKey, weightsSeq) <- groupedMatMulWeights.toSeq.sortBy(_._2.head)
     ) {
       val loadWeightsRollup = new SingleAddressReverseRollup(
-        computeLir.emitLoadWeights(_, _, _),
-        arch
+        lir.emitLoadWeights(_, _, _),
+        context.options.arch
       )
 
       for (weights <- weightsSeq) {
         val weightsLocalAddress =
           if (weights.tag != MemoryTag.Zeroes)
-            locateLocal(weights)
+            localAllocator.locate(weights)
           else weights
         loadWeightsRollup.emit(weightsLocalAddress)
       }
@@ -1179,12 +712,12 @@ class Scheduler(
       loadWeightsRollup.finalEmit()
 
       val matMulRollup = new DoubleAddressRollup(
-        computeLir.emitMatMul(accumulate = false, _, _, _, _, _),
-        arch
+        lir.emitMatMul(accumulate = false, _, _, _, _, _),
+        context.options.arch
       )
       val matMulAccumulateRollup = new DoubleAddressRollup(
-        computeLir.emitMatMul(accumulate = true, _, _, _, _, _),
-        arch
+        lir.emitMatMul(accumulate = true, _, _, _, _, _),
+        context.options.arch
       )
 
       groupedMatMulInputOutputs.get(weightsKey) match {
@@ -1228,25 +761,27 @@ class Scheduler(
     }
 
     val loadAccRollup = new DoubleAddressRollup(
-      computeLir
+      lir
         .emitDataMove(toLocal = false, accumulate = false, _, _, _, _, _),
-      arch
+      context.options.arch
     )
 
     val loadAccInputOutputs = nodes
       .filter(_.isInstanceOf[LoadNode])
       .map(_.asInstanceOf[LoadNode])
-      .map(n => (locateLocal(n.input), n.output))
+      .map(n => (localAllocator.locate(n.input), n.output))
 
     for (
       (inputLocalAddress, outputTempAddress) <- loadAccInputOutputs.sortBy(_._1)
     ) {
-      val outputAccAddress = allocateAccumulator(outputTempAddress)
+      val (allocated, outputAccAddress) =
+        accumulatorAllocator.allocateOrLocate(outputTempAddress)
 
-      loadAccRollup.emit(
-        inputLocalAddress,
-        outputAccAddress
-      )
+      if (allocated)
+        loadAccRollup.emit(
+          inputLocalAddress,
+          outputAccAddress
+        )
     }
 
     loadAccRollup.finalEmit()
@@ -1258,10 +793,10 @@ class Scheduler(
           .map(_.asInstanceOf[AddNode])
           .sortBy(_.output)
     ) {
-      val outputAccAddress = allocateAccumulator(addNode.output)
-      val inputAccAddress  = locateAccumulator(addNode.input0)
+      val outputAccAddress = accumulatorAllocator.allocate(addNode.output)
+      val inputAccAddress  = accumulatorAllocator.locate(addNode.input0)
 
-      computeLir.emitSIMD(
+      lir.emitSIMD(
         accumulate = false,
         SIMDOp.Move,
         SIMDSource.Input,
@@ -1273,9 +808,9 @@ class Scheduler(
     }
 
     val addRollup = new DoubleAddressRollup(
-      computeLir
+      lir
         .emitDataMove(toLocal = false, accumulate = true, _, _, _, _, _),
-      arch
+      context.options.arch
     )
 
     for (
@@ -1285,8 +820,8 @@ class Scheduler(
           .map(_.asInstanceOf[AddNode])
           .sortBy(_.output)
     ) {
-      val outputAccAddress   = locateAccumulator(addNode.output)
-      val input1LocalAddress = locateLocal(addNode.input1)
+      val outputAccAddress   = accumulatorAllocator.locate(addNode.output)
+      val input1LocalAddress = localAllocator.locate(addNode.input1)
 
       addRollup.emit(
         input1LocalAddress,
@@ -1303,11 +838,14 @@ class Scheduler(
           .map(_.asInstanceOf[BinarySIMDNode])
           .sortBy(_.output)
     ) {
-      val outputAccAddress = allocateAccumulator(binarySIMDNode.output)
-      val input0AccAddress = locateAccumulator(binarySIMDNode.input0)
-      val input1AccAddress = locateAccumulator(binarySIMDNode.input1)
+      val outputAccAddress =
+        accumulatorAllocator.allocate(binarySIMDNode.output)
+      val input0AccAddress =
+        accumulatorAllocator.locate(binarySIMDNode.input0)
+      val input1AccAddress =
+        accumulatorAllocator.locate(binarySIMDNode.input1)
 
-      computeLir.emitSIMD(
+      lir.emitSIMD(
         accumulate = false,
         SIMDOp.Move,
         SIMDSource.Input,
@@ -1317,7 +855,7 @@ class Scheduler(
         input0AccAddress
       )
 
-      computeLir.emitSIMD(
+      lir.emitSIMD(
         accumulate = false,
         binarySIMDNode.op,
         SIMDSource.Register1,
@@ -1335,12 +873,12 @@ class Scheduler(
           .map(_.asInstanceOf[NormNode])
           .sortBy(_.output)
     ) {
-      val outputAccAddress = allocateAccumulator(normNode.output)
-      val scaleAccAddress  = locateAccumulator(normNode.scale)
-      val offsetAccAddress = locateAccumulator(normNode.offset)
-      val inputAccAddress  = locateAccumulator(normNode.input)
+      val outputAccAddress = accumulatorAllocator.allocate(normNode.output)
+      val scaleAccAddress  = accumulatorAllocator.locate(normNode.scale)
+      val offsetAccAddress = accumulatorAllocator.locate(normNode.offset)
+      val inputAccAddress  = accumulatorAllocator.locate(normNode.input)
 
-      computeLir.emitSIMD(
+      lir.emitSIMD(
         accumulate = false,
         SIMDOp.Move,
         SIMDSource.Input,
@@ -1350,7 +888,7 @@ class Scheduler(
         inputAccAddress
       )
 
-      computeLir.emitSIMD(
+      lir.emitSIMD(
         accumulate = false,
         SIMDOp.Multiply,
         SIMDSource.Input,
@@ -1360,7 +898,7 @@ class Scheduler(
         scaleAccAddress
       )
 
-      computeLir.emitSIMD(
+      lir.emitSIMD(
         accumulate = false,
         SIMDOp.Add,
         SIMDSource.Input,
@@ -1378,13 +916,16 @@ class Scheduler(
           .map(_.asInstanceOf[InterpolateNode])
           .sortBy(_.output)
     ) {
-      val outputAccAddress = allocateAccumulator(interpolateNode.output)
+      val outputAccAddress =
+        accumulatorAllocator.allocate(interpolateNode.output)
 
       for (i <- 0 until interpolateNode.scales.size) {
-        val scaleAccAddress = locateAccumulator(interpolateNode.scales(i))
-        val inputAccAddress = locateAccumulator(interpolateNode.inputs(i))
+        val scaleAccAddress =
+          accumulatorAllocator.locate(interpolateNode.scales(i))
+        val inputAccAddress =
+          accumulatorAllocator.locate(interpolateNode.inputs(i))
 
-        computeLir.emitSIMD(
+        lir.emitSIMD(
           accumulate = false,
           SIMDOp.Move,
           SIMDSource.Input,
@@ -1394,7 +935,7 @@ class Scheduler(
           inputAccAddress
         )
 
-        computeLir.emitSIMD(
+        lir.emitSIMD(
           accumulate = (i != 0),
           SIMDOp.Multiply,
           SIMDSource.Input,
@@ -1415,12 +956,12 @@ class Scheduler(
           .map(_.asInstanceOf[ReluNode])
           .sortBy(_.output)
     ) {
-      val outputAccAddress = allocateAccumulator(reluNode.output)
-      val inputAccAddress  = locateAccumulator(reluNode.input)
+      val outputAccAddress = accumulatorAllocator.allocate(reluNode.output)
+      val inputAccAddress  = accumulatorAllocator.locate(reluNode.input)
 
       if (!reluInited) {
         reluInited = true
-        computeLir.emitSIMD(
+        lir.emitSIMD(
           accumulate = false,
           SIMDOp.Zero,
           0,
@@ -1431,7 +972,7 @@ class Scheduler(
         )
       }
 
-      computeLir.emitSIMD(
+      lir.emitSIMD(
         accumulate = false,
         SIMDOp.Max,
         SIMDSource.Input,
@@ -1449,11 +990,11 @@ class Scheduler(
           .map(_.asInstanceOf[SoftmaxNode])
           .sortBy(_.output)
     ) {
-      val outputAccAddress = allocateAccumulator(softmaxNode.output)
-      val inputAccAddress  = locateAccumulator(softmaxNode.input)
+      val outputAccAddress = accumulatorAllocator.allocate(softmaxNode.output)
+      val inputAccAddress  = accumulatorAllocator.locate(softmaxNode.input)
 
       // TODO: Implement Softmax
-      computeLir.emitSIMD(
+      lir.emitSIMD(
         accumulate = false,
         SIMDOp.Move,
         SIMDSource.Input,
@@ -1471,11 +1012,11 @@ class Scheduler(
           .map(_.asInstanceOf[LeakyReluNode])
           .sortBy(_.output)
     ) {
-      val outputAccAddress = allocateAccumulator(leakyReluNode.output)
-      val alphaAccAddress  = locateAccumulator(leakyReluNode.alpha)
-      val inputAccAddress  = locateAccumulator(leakyReluNode.input)
+      val outputAccAddress = accumulatorAllocator.allocate(leakyReluNode.output)
+      val alphaAccAddress  = accumulatorAllocator.locate(leakyReluNode.alpha)
+      val inputAccAddress  = accumulatorAllocator.locate(leakyReluNode.input)
 
-      computeLir.emitSIMD(
+      lir.emitSIMD(
         accumulate = false,
         SIMDOp.Move,
         SIMDSource.Input,
@@ -1485,7 +1026,7 @@ class Scheduler(
         alphaAccAddress
       )
 
-      computeLir.emitSIMD(
+      lir.emitSIMD(
         accumulate = false,
         SIMDOp.Multiply,
         SIMDSource.Input,
@@ -1495,7 +1036,7 @@ class Scheduler(
         inputAccAddress
       )
 
-      computeLir.emitSIMD(
+      lir.emitSIMD(
         accumulate = false,
         SIMDOp.Max,
         SIMDSource.Input,
@@ -1513,17 +1054,17 @@ class Scheduler(
           .map(_.asInstanceOf[PoolNode])
           .sortBy(_.output)
     ) {
-      val outputAccAddress = allocateAccumulator(poolNode.output)
+      val outputAccAddress = accumulatorAllocator.allocate(poolNode.output)
 
       for (i <- 0 until poolNode.inputs.length) {
-        val inputAccAddress = locateAccumulator(poolNode.inputs(i))
+        val inputAccAddress = accumulatorAllocator.locate(poolNode.inputs(i))
 
         val first = i == 0
         val last  = i == poolNode.inputs.length - 1
 
         if (poolNode.op == "MaxPool") {
           if (first && last)
-            computeLir.emitSIMD(
+            lir.emitSIMD(
               accumulate = false,
               SIMDOp.Move,
               SIMDSource.Input,
@@ -1533,7 +1074,7 @@ class Scheduler(
               inputAccAddress
             )
           else if (first)
-            computeLir.emitSIMD(
+            lir.emitSIMD(
               accumulate = false,
               SIMDOp.Max,
               SIMDSource.Input,
@@ -1543,7 +1084,7 @@ class Scheduler(
               inputAccAddress
             )
           else if (last)
-            computeLir.emitSIMD(
+            lir.emitSIMD(
               accumulate = false,
               SIMDOp.Max,
               SIMDSource.Input,
@@ -1553,7 +1094,7 @@ class Scheduler(
               inputAccAddress
             )
           else
-            computeLir.emitSIMD(
+            lir.emitSIMD(
               accumulate = false,
               SIMDOp.Max,
               SIMDSource.Input,
@@ -1564,7 +1105,7 @@ class Scheduler(
             )
         } else if (poolNode.op == "AvgPool") {
           if (first)
-            computeLir.emitSIMD(
+            lir.emitSIMD(
               accumulate = false,
               SIMDOp.Max,
               SIMDSource.Input,
@@ -1574,7 +1115,7 @@ class Scheduler(
               inputAccAddress
             )
           else {
-            computeLir.emitSIMD(
+            lir.emitSIMD(
               accumulate = false,
               SIMDOp.Add,
               SIMDSource.Input,
@@ -1585,11 +1126,11 @@ class Scheduler(
             )
 
             if (last) {
-              val multiplierAccAddress = locateAccumulator(
+              val multiplierAccAddress = accumulatorAllocator.locate(
                 poolNode.multiplier.get
               )
 
-              computeLir.emitSIMD(
+              lir.emitSIMD(
                 accumulate = false,
                 SIMDOp.Multiply,
                 SIMDSource.Input,
@@ -1609,9 +1150,9 @@ class Scheduler(
     }
 
     val saveAccRollup = new DoubleAddressRollup(
-      computeLir
+      lir
         .emitDataMove(toLocal = true, accumulate = false, _, _, _, _, _),
-      arch
+      context.options.arch
     )
 
     for (
@@ -1619,10 +1160,12 @@ class Scheduler(
         nodes
           .filter(_.isInstanceOf[SaveNode])
           .map(_.asInstanceOf[SaveNode])
+          .filter(_.input.tag == MemoryTag.Temp)
           .sortBy(_.output)
     ) {
-      val inputAccAddress    = locateAccumulator(saveNode.input)
-      val outputLocalAddress = allocateLocal(saveNode.output)
+      val inputAccAddress = accumulatorAllocator.locate(saveNode.input)
+      val (_, outputLocalAddress) =
+        localAllocator.allocateOrLocate(saveNode.output)
 
       saveAccRollup.emit(
         outputLocalAddress,
@@ -1631,11 +1174,16 @@ class Scheduler(
     }
 
     saveAccRollup.finalEmit()
+  }
 
+  protected def lowerSaveVars(
+      lir: LIR,
+      localAllocator: RenamingMemoryAllocator,
+      nodes: Seq[Node]
+  ): Unit = {
     val saveLocalRollup = new DoubleAddressRollup(
-      saveLir
-        .emitDataMove(toLocal = false, accumulate = false, _, _, _, _, _),
-      arch
+      lir.emitDataMove(toLocal = false, accumulate = false, _, _, _, _, _),
+      context.options.arch
     )
 
     for (
@@ -1643,20 +1191,21 @@ class Scheduler(
         nodes
           .filter(_.isInstanceOf[SaveNode])
           .map(_.asInstanceOf[SaveNode])
+          .filter(_.output.tag == MemoryTag.DRAM0)
           .sortBy(_.output)
     ) {
-      val inputLocalAddress = locateLocal(saveNode.output)
-      val outputVarsAddress = saveNode.output
+      val inputLocalAddress =
+        if (saveNode.input.tag == MemoryTag.Local)
+          saveNode.input
+        else
+          localAllocator.locate(saveNode.output)
 
       saveLocalRollup.emit(
         inputLocalAddress,
-        outputVarsAddress
+        saveNode.output
       )
     }
 
     saveLocalRollup.finalEmit()
-    loadLir.endEmit()
-    computeLir.endEmit()
-    saveLir.endEmit()
   }
 }

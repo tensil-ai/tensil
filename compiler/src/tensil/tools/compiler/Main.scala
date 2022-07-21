@@ -12,7 +12,13 @@ import tensil.{
   InstructionLayout,
   TablePrinter
 }
-import tensil.tools.{Compiler, CompilerOptions, CompilerInputShapes}
+import tensil.tools.{
+  Compiler,
+  CompilerOptions,
+  CompilerStrategy,
+  CompilerInputShapes,
+  CompilerException
+}
 
 case class Args(
     archFile: File = new File("."),
@@ -29,6 +35,7 @@ case class Args(
     writeGraph: Boolean = false,
     writeProgramAssembly: Boolean = false,
     targetDir: File = new File("."),
+    strategy: CompilerStrategy.Kind = CompilerStrategy.LocalIsolated,
 )
 
 object Main extends App {
@@ -107,6 +114,18 @@ object Main extends App {
       .valueName("<dir>")
       .action((x, c) => c.copy(targetDir = x))
       .text("Optional target directory")
+
+    opt[String]("strategy")
+      .valueName("local-isolated|local-vars|local-consts|local-vars-and-consts")
+      .action((x, c) =>
+        c.copy(strategy = x match {
+          case "local-isolated"        => CompilerStrategy.LocalIsolated
+          case "local-vars"            => CompilerStrategy.LocalVars
+          case "local-consts"          => CompilerStrategy.LocalConsts
+          case "local-vars-and-consts" => CompilerStrategy.LocalVarsAndConsts
+        })
+      )
+      .text("Local memory strategy, defaults to local-isolated")
   }
 
   argParser.parse(args, Args()) match {
@@ -121,6 +140,7 @@ object Main extends App {
 
       val options = CompilerOptions(
         arch = arch,
+        strategy = args.strategy,
         inputShapes = CompilerInputShapes.parse(args.inputShapes),
         printProgress = args.verbose,
         printSummary = args.summary,
@@ -134,22 +154,28 @@ object Main extends App {
         targetPath = Some(targetDir)
       )
 
-      val r = Compiler.compile(
-        modelName,
-        args.modelFile.getPath(),
-        args.outputNodes,
-        options
-      )
-
-      val tb = new TablePrinter(Some("ARTIFACTS"))
-
-      for (artifact <- r.artifacts)
-        tb.addNamedLine(
-          artifact.kind,
-          new File(artifact.fileName).getAbsolutePath()
+      try {
+        val r = Compiler.compile(
+          modelName,
+          args.modelFile.getPath(),
+          args.outputNodes,
+          options
         )
 
-      print(tb)
+        val tb = new TablePrinter(Some("ARTIFACTS"))
+
+        for (artifact <- r.artifacts)
+          tb.addNamedLine(
+            artifact.kind,
+            new File(artifact.fileName).getAbsolutePath()
+          )
+
+        print(tb)
+      } catch {
+        case e: CompilerException =>
+          println(s"Error: ${e.getMessage()}")
+          sys.exit(1)
+      }
 
     case _ =>
       sys.exit(1)

@@ -7,16 +7,27 @@ import java.io._
 import scala.collection.mutable
 import org.tensorflow.framework.types.DataType
 
-import _root_.tensil.tools.data.{Shape, TensorData}
-import _root_.tensil.tools.util
-import _root_.tensil.tools.{
-  CompilerException,
-  TraceContext,
-  TracepointCondition
+import tensil.tools.data.{Shape, TensorData}
+import tensil.tools.util
+import tensil.tools.{CompilerException, TraceContext, TracepointCondition}
+import tensil.{Architecture, ArchitectureDataType}
+
+object MemoryManager {
+  object ReservedConsumers {
+    val Output = "~output~"
+    val Consts = "~consts~"
+
+    val All = Seq(Output, Consts)
+  }
 }
-import _root_.tensil.{Architecture, ArchitectureDataType}
 
 class MemoryManager(
+    tempSpace: MemorySpace,
+    tempAllocator: MemoryObjectAllocator,
+    ioSpace: MemorySpace,
+    varsSpace: MemorySpace,
+    constsSpace: MemorySpace,
+    freeableAllocator: MemoryObjectAllocator,
     constsStream: OutputStream,
     dataType: ArchitectureDataType,
     arch: Architecture,
@@ -24,21 +35,6 @@ class MemoryManager(
     traceContext: TraceContext,
     tracepointConditions: Seq[TracepointCondition]
 ) {
-
-  private val tempSpace     = new InfiniteMemorySpace(MemoryTag.Temp)
-  private val tempAllocator = new InfiniteMemoryObjectAllocator(16384)
-
-  private val varsSpace =
-    new MemorySpace("vars", MemoryTag.Vars, arch.varsDepth)
-  private val constsSpace =
-    new MemorySpace("consts", MemoryTag.Consts, arch.constsDepth)
-
-  private val spacesToFree = Seq(varsSpace, constsSpace)
-
-  private val allocator = new MemoryObjectAllocator(
-    new MemorySpanAllocator()
-  )
-
   private abstract class PendingConsts {
     def add(
         name: String,
@@ -110,17 +106,26 @@ class MemoryManager(
   def inputObjects  = inputObjectsBuffer.toSeq
   def outputObjects = outputObjectsBuffer.toSeq
 
-  def constsMaxSize = constsSpace.maxSize
-  def constsAggSize = constsSpace.aggSize
-  def varsMaxSize   = varsSpace.maxSize
-  def varsAggSize   = varsSpace.aggSize
+  def emitOutputObject(name: String): (MemoryObject, Option[MemoryObject]) = {
+    val outputObj = consumeObject(name, Nil)
 
-  def emitOutputObject(name: String): MemoryObject = {
-    val outputObj = consumeObject(name, Nil) // TODO: consume pinned object
+    val (nonFinal, finalOutputObj) =
+      if (outputObj.span(0).tag == MemoryTag.Local) {
+        (
+          true,
+          freeableAllocator.allocateObject(
+            ioSpace,
+            name,
+            outputObj.dims,
+            Seq(MemoryManager.ReservedConsumers.Output)
+          )
+        )
+      } else
+        (false, outputObj)
 
-    outputObjectsBuffer += outputObj
+    outputObjectsBuffer += finalOutputObj
 
-    outputObj
+    (finalOutputObj, if (nonFinal) Some(outputObj) else None)
   }
 
   def emitInputObject(
@@ -128,7 +133,8 @@ class MemoryManager(
       dims: MemoryDimensions,
       consumers: Seq[String]
   ): MemoryObject = {
-    val inputObj = allocateVarsObject(
+    val inputObj = freeableAllocator.allocateObject(
+      ioSpace,
       name,
       dims,
       consumers
@@ -146,7 +152,7 @@ class MemoryManager(
       dims: MemoryDimensions,
       consumers: Seq[String]
   ): MemoryObject =
-    allocator.allocateObject(
+    freeableAllocator.allocateObject(
       varsSpace,
       name,
       dims,
@@ -160,7 +166,7 @@ class MemoryManager(
       blendeeNames: Seq[String],
       blendedAddresses: MemorySpan
   ): MemoryObject = {
-    val obj = allocator.blendObjects(
+    val obj = freeableAllocator.blendObjects(
       name,
       dims,
       consumers,
@@ -173,29 +179,16 @@ class MemoryManager(
     obj
   }
 
-  def hasObject(name: String): Boolean = allocator.hasObject(name)
+  def hasObject(name: String): Boolean = freeableAllocator.hasObject(name)
 
-  def resolveRefToObject(ref: MemoryRef): Option[MemoryObject] =
-    allocator
-      .resolveRefToObject(ref)
-      .orElse(tempAllocator.resolveRefToObject(ref))
-
-  def consumeObject(name: String, consumers: Seq[String]): MemoryObject = {
-    allocator.consumeObject(name, consumers)
-  }
+  def consumeObject(name: String, consumers: Seq[String]): MemoryObject =
+    freeableAllocator.consumeObject(name, consumers)
 
   def allocateTempObject(
       name: String,
       dims: MemoryDimensions
   ): MemoryObject =
-    tempAllocator.allocateObject(tempSpace, name, dims)
-
-  def freeConsumedObjects(): Unit = {
-    allocator.freeConsumedObjects(spacesToFree)
-  }
-
-  def reportObjects() = allocator.reportObjects()
-  def reportSpans()   = allocator.reportSpans()
+    tempAllocator.allocateObject(tempSpace, name, dims, Nil)
 
   def getOrEmitWeightsAndBiasObjects(
       weightsName: String,
@@ -205,10 +198,10 @@ class MemoryManager(
       if (biasName.isDefined) {
         val resolvedBiasName = biasName.get
 
-        if (allocator.hasObject(resolvedBiasName))
+        if (freeableAllocator.hasObject(resolvedBiasName))
           Some(
-            allocator.consumeObject(resolvedBiasName, Nil)
-          ) // TODO: consume pinned object
+            freeableAllocator.consumeObject(resolvedBiasName, Nil)
+          )
         else
           Some(mkConstObject(resolvedBiasName, constsDataStream))
 
@@ -218,11 +211,11 @@ class MemoryManager(
     val resolvedWeightsName = weightsName
 
     val weightsObject =
-      if (allocator.hasObject(resolvedWeightsName))
-        allocator.consumeObject(
+      if (freeableAllocator.hasObject(resolvedWeightsName))
+        freeableAllocator.consumeObject(
           resolvedWeightsName,
           Nil
-        ) // TODO: consume pinned object
+        )
       else
         mkConstObject(resolvedWeightsName, constsDataStream)
 
@@ -234,8 +227,8 @@ class MemoryManager(
       broadcastDims: Option[MemoryDimensions] = None
   ): MemoryObject = {
     val constObject =
-      if (allocator.hasObject(name))
-        allocator.consumeObject(name, Nil) // TODO: consume pinned object
+      if (freeableAllocator.hasObject(name))
+        freeableAllocator.consumeObject(name, Nil)
       else
         mkConstObject(name, constsDataStream, broadcastDims)
 
@@ -243,19 +236,21 @@ class MemoryManager(
   }
 
   def constsUtilization =
-    if (constsUtilizations.isEmpty) 0f
+    if (constsSizesBuffer.isEmpty) 0f
     else
-      constsUtilizations.sum / constsUtilizations.size.toFloat
+      constsSizesBuffer
+        .map(p => p._1.toFloat / (p._2 * arch.arraySize).toFloat)
+        .sum / constsSizesBuffer.size.toFloat
 
-  def constsScalarSize = constsScalarSizes.sum
+  def constsScalarSize = constsSizesBuffer.map(_._1).sum
+  def constsVectorSize = constsSizesBuffer.map(_._2).sum
 
-  private var constsUtilizations = mutable.ArrayBuffer.empty[Float]
-  private var constsScalarSizes  = mutable.ArrayBuffer.empty[Long]
+  private var constsUtilizationBuffer = mutable.ArrayBuffer.empty[Float]
+  private var constsSizesBuffer       = mutable.ArrayBuffer.empty[(Long, Long)]
 
   private def addConstSize(scalarSize: Long, vectorSize: Long): Unit =
     if (scalarSize != 0 && vectorSize != 0) {
-      constsUtilizations += scalarSize.toFloat / (vectorSize * arch.arraySize).toFloat
-      constsScalarSizes += scalarSize
+      constsSizesBuffer += ((scalarSize, vectorSize))
     }
 
   private def mkConstObject(
@@ -288,11 +283,11 @@ class MemoryManager(
 
     addConstSize(dims.sizeScalars, dims.sizeVectors)
 
-    val constObj = allocator.allocateObject(
+    val constObj = freeableAllocator.allocateObject(
       constsSpace,
       name,
       dims,
-      Seq("pin") // TODO: we need another mechanism to pin constant objects
+      Seq(MemoryManager.ReservedConsumers.Consts)
     )
 
     emitInitialTracepoints(constObj)
@@ -302,7 +297,10 @@ class MemoryManager(
 
   private def emitInitialTracepoints(obj: MemoryObject): Unit = {
     val writer =
-      new TracepointsWriter(tracepointConditions, resolveRefToObject(_))
+      new TracepointsWriter(
+        tracepointConditions,
+        freeableAllocator.resolveRefToObject(_)
+      )
     obj.span.foreach(writer.write(_))
     traceContext.emitTracepoints(-InstructionAddress.One, writer.toMap)
   }

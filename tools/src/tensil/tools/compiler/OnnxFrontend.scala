@@ -9,17 +9,18 @@ import scala.collection.mutable
 
 import onnx.onnx.{NodeProto, ModelProto, TensorProto, ValueInfoProto}
 
-import _root_.tensil.tools.{
+import tensil.tools.{
   CompilerException,
   TracepointCondition,
   CompilerOptions,
   CompilerInputShapesHelper
 }
-import _root_.tensil.tools.data.{Shape, TensorData}
-import _root_.tensil.tools.util
-import _root_.tensil.{TablePrinter, Architecture}
+import tensil.tools.data.{Shape, TensorData}
+import tensil.tools.util
+import tensil.{TablePrinter, Architecture}
 import com.google.protobuf.CodedInputStream
 import onnx.onnx.TensorShapeProto
+import tensil.tools.GraphPrinter
 
 object OnnxFrontend {
   val ModelFileNameExtension = "onnx"
@@ -31,7 +32,6 @@ class OnnxFrontend(
     graphStream: Option[OutputStream],
     options: CompilerOptions
 ) extends Frontend {
-
   private object VarsDimensions {
     def apply(
         number: Int,
@@ -166,15 +166,120 @@ class OnnxFrontend(
     }
   }
 
-  val graphPrinter =
-    graphStream.map(
-      new OnnxFrontendGraphPrinter(
-        _,
-        "model",
-        arch.arraySize,
-        outputNodeNames.mapValues(_.toArray).toMap
+  private implicit class GraphPrinterHelper(printer: FrontendGraphPrinter) {
+    private def beforePrintNode(): Unit =
+      if (printer.currentLayerName.isDefined)
+        printer.printStartSubGraph(
+          GraphPrinter.quoteName(s"cluster_${printer.currentLayerName.get}"),
+          GraphPrinter.quote(shortName(printer.currentLayerName.get))
+        )
+
+    private def afterPrintNode(): Unit =
+      if (printer.currentLayerName.isDefined)
+        printer.printEndSubGraph()
+
+    def printOp(
+        nodeProto: NodeProto,
+        outputs: Seq[MemoryObject],
+        inputs: Seq[MemoryObject] = Nil,
+        params: Seq[(String, MemoryObject)] = Nil
+    ): Unit = {
+      val name = nodeProto.name.get
+      val op   = nodeProto.opType.get
+
+      val slashParts = name.split("/")
+
+      val title = new StringBuffer(s"${shortName(name)}\\n\\nOp: $op")
+      for ((paramName, paramObj) <- params) {
+        title.append(s"\\n$paramName: ${paramObj.dims}")
+      }
+
+      def mkPort(obj: MemoryObject, i: Int) =
+        s"<${GraphPrinter.name(obj.name)}> #$i"
+
+      val inputPorts =
+        inputs.zipWithIndex
+          .map { case (obj, i) => mkPort(obj, i) }
+          .mkString("|")
+      val outputPorts =
+        outputs.zipWithIndex
+          .map { case (obj, i) => mkPort(obj, i) }
+          .mkString("|")
+
+      val colspan = Math.max(inputs.size, outputs.size)
+
+      beforePrintNode()
+
+      printer.printNode(
+        GraphPrinter.quoteName(name),
+        GraphPrinter.quote(s"{{$inputPorts}|$title|{$outputPorts}}"),
+        "record"
       )
-    )
+
+      afterPrintNode()
+
+      for (input <- inputs)
+        outputNodeNames.get(input.name) match {
+          case Some(outputNodeNames) =>
+            for (outputNodeName <- outputNodeNames)
+              printer.printEdge(
+                s"${GraphPrinter.quoteName(outputNodeName)}:${GraphPrinter
+                  .quoteName(input.name)}",
+                s"${GraphPrinter.quoteName(name)}:${GraphPrinter.quoteName(input.name)}",
+                GraphPrinter.quote(s"${input.name}\\n${input.dims}")
+              )
+
+          case None =>
+            printer.printEdge(
+              s"${GraphPrinter.quoteName(input.name)}",
+              s"${GraphPrinter.quoteName(name)}:${GraphPrinter.quoteName(input.name)}",
+              GraphPrinter.quote(s"${input.name}\\n${input.dims}")
+            )
+        }
+    }
+
+    def printInputPost(obj: MemoryObject): Unit = {
+      beforePrintNode()
+
+      printer.printNode(
+        GraphPrinter.quoteName(obj.name),
+        GraphPrinter.quote(""),
+        "circle"
+      )
+
+      afterPrintNode()
+    }
+
+    def printOutputPost(
+        obj: MemoryObject
+    ): Unit = {
+      beforePrintNode()
+
+      printer.printNode(
+        GraphPrinter.quoteName(obj.name),
+        GraphPrinter.quote(""),
+        "doublecircle"
+      )
+
+      afterPrintNode()
+
+      for (outputNodeName <- outputNodeNames(obj.name))
+        printer.printEdge(
+          s"${GraphPrinter.quoteName(outputNodeName)}:${GraphPrinter.quoteName(obj.name)}",
+          s"${GraphPrinter.quoteName(obj.name)}",
+          GraphPrinter.quote(s"${obj.name}\\n${obj.dims}")
+        )
+    }
+
+    private def shortName(name: String): String = {
+      val slashParts = name.split("/")
+
+      if (slashParts.size > 2)
+        slashParts(slashParts.size - 2)
+      else
+        name
+    }
+  }
 
   /*
    * Traverse function takes the names of the outputs representing
@@ -219,7 +324,7 @@ class OnnxFrontend(
    *   c) adding a function closure to the emit list.
    *
    * The emit list contains functions that take an emit context and
-   * captures all necessary backend and memory managment operations to
+   * captures all necessary scheduler and memory managment operations to
    * emit the instructions representing the rewritten node(s).
    * The recursion continues until the definition list is empty.
    */
@@ -390,34 +495,6 @@ class OnnxFrontend(
   ): Seq[Emitter] =
     recursiveRewrite(protos, emitter +: emitters)
 
-  private var nextLayerIndex = 0
-
-  private def startLayer(nodeProtos: Seq[NodeProto]): Scheduler = {
-    if (graphPrinter.isDefined)
-      graphPrinter.get.startLayer(s"layer_$nextLayerIndex")
-
-    val layerIndex = nextLayerIndex
-    nextLayerIndex += 1
-
-    new Scheduler(
-      layerIndex,
-      arch,
-      options
-    )
-  }
-
-  /*private def finishLayer(scheduler: Scheduler, context: EmitContext) = {
-    scheduler.saveGraph(s"onnx_layer_${layerIndex - 1}.tgraph")
-    None
-  }*/
-
-  private def finishLayer(scheduler: Scheduler, context: EmitContext) = {
-    if (graphPrinter.isDefined)
-      graphPrinter.get.endLayer()
-
-    Some(scheduler.emit(context.backend))
-  }
-
   private def doRewriteLayer(
       nodeProto: NodeProto,
       addProto: Option[NodeProto],
@@ -426,18 +503,6 @@ class OnnxFrontend(
       poolProto: Option[NodeProto]
   ): Emitter =
     (context: EmitContext) => {
-      val scheduler = startLayer(
-        Seq(
-          Some(nodeProto),
-          addProto,
-          normProto,
-          activateProto,
-          poolProto
-        )
-          .filter(_.isDefined)
-          .map(_.get)
-      )
-
       val (consumers, nodeName) =
         (
           findInterLayerOutputs(
@@ -452,19 +517,16 @@ class OnnxFrontend(
         if (nodeProto.opType.get == "MatMul")
           emitLayerMatMul(
             context,
-            scheduler,
             nodeProto
           )
         else if (nodeProto.opType.get == "Gemm")
           emitLayerGemm(
             context,
-            scheduler,
             nodeProto
           )
         else
           emitLayerConv(
             context,
-            scheduler,
             nodeProto
           )
 
@@ -479,7 +541,7 @@ class OnnxFrontend(
             consumers
           )
 
-          scheduler.emitSave(outputTemp, outputVars)
+          context.hir.emitSave(outputTemp, outputVars)
         }
 
       emitSaveIfConsumed(matMulTemp, consumers)
@@ -487,7 +549,6 @@ class OnnxFrontend(
       val addTemp = if (addProto.isDefined) {
         val outputTemp = emitLayerAdd(
           context,
-          scheduler,
           addProto.get,
           matMulTemp
         )
@@ -508,7 +569,6 @@ class OnnxFrontend(
       val normTemp = if (normProto.isDefined) {
         val outputTemp = emitLayerNorm(
           context,
-          scheduler,
           normProto.get,
           addTemp
         )
@@ -530,7 +590,6 @@ class OnnxFrontend(
         if (activateProto.isDefined) {
           val outputTemp = emitLayerActivate(
             context,
-            scheduler,
             activateProto.get,
             normTemp
           )
@@ -550,7 +609,7 @@ class OnnxFrontend(
 
       if (poolProto.isDefined) {
         val outputTemp =
-          emitLayerPool(context, scheduler, poolProto.get, activateTemp)
+          emitLayerPool(context, poolProto.get, activateTemp)
 
         emitSaveIfConsumed(
           outputTemp,
@@ -558,8 +617,6 @@ class OnnxFrontend(
         )
 
       }
-
-      finishLayer(scheduler, context)
     }
 
   private def findInterLayerOutputs(
@@ -568,7 +625,7 @@ class OnnxFrontend(
       nextNode: Option[NodeProto]
   ): Seq[String] =
     if (context.outputNames.contains(outputName))
-      Seq("pin") // TODO: we need another mechanism to pin output objects
+      Seq(MemoryManager.ReservedConsumers.Output)
     else
       (inputNodeNames
         .get(outputName)
@@ -577,7 +634,7 @@ class OnnxFrontend(
                                     Set(nextNode.get.name.get)
                                   else Seq.empty)).toSeq
 
-  private def emitInput(context: EmitContext): EmitResult = {
+  private def emitInput(context: EmitContext): Unit = {
     for ((name, valueInfoProto) <- inputValueInfoProtos) {
       val modelInputShape =
         valueInfoProto.`type`.get.value.tensorType.get.shape.get.dim
@@ -626,18 +683,16 @@ class OnnxFrontend(
         consumers
       )
 
-      if (graphPrinter.isDefined) {
-        graphPrinter.get.printInputPost(outputVars)
+      if (context.graphPrinter.isDefined) {
+        context.graphPrinter.get.printInputPost(outputVars)
       }
     }
-
-    None
   }
 
   private def emitTranspose(
       context: EmitContext,
       transposeProto: NodeProto
-  ): EmitResult = {
+  ): Unit = {
     val permAttr = getAttr(transposeProto, "perm").get
 
     require(permAttr.`type`.get.isInts)
@@ -658,20 +713,18 @@ class OnnxFrontend(
       inputVars.span
     )
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         transposeProto,
         Seq(outputVars),
         Seq(inputVars)
       )
-
-    None
   }
 
   private def emitSqueeze(
       context: EmitContext,
       squeezeProto: NodeProto
-  ): EmitResult = {
+  ): Unit = {
     val axesAttr = getAttr(squeezeProto, "axes").get
 
     require(axesAttr.`type`.get.isInts)
@@ -697,20 +750,18 @@ class OnnxFrontend(
       inputVars.span
     )
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         squeezeProto,
         Seq(outputVars),
         Seq(inputVars)
       )
-
-    None
   }
 
   private def emitShape(
       context: EmitContext,
       shapeProto: NodeProto
-  ): EmitResult = {
+  ): Unit = {
     val inputVars =
       context.mm
         .consumeObject(shapeProto.input(0), Seq(shapeProto.name.get))
@@ -728,14 +779,12 @@ class OnnxFrontend(
         org.tensorflow.framework.types.DataType.DT_INT64
       )
     )
-
-    None
   }
 
   private def emitSlice(
       context: EmitContext,
       sliceProto: NodeProto
-  ): EmitResult = {
+  ): Unit = {
     val input = context.mm.getPendingConst(
       org.tensorflow.framework.types.DataType.DT_INT64,
       sliceProto.input(0)
@@ -773,14 +822,12 @@ class OnnxFrontend(
         org.tensorflow.framework.types.DataType.DT_INT64
       )
     )
-
-    None
   }
 
   private def emitCast(
       context: EmitContext,
       castProto: NodeProto
-  ): EmitResult = {
+  ): Unit = {
     val input =
       context.mm.getPendingLongConst(castProto.input(0))
     val castedData = input.data.map(_.toFloat)
@@ -793,14 +840,12 @@ class OnnxFrontend(
         org.tensorflow.framework.types.DataType.DT_FLOAT
       )
     )
-
-    None
   }
 
   private def emitDiv(
       context: EmitContext,
       divProto: NodeProto
-  ): EmitResult = {
+  ): Unit = {
     val a = getTensorData(tensorProtos(divProto.input(0)))
       .asInstanceOf[TensorData[Float]]
 
@@ -819,14 +864,12 @@ class OnnxFrontend(
         org.tensorflow.framework.types.DataType.DT_FLOAT
       )
     )
-
-    None
   }
 
   private def emitConstant(
       context: EmitContext,
       constantProto: NodeProto
-  ): EmitResult = {
+  ): Unit = {
     val valueAttr = getAttr(constantProto, "value").get
 
     require(valueAttr.`type`.get.isTensor)
@@ -837,11 +880,9 @@ class OnnxFrontend(
       constantProto.output(0),
       getTensorData(value)
     )
-
-    None
   }
 
-  private def emitPad(context: EmitContext, padProto: NodeProto): EmitResult = {
+  private def emitPad(context: EmitContext, padProto: NodeProto): Unit = {
     val inputVars =
       context.mm.consumeObject(padProto.input(0), Seq(padProto.name.get))
 
@@ -935,35 +976,37 @@ class OnnxFrontend(
       paddedAddresses.toArray
     )
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         padProto,
         Seq(outputVars),
         Seq(inputVars)
       )
-
-    None
   }
 
   private def emitOutput(
       context: EmitContext
-  ): EmitResult = {
+  ): Unit = {
     for (outputName <- context.outputNames) {
-      val obj = context.mm.emitOutputObject(outputName)
+      val (finalOutputObj, nonFinalOutputObj) =
+        context.mm.emitOutputObject(outputName)
 
-      if (graphPrinter.isDefined)
-        graphPrinter.get.printOutputPost(obj)
+      if (context.graphPrinter.isDefined)
+        context.graphPrinter.get.printOutputPost(finalOutputObj)
+
+      if (nonFinalOutputObj.isDefined) {
+        context.hir.emitSave(
+          nonFinalOutputObj.get,
+          finalOutputObj
+        )
+      }
     }
-
-    if (graphPrinter.isDefined) graphPrinter.get.endPrint
-
-    None
   }
 
   private def emitReshape(
       context: EmitContext,
       reshapeProto: NodeProto
-  ): EmitResult = {
+  ): Unit = {
     val inputVars =
       context.mm
         .consumeObject(reshapeProto.input(0), Seq(reshapeProto.name.get))
@@ -1036,9 +1079,8 @@ class OnnxFrontend(
         outputAddresses(indexPair._1) = inputVars.span(indexPair._2)
       }
 
-    val (outputNames, r) =
+    val outputNames =
       if (groupedByOffsetPairs.size > 1) {
-        val scheduler = startLayer(Seq(reshapeProto))
         val adjustedOutputTemp = context.mm.allocateTempObject(
           reshapeProto.output(0),
           outputDims
@@ -1059,7 +1101,7 @@ class OnnxFrontend(
             val pixelAdjustedOutputTemp =
               mkSub(adjustedOutputTemp, indexPair._1, pixelDims)
 
-            scheduler.emitMatMul(
+            context.hir.emitMatMul(
               pixelWeightsConst,
               None,
               Seq(
@@ -1085,19 +1127,16 @@ class OnnxFrontend(
           indexPair <- indexPairs
         ) {
 
-          scheduler.emitSave(
+          context.hir.emitSave(
             mkSub(adjustedOutputTemp, indexPair._1, pixelDims),
             mkSub(adjustedOutputVars, indexPair._1, pixelDims)
           )
           outputAddresses(indexPair._1) = adjustedOutputVars.span(indexPair._1)
         }
 
-        (
-          Seq(inputVars.name, adjustedOutputVars.name),
-          finishLayer(scheduler, context)
-        )
+        Seq(inputVars.name, adjustedOutputVars.name),
       } else
-        (Seq(inputVars.name), None)
+        Seq(inputVars.name)
 
     val outputVars = context.mm.blendObjects(
       reshapeProto.output(0),
@@ -1107,20 +1146,18 @@ class OnnxFrontend(
       outputAddresses
     )
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         reshapeProto,
         Seq(outputVars),
         Seq(inputVars)
       )
-
-    r
   }
 
   private def emitSplit(
       context: EmitContext,
       splitProto: NodeProto
-  ): EmitResult = {
+  ): Unit = {
     val num = splitProto.output.size
 
     val axisAttr = getAttr(splitProto, "axis").get
@@ -1193,10 +1230,8 @@ class OnnxFrontend(
           inputVars.span(indexPair._2)
       }
 
-    val (outputsNames, r) =
+    val outputsNames =
       if (groupedByOffsetPairs.size > 1) {
-        val scheduler = startLayer(Seq(splitProto))
-
         val adjustedOutputsTemp =
           for (i <- 0 until outputsDims.size)
             yield context.mm.allocateTempObject(
@@ -1223,7 +1258,7 @@ class OnnxFrontend(
                 pixelDims
               )
 
-            scheduler.emitMatMul(
+            context.hir.emitMatMul(
               pixelWeightsConst,
               None,
               Seq(
@@ -1251,7 +1286,7 @@ class OnnxFrontend(
           indexPair <- indexPairs
         ) {
 
-          scheduler.emitSave(
+          context.hir.emitSave(
             mkSub(
               adjustedOutputsTemp(indexPair._1._1),
               indexPair._1._2,
@@ -1267,14 +1302,11 @@ class OnnxFrontend(
             adjustedOutputsVars((indexPair._1._1)).span(indexPair._1._2)
         }
 
-        (
-          adjustedOutputsVars
-            .map(vars => Seq(inputVars.name, vars.name))
-            .toArray,
-          finishLayer(scheduler, context)
-        )
+        adjustedOutputsVars
+          .map(vars => Seq(inputVars.name, vars.name))
+          .toArray
       } else
-        (Array.fill(num)(Seq(inputVars.name)), None)
+        Array.fill(num)(Seq(inputVars.name))
 
     val outputsVars = for (i <- 0 until outputsDims.size) yield {
       context.mm.blendObjects(
@@ -1286,20 +1318,18 @@ class OnnxFrontend(
       )
     }
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         splitProto,
         outputsVars.toSeq,
         Seq(inputVars)
       )
-
-    r
   }
 
   private def emitConcat(
       context: EmitContext,
       concatProto: NodeProto
-  ): EmitResult = {
+  ): Unit = {
     val num = concatProto.input.size
 
     val axisAttr = getAttr(concatProto, "axis").get
@@ -1321,9 +1351,6 @@ class OnnxFrontend(
           org.tensorflow.framework.types.DataType.DT_FLOAT
         )
       )
-
-      None
-
     } else {
 
       if (axis != 1)
@@ -1400,10 +1427,8 @@ class OnnxFrontend(
             inputsVars(indexPair._2._1).span(indexPair._2._2)
         }
 
-      val (inputNamesToAdd, r) =
+      val inputNamesToAdd =
         if (groupedByOffsetPairs.size > 1) {
-          val scheduler = startLayer(Seq(concatProto))
-
           val adjustedOutputTemp = context.mm.allocateTempObject(
             concatProto.name.get,
             outputDims
@@ -1428,7 +1453,7 @@ class OnnxFrontend(
                   pixelDims
                 )
 
-              scheduler.emitMatMul(
+              context.hir.emitMatMul(
                 pixelWeightsConst,
                 None,
                 Seq(
@@ -1455,7 +1480,7 @@ class OnnxFrontend(
             indexPair <- indexPairs
           ) {
 
-            scheduler.emitSave(
+            context.hir.emitSave(
               mkSub(
                 adjustedOutputTemp,
                 indexPair._1,
@@ -1471,12 +1496,9 @@ class OnnxFrontend(
               adjustedOutputVars.span(indexPair._1)
           }
 
-          (
-            Seq(adjustedOutputVars.name),
-            finishLayer(scheduler, context)
-          )
+          Seq(adjustedOutputVars.name)
         } else
-          (Nil, None)
+          Nil
 
       val outputVars = context.mm.blendObjects(
         concatProto.output(0),
@@ -1486,23 +1508,19 @@ class OnnxFrontend(
         outputAddresses
       )
 
-      if (graphPrinter.isDefined)
-        graphPrinter.get.printOp(
+      if (context.graphPrinter.isDefined)
+        context.graphPrinter.get.printOp(
           concatProto,
           Seq(outputVars),
           inputsVars.toSeq
         )
-
-      r
     }
   }
 
   private def emitResize(
       context: EmitContext,
       resizeProto: NodeProto
-  ): EmitResult = {
-    val scheduler = startLayer(Seq(resizeProto))
-
+  ): Unit = {
     val inputVars =
       context.mm.consumeObject(
         resizeProto.input(0),
@@ -1514,9 +1532,9 @@ class OnnxFrontend(
       inputVars.dims
     )
 
-    scheduler.emitLoad(inputVars, inputTemp)
+    context.hir.emitLoad(inputVars, inputTemp)
 
-    val outputTemp = emitLayerResize(context, scheduler, resizeProto, inputTemp)
+    val outputTemp = emitLayerResize(context, resizeProto, inputTemp)
 
     val outputVars = context.mm.allocateVarsObject(
       outputTemp.name,
@@ -1524,14 +1542,11 @@ class OnnxFrontend(
       findInterLayerOutputs(context, resizeProto.output(0), None)
     )
 
-    scheduler.emitSave(outputTemp, outputVars)
-
-    finishLayer(scheduler, context)
+    context.hir.emitSave(outputTemp, outputVars)
   }
 
   private def emitLayerResize(
       context: EmitContext,
-      scheduler: Scheduler,
       resizeProto: NodeProto,
       inputTemp: MemoryObject
   ): MemoryObject = {
@@ -1609,7 +1624,7 @@ class OnnxFrontend(
             lerpConst.dims
           )
 
-          scheduler.emitLoad(lerpConst, lerpTemp)
+          context.hir.emitLoad(lerpConst, lerpTemp)
 
           lerpTemp
         }
@@ -1668,15 +1683,15 @@ class OnnxFrontend(
         VarsDimensions(outputTemp.dims.channels)
       )
 
-      scheduler.emitInterpolate(
+      context.hir.emitInterpolate(
         pixelInputsTemp,
         lerpsTemp,
         pixelOutputTemp
       )
     }
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         resizeProto,
         Seq(outputTemp),
         Seq(inputTemp)
@@ -1688,9 +1703,7 @@ class OnnxFrontend(
   private def emitPool(
       context: EmitContext,
       poolProto: NodeProto
-  ): EmitResult = {
-    val scheduler = startLayer(Seq(poolProto))
-
+  ): Unit = {
     val inputVars =
       context.mm.consumeObject(poolProto.input(0), Seq(poolProto.name.get))
 
@@ -1699,10 +1712,10 @@ class OnnxFrontend(
       inputVars.dims
     )
 
-    scheduler.emitLoad(inputVars, inputTemp)
+    context.hir.emitLoad(inputVars, inputTemp)
 
     val outputTemp =
-      emitLayerPool(context, scheduler, poolProto, inputTemp)
+      emitLayerPool(context, poolProto, inputTemp)
 
     val outputVars = context.mm.allocateVarsObject(
       outputTemp.name,
@@ -1710,17 +1723,13 @@ class OnnxFrontend(
       findInterLayerOutputs(context, poolProto.output(0), None)
     )
 
-    scheduler.emitSave(outputTemp, outputVars)
-
-    finishLayer(scheduler, context)
+    context.hir.emitSave(outputTemp, outputVars)
   }
 
   private def emitGlobalPool(
       context: EmitContext,
       globalPoolProto: NodeProto
-  ): EmitResult = {
-    val scheduler = startLayer(Seq(globalPoolProto))
-
+  ): Unit = {
     val inputVars =
       context.mm.consumeObject(
         globalPoolProto.input(0),
@@ -1732,10 +1741,10 @@ class OnnxFrontend(
       inputVars.dims
     )
 
-    scheduler.emitLoad(inputVars, inputTemp)
+    context.hir.emitLoad(inputVars, inputTemp)
 
     val outputTemp =
-      emitLayerGlobalPool(context, scheduler, globalPoolProto, inputTemp)
+      emitLayerGlobalPool(context, globalPoolProto, inputTemp)
 
     val outputVars = context.mm.allocateVarsObject(
       outputTemp.name,
@@ -1743,17 +1752,13 @@ class OnnxFrontend(
       findInterLayerOutputs(context, globalPoolProto.output(0), None)
     )
 
-    scheduler.emitSave(outputTemp, outputVars)
-
-    finishLayer(scheduler, context)
+    context.hir.emitSave(outputTemp, outputVars)
   }
 
   private def emitNorm(
       context: EmitContext,
       normProto: NodeProto
-  ): EmitResult = {
-    val scheduler = startLayer(Seq(normProto))
-
+  ): Unit = {
     val inputVars =
       context.mm.consumeObject(normProto.input(0), Seq(normProto.name.get))
 
@@ -1762,10 +1767,10 @@ class OnnxFrontend(
       inputVars.dims
     )
 
-    scheduler.emitLoad(inputVars, inputTemp)
+    context.hir.emitLoad(inputVars, inputTemp)
 
     val outputTemp =
-      emitLayerNorm(context, scheduler, normProto, inputTemp)
+      emitLayerNorm(context, normProto, inputTemp)
 
     val outputVars = context.mm.allocateVarsObject(
       outputTemp.name,
@@ -1773,17 +1778,13 @@ class OnnxFrontend(
       findInterLayerOutputs(context, normProto.output(0), None)
     )
 
-    scheduler.emitSave(outputTemp, outputVars)
-
-    finishLayer(scheduler, context)
+    context.hir.emitSave(outputTemp, outputVars)
   }
 
   private def emitActivate(
       context: EmitContext,
       activateProto: NodeProto
-  ): EmitResult = {
-    val scheduler = startLayer(Seq(activateProto))
-
+  ): Unit = {
     val inputVars =
       context.mm.consumeObject(
         activateProto.input(0),
@@ -1795,10 +1796,10 @@ class OnnxFrontend(
       inputVars.dims
     )
 
-    scheduler.emitLoad(inputVars, inputTemp)
+    context.hir.emitLoad(inputVars, inputTemp)
 
     val outputTemp =
-      emitLayerActivate(context, scheduler, activateProto, inputTemp)
+      emitLayerActivate(context, activateProto, inputTemp)
 
     val outputVars = context.mm.allocateVarsObject(
       outputTemp.name,
@@ -1806,14 +1807,10 @@ class OnnxFrontend(
       findInterLayerOutputs(context, activateProto.output(0), None)
     )
 
-    scheduler.emitSave(outputTemp, outputVars)
-
-    finishLayer(scheduler, context)
+    context.hir.emitSave(outputTemp, outputVars)
   }
 
-  private def emitAdd(context: EmitContext, addProto: NodeProto): EmitResult = {
-    val scheduler = startLayer(Seq(addProto))
-
+  private def emitAdd(context: EmitContext, addProto: NodeProto): Unit = {
     val input0Vars =
       context.mm.consumeObject(addProto.input(0), Seq(addProto.name.get))
 
@@ -1822,10 +1819,10 @@ class OnnxFrontend(
       input0Vars.dims
     )
 
-    scheduler.emitLoad(input0Vars, input0Temp)
+    context.hir.emitLoad(input0Vars, input0Temp)
 
     val outputTemp =
-      emitLayerAdd(context, scheduler, addProto, input0Temp)
+      emitLayerAdd(context, addProto, input0Temp)
 
     val outputVars = context.mm.allocateVarsObject(
       outputTemp.name,
@@ -1833,17 +1830,13 @@ class OnnxFrontend(
       findInterLayerOutputs(context, addProto.output(0), None)
     )
 
-    scheduler.emitSave(outputTemp, outputVars)
-
-    finishLayer(scheduler, context)
+    context.hir.emitSave(outputTemp, outputVars)
   }
 
   private def emitSub(
       context: EmitContext,
       nodeProto: NodeProto
-  ): EmitResult = {
-    val scheduler = startLayer(Seq(nodeProto))
-
+  ): Unit = {
     val input0Vars =
       context.mm.consumeObject(nodeProto.input(0), Seq(nodeProto.name.get))
 
@@ -1852,7 +1845,7 @@ class OnnxFrontend(
       input0Vars.dims
     )
 
-    scheduler.emitLoad(input0Vars, input0Temp)
+    context.hir.emitLoad(input0Vars, input0Temp)
 
     val input1VarsOrConst = if (tensorProtos.isDefinedAt(nodeProto.input(1))) {
       context.mm.addPendingConst(
@@ -1869,10 +1862,10 @@ class OnnxFrontend(
       input1VarsOrConst.dims
     )
 
-    scheduler.emitLoad(input1VarsOrConst, input1Temp)
+    context.hir.emitLoad(input1VarsOrConst, input1Temp)
 
     val outputTemp =
-      emitLayerSub(context, scheduler, nodeProto, input0Temp, input1Temp)
+      emitLayerSub(context, nodeProto, input0Temp, input1Temp)
 
     val outputVars = context.mm.allocateVarsObject(
       outputTemp.name,
@@ -1880,17 +1873,13 @@ class OnnxFrontend(
       findInterLayerOutputs(context, nodeProto.output(0), None)
     )
 
-    scheduler.emitSave(outputTemp, outputVars)
-
-    finishLayer(scheduler, context)
+    context.hir.emitSave(outputTemp, outputVars)
   }
 
   private def emitMul(
       context: EmitContext,
       nodeProto: NodeProto
-  ): EmitResult = {
-    val scheduler = startLayer(Seq(nodeProto))
-
+  ): Unit = {
     val input0Vars =
       context.mm.consumeObject(nodeProto.input(0), Seq(nodeProto.name.get))
 
@@ -1899,7 +1888,7 @@ class OnnxFrontend(
       input0Vars.dims
     )
 
-    scheduler.emitLoad(input0Vars, input0Temp)
+    context.hir.emitLoad(input0Vars, input0Temp)
 
     val input1VarsOrConst = if (tensorProtos.isDefinedAt(nodeProto.input(1))) {
       context.mm.addPendingConst(
@@ -1916,10 +1905,10 @@ class OnnxFrontend(
       input1VarsOrConst.dims
     )
 
-    scheduler.emitLoad(input1VarsOrConst, input1Temp)
+    context.hir.emitLoad(input1VarsOrConst, input1Temp)
 
     val outputTemp =
-      emitLayerMul(context, scheduler, nodeProto, input0Temp, input1Temp)
+      emitLayerMul(context, nodeProto, input0Temp, input1Temp)
 
     val outputVars = context.mm.allocateVarsObject(
       outputTemp.name,
@@ -1927,14 +1916,11 @@ class OnnxFrontend(
       findInterLayerOutputs(context, nodeProto.output(0), None)
     )
 
-    scheduler.emitSave(outputTemp, outputVars)
-
-    finishLayer(scheduler, context)
+    context.hir.emitSave(outputTemp, outputVars)
   }
 
   private def emitLayerConv(
       context: EmitContext,
-      scheduler: Scheduler,
       conv2DProto: NodeProto
   ): MemoryObject = {
     val autoPadAttr = getAttr(conv2DProto, "auto_pad")
@@ -2101,15 +2087,15 @@ class OnnxFrontend(
             MemoryOptionalInputOutputObjects(None, pixelOutputTemp)
         }
 
-      scheduler.emitMatMul(
+      context.hir.emitMatMul(
         pixelWeights,
         if (withBias) bias else None,
         pixelPairs
       )
     }
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         conv2DProto,
         Seq(outputTemp),
         Seq(inputVars),
@@ -2123,7 +2109,6 @@ class OnnxFrontend(
 
   private def emitLayerGemm(
       context: EmitContext,
-      scheduler: Scheduler,
       matMulProto: NodeProto
   ): MemoryObject = {
     context.mm.addPendingConst(
@@ -2160,14 +2145,14 @@ class OnnxFrontend(
       MemoryOptionalInputOutputObjects(Some(inputVars), outputTemp)
     )
 
-    scheduler.emitMatMul(
+    context.hir.emitMatMul(
       weights,
       bias,
       pairs
     )
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         matMulProto,
         Seq(outputTemp),
         Seq(inputVars),
@@ -2181,7 +2166,6 @@ class OnnxFrontend(
 
   private def emitLayerMatMul(
       context: EmitContext,
-      scheduler: Scheduler,
       matMulProto: NodeProto
   ): MemoryObject = {
     context.mm.addPendingConst(
@@ -2211,14 +2195,14 @@ class OnnxFrontend(
       MemoryOptionalInputOutputObjects(Some(inputVars), outputTemp)
     )
 
-    scheduler.emitMatMul(
+    context.hir.emitMatMul(
       weights,
       bias,
       pairs
     )
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         matMulProto,
         Seq(outputTemp),
         Seq(inputVars),
@@ -2230,7 +2214,6 @@ class OnnxFrontend(
 
   private def emitLayerPool(
       context: EmitContext,
-      scheduler: Scheduler,
       poolProto: NodeProto,
       inputTemp: MemoryObject
   ): MemoryObject = {
@@ -2299,7 +2282,7 @@ class OnnxFrontend(
         multiplierConst.dims
       )
 
-      scheduler.emitLoad(multiplierConst, multiplierTemp)
+      context.hir.emitLoad(multiplierConst, multiplierTemp)
 
       Some(multiplierTemp)
     } else None
@@ -2330,7 +2313,7 @@ class OnnxFrontend(
           )
         }
 
-      scheduler.emitPool(
+      context.hir.emitPool(
         poolProto.opType.get match {
           case "MaxPool"     => "MaxPool"
           case "AveragePool" => "AvgPool"
@@ -2341,8 +2324,8 @@ class OnnxFrontend(
       )
     }
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         poolProto,
         Seq(outputTemp),
         Seq(inputTemp)
@@ -2353,7 +2336,6 @@ class OnnxFrontend(
 
   private def emitLayerGlobalPool(
       context: EmitContext,
-      scheduler: Scheduler,
       globalPoolProto: NodeProto,
       inputTemp: MemoryObject,
   ): MemoryObject = {
@@ -2385,7 +2367,7 @@ class OnnxFrontend(
       multiplierConst.dims
     )
 
-    scheduler.emitLoad(multiplierConst, multiplierTemp)
+    context.hir.emitLoad(multiplierConst, multiplierTemp)
 
     for (n <- 0 until inputDims.numberVectors) {
       val dims = VarsDimensions(inputDims.channels)
@@ -2403,7 +2385,7 @@ class OnnxFrontend(
           mkSub(inputTemp, offset, dims)
         }
 
-      scheduler.emitPool(
+      context.hir.emitPool(
         "AvgPool",
         pixelInputsTemp,
         pixelOutputTemp,
@@ -2411,8 +2393,8 @@ class OnnxFrontend(
       )
     }
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         globalPoolProto,
         Seq(outputTemp),
         Seq(inputTemp)
@@ -2423,7 +2405,6 @@ class OnnxFrontend(
 
   private def emitLayerActivate(
       context: EmitContext,
-      scheduler: Scheduler,
       activateProto: NodeProto,
       inputTemp: MemoryObject,
   ): MemoryObject = {
@@ -2434,13 +2415,13 @@ class OnnxFrontend(
 
     activateProto.opType.get match {
       case "Relu" =>
-        scheduler.emitRelu(
+        context.hir.emitRelu(
           inputTemp,
           outputTemp
         )
 
       case "Softmax" =>
-        scheduler.emitSoftmax(
+        context.hir.emitSoftmax(
           inputTemp,
           outputTemp
         )
@@ -2468,8 +2449,8 @@ class OnnxFrontend(
           alphaConst.dims
         )
 
-        scheduler.emitLoad(alphaConst, alphaTemp)
-        scheduler.emitLeakyRelu(
+        context.hir.emitLoad(alphaConst, alphaTemp)
+        context.hir.emitLeakyRelu(
           inputTemp,
           alphaTemp,
           outputTemp
@@ -2477,8 +2458,8 @@ class OnnxFrontend(
       }
     }
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         activateProto,
         Seq(outputTemp),
         Seq(inputTemp)
@@ -2489,7 +2470,6 @@ class OnnxFrontend(
 
   private def emitLayerNorm(
       context: EmitContext,
-      scheduler: Scheduler,
       normProto: NodeProto,
       inputTemp: MemoryObject,
   ): MemoryObject = {
@@ -2520,8 +2500,8 @@ class OnnxFrontend(
         (offset.data(i) - mean.data(i) * inferenceScale(i)).toFloat
     }
 
-    val scaleName  = s"${normProto.name}+Scale"
-    val offsetName = s"${normProto.name}+Offset"
+    val scaleName  = s"${normProto.name.get}+Scale"
+    val offsetName = s"${normProto.name.get}+Offset"
 
     context.mm.addPendingConst(
       scaleName,
@@ -2545,8 +2525,8 @@ class OnnxFrontend(
       offsetConst.dims
     )
 
-    scheduler.emitLoad(scaleConst, scaleTemp)
-    scheduler.emitLoad(offsetConst, offsetTemp)
+    context.hir.emitLoad(scaleConst, scaleTemp)
+    context.hir.emitLoad(offsetConst, offsetTemp)
 
     val outputTemp = context.mm.allocateTempObject(
       normProto.output(0),
@@ -2564,7 +2544,7 @@ class OnnxFrontend(
       val pixelInputTemp  = mkSub(inputTemp, offset, dims)
       val pixelOutputTemp = mkSub(outputTemp, offset, dims)
 
-      scheduler.emitNorm(
+      context.hir.emitNorm(
         pixelInputTemp,
         scaleTemp,
         offsetTemp,
@@ -2572,8 +2552,8 @@ class OnnxFrontend(
       )
     }
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         normProto,
         Seq(outputTemp),
         Seq(inputTemp),
@@ -2585,7 +2565,6 @@ class OnnxFrontend(
 
   private def emitLayerAdd(
       context: EmitContext,
-      scheduler: Scheduler,
       addProto: NodeProto,
       input0Temp: MemoryObject,
   ): MemoryObject = {
@@ -2608,14 +2587,14 @@ class OnnxFrontend(
     } else
       context.mm.consumeObject(input1Name, Seq(addProto.name.get))
 
-    scheduler.emitAdd(
+    context.hir.emitAdd(
       input0Temp,
       input1VarsOrConst,
       outputTemp
     )
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         addProto,
         Seq(outputTemp),
         Seq(input1VarsOrConst, input0Temp)
@@ -2626,7 +2605,6 @@ class OnnxFrontend(
 
   private def emitLayerSub(
       context: EmitContext,
-      scheduler: Scheduler,
       nodeProto: NodeProto,
       input0Temp: MemoryObject,
       input1Temp: MemoryObject,
@@ -2636,14 +2614,14 @@ class OnnxFrontend(
       input0Temp.dims
     )
 
-    scheduler.emitSub(
+    context.hir.emitSub(
       input0Temp,
       input1Temp,
       outputTemp
     )
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         nodeProto,
         Seq(outputTemp),
         Seq(input0Temp, input1Temp)
@@ -2654,7 +2632,6 @@ class OnnxFrontend(
 
   private def emitLayerMul(
       context: EmitContext,
-      scheduler: Scheduler,
       nodeProto: NodeProto,
       input0Temp: MemoryObject,
       input1Temp: MemoryObject,
@@ -2664,14 +2641,14 @@ class OnnxFrontend(
       input0Temp.dims
     )
 
-    scheduler.emitMul(
+    context.hir.emitMul(
       input0Temp,
       input1Temp,
       outputTemp
     )
 
-    if (graphPrinter.isDefined)
-      graphPrinter.get.printOp(
+    if (context.graphPrinter.isDefined)
+      context.graphPrinter.get.printOp(
         nodeProto,
         Seq(outputTemp),
         Seq(input0Temp, input1Temp)

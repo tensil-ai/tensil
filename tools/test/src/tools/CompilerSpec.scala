@@ -92,47 +92,47 @@ class CompilerSpec extends AnyFlatSpec {
       printProgramWithComments = true,
       printGraph = true,
       tracepointConditions = List(
-        TracepointCondition(MemoryTag.Vars, "x"),
+        TracepointCondition(MemoryTag.DRAM0, "x"),
         TracepointCondition(MemoryTag.Local, "x"),
         TracepointCondition(MemoryTag.Accumulators, "x"),
-        TracepointCondition(MemoryTag.Vars, "sequential_10/dense_23/BiasAdd"),
+        TracepointCondition(MemoryTag.DRAM0, "sequential_10/dense_23/BiasAdd"),
         TracepointCondition(MemoryTag.Local, "sequential_10/dense_23/BiasAdd"),
         TracepointCondition(
           MemoryTag.Accumulators,
           "sequential_10/dense_23/BiasAdd"
         ),
-        TracepointCondition(MemoryTag.Vars, "sequential_10/dense_23/Relu"),
+        TracepointCondition(MemoryTag.DRAM0, "sequential_10/dense_23/Relu"),
         TracepointCondition(MemoryTag.Local, "sequential_10/dense_23/Relu"),
         TracepointCondition(
           MemoryTag.Accumulators,
           "sequential_10/dense_23/Relu"
         ),
-        TracepointCondition(MemoryTag.Vars, "sequential_10/dense_23/Relu"),
+        TracepointCondition(MemoryTag.DRAM0, "sequential_10/dense_23/Relu"),
         TracepointCondition(MemoryTag.Local, "sequential_10/dense_23/Relu"),
         TracepointCondition(
           MemoryTag.Accumulators,
           "sequential_10/dense_23/Relu"
         ),
-        TracepointCondition(MemoryTag.Vars, "sequential_10/dense_24/BiasAdd"),
+        TracepointCondition(MemoryTag.DRAM0, "sequential_10/dense_24/BiasAdd"),
         TracepointCondition(MemoryTag.Local, "sequential_10/dense_24/BiasAdd"),
         TracepointCondition(
           MemoryTag.Accumulators,
           "sequential_10/dense_24/BiasAdd"
         ),
         TracepointCondition(
-          MemoryTag.Consts,
+          MemoryTag.DRAM1,
           "sequential_10/dense_23/BiasAdd/ReadVariableOp"
         ),
         TracepointCondition(
-          MemoryTag.Consts,
+          MemoryTag.DRAM1,
           "sequential_10/dense_23/MatMul/ReadVariableOp"
         ),
         TracepointCondition(
-          MemoryTag.Consts,
+          MemoryTag.DRAM1,
           "sequential_10/dense_24/BiasAdd/ReadVariableOp"
         ),
         TracepointCondition(
-          MemoryTag.Consts,
+          MemoryTag.DRAM1,
           "sequential_10/dense_24/MatMul/ReadVariableOp"
         )
       )
@@ -819,41 +819,41 @@ class CompilerSpec extends AnyFlatSpec {
       printProgramWithComments = true,
       printGraph = true,
       tracepointConditions = List(
-        TracepointCondition(MemoryTag.Vars, "x"),
+        TracepointCondition(MemoryTag.DRAM0, "x"),
         TracepointCondition(MemoryTag.Local, "x"),
         TracepointCondition(MemoryTag.Accumulators, "x"),
-        TracepointCondition(MemoryTag.Vars, "sequential_3/dense_6/BiasAdd"),
+        TracepointCondition(MemoryTag.DRAM0, "sequential_3/dense_6/BiasAdd"),
         TracepointCondition(MemoryTag.Local, "sequential_3/dense_6/BiasAdd"),
         TracepointCondition(
           MemoryTag.Accumulators,
           "sequential_3/dense_6/BiasAdd"
         ),
-        TracepointCondition(MemoryTag.Vars, "sequential_3/dense_6/Relu"),
+        TracepointCondition(MemoryTag.DRAM0, "sequential_3/dense_6/Relu"),
         TracepointCondition(MemoryTag.Local, "sequential_3/dense_6/Relu"),
         TracepointCondition(
           MemoryTag.Accumulators,
           "sequential_3/dense_6/Relu"
         ),
-        TracepointCondition(MemoryTag.Vars, "sequential_3/dense_7/BiasAdd"),
+        TracepointCondition(MemoryTag.DRAM0, "sequential_3/dense_7/BiasAdd"),
         TracepointCondition(MemoryTag.Local, "sequential_3/dense_7/BiasAdd"),
         TracepointCondition(
           MemoryTag.Accumulators,
           "sequential_3/dense_7/BiasAdd"
         ),
         TracepointCondition(
-          MemoryTag.Consts,
+          MemoryTag.DRAM1,
           "sequential_3/dense_6/MatMul/ReadVariableOp"
         ),
         TracepointCondition(
-          MemoryTag.Consts,
+          MemoryTag.DRAM1,
           "sequential_3/dense_6/BiasAdd/ReadVariableOp"
         ),
         TracepointCondition(
-          MemoryTag.Consts,
+          MemoryTag.DRAM1,
           "sequential_3/dense_7/MatMul/ReadVariableOp"
         ),
         TracepointCondition(
-          MemoryTag.Consts,
+          MemoryTag.DRAM1,
           "sequential_3/dense_7/BiasAdd/ReadVariableOp"
         )
       )
@@ -1945,6 +1945,15 @@ class CompilerSpec extends AnyFlatSpec {
     numberOfThreads = 2,
   )
 
+  val HugeResNetFp16bp8Architecture = Architecture.mkWithDefaults(
+    dataType = ArchitectureDataType.FP16BP8,
+    arraySize = 32,
+    accumulatorDepth = Kibi * 16,
+    localDepth = Kibi * 64,
+    stride0Depth = 8,
+    stride1Depth = 8,
+  )
+
   it should "Compile TF float ResNet20V2 (CIFAR)" taggedAs (Slow) in {
     val name         = "resnet20v2_cifar_8x8_float"
     val traceContext = new ExecutiveTraceContext()
@@ -1978,7 +1987,7 @@ class CompilerSpec extends AnyFlatSpec {
       printGraph = true,
       //printProgramAssembly = true,
       tracepointConditions = List(
-        TracepointCondition(MemoryTag.Vars, "model/dense/Softmax")
+        TracepointCondition(MemoryTag.DRAM0, "model/dense/Softmax")
       )
     )
 
@@ -2007,7 +2016,7 @@ class CompilerSpec extends AnyFlatSpec {
       printGraph = true,
       //printProgramAssembly = true,
       tracepointConditions = List(
-        TracepointCondition(MemoryTag.Vars, "model/dense/Softmax")
+        TracepointCondition(MemoryTag.DRAM0, "model/dense/Softmax")
       )
     )
 
@@ -2061,7 +2070,7 @@ class CompilerSpec extends AnyFlatSpec {
       printGraph = true,
       //printProgramAssembly = true,
       tracepointConditions = List(
-        TracepointCondition(MemoryTag.Vars, "model/dense/Softmax")
+        TracepointCondition(MemoryTag.DRAM0, "model/dense/Softmax")
       )
     )
 
@@ -2091,7 +2100,7 @@ class CompilerSpec extends AnyFlatSpec {
       printGraph = true,
       //printProgramAssembly = true,
       tracepointConditions = List(
-        TracepointCondition(MemoryTag.Vars, "model/dense/Softmax")
+        TracepointCondition(MemoryTag.DRAM0, "model/dense/Softmax")
       )
     )
 
@@ -2142,7 +2151,7 @@ class CompilerSpec extends AnyFlatSpec {
       printLayersSummary = true,
       printGraph = true,
       tracepointConditions = List(
-        TracepointCondition(MemoryTag.Vars, "Identity:0")
+        TracepointCondition(MemoryTag.DRAM0, "Identity:0")
       )
     )
 
@@ -2157,6 +2166,154 @@ class CompilerSpec extends AnyFlatSpec {
     EmulatorHelper.test(
       name,
       inputBatchSize = options.inputShapes.batchSize,
+      traceContext = traceContext
+    )
+  }
+
+  it should "Compile TF fixed16bp8-local-vars ResNet20V2 (CIFAR)" in {
+    val name         = "resnet20v2_cifar_8x8_fixed16bp8_local_vars"
+    val traceContext = new ExecutiveTraceContext()
+    val options = CompilerOptions(
+      arch = HugeResNetFp16bp8Architecture,
+      strategy = CompilerStrategy.LocalVars,
+      printSummary = true,
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/resnet20v2_cifar.pb",
+      List("Identity"),
+      options,
+      traceContext
+    )
+
+    EmulatorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize,
+      traceContext = traceContext
+    )
+  }
+
+  it should "Compile TF fixed16bp8-local-consts ResNet20V2 (CIFAR)" in {
+    val name         = "resnet20v2_cifar_8x8_fixed16bp8_local_consts"
+    val traceContext = new ExecutiveTraceContext()
+    val options = CompilerOptions(
+      arch = HugeResNetFp16bp8Architecture,
+      strategy = CompilerStrategy.LocalConsts,
+      printSummary = true,
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/resnet20v2_cifar.pb",
+      List("Identity"),
+      options,
+      traceContext
+    )
+
+    EmulatorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize,
+      localConsts = true,
+      traceContext = traceContext
+    )
+  }
+
+  it should "Compile TF fixed16bp8-local-vars-and-consts ResNet20V2 (CIFAR)" in {
+    val name         = "resnet20v2_cifar_8x8_fixed16bp8_local_vars_and_consts"
+    val traceContext = new ExecutiveTraceContext()
+    val options = CompilerOptions(
+      arch = HugeResNetFp16bp8Architecture,
+      strategy = CompilerStrategy.LocalVarsAndConsts,
+      printSummary = true,
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/resnet20v2_cifar.pb",
+      List("Identity"),
+      options,
+      traceContext
+    )
+
+    EmulatorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize,
+      localConsts = true,
+      traceContext = traceContext
+    )
+  }
+
+  it should "Compile ONNX fixed16bp8-local-vars ResNet20V2 (CIFAR)" in {
+    val name         = "resnet20v2_cifar_fixed16bp8_onnx_local_vars"
+    val traceContext = new ExecutiveTraceContext()
+    val options = CompilerOptions(
+      arch = HugeResNetFp16bp8Architecture,
+      strategy = CompilerStrategy.LocalVars,
+      printSummary = true,
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/resnet20v2_cifar.onnx",
+      List("Identity:0"),
+      options,
+      traceContext
+    )
+
+    EmulatorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize,
+      traceContext = traceContext
+    )
+  }
+
+  it should "Compile ONNX fixed16bp8-local-consts ResNet20V2 (CIFAR)" in {
+    val name         = "resnet20v2_cifar_fixed16bp8_onnx_local_consts"
+    val traceContext = new ExecutiveTraceContext()
+    val options = CompilerOptions(
+      arch = HugeResNetFp16bp8Architecture,
+      strategy = CompilerStrategy.LocalConsts,
+      printSummary = true,
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/resnet20v2_cifar.onnx",
+      List("Identity:0"),
+      options,
+      traceContext
+    )
+
+    EmulatorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize,
+      localConsts = true,
+      traceContext = traceContext
+    )
+  }
+
+  it should "Compile ONNX fixed16bp8-local-vars-and-consts ResNet20V2 (CIFAR)" in {
+    val name         = "resnet20v2_cifar_fixed16bp8_onnx_local_vars_and_consts"
+    val traceContext = new ExecutiveTraceContext()
+    val options = CompilerOptions(
+      arch = HugeResNetFp16bp8Architecture,
+      strategy = CompilerStrategy.LocalVarsAndConsts,
+      printSummary = true,
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/resnet20v2_cifar.onnx",
+      List("Identity:0"),
+      options,
+      traceContext
+    )
+
+    EmulatorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize,
+      localConsts = true,
       traceContext = traceContext
     )
   }
@@ -2287,8 +2444,8 @@ class CompilerSpec extends AnyFlatSpec {
       printLayersSummary = true,
       printGraph = true,
       /*tracepointConditions = List(
-        TracepointCondition(MemoryTag.Vars, "model/conv2d_17/BiasAdd"),
-        TracepointCondition(MemoryTag.Vars, "model/conv2d_20/BiasAdd")
+        TracepointCondition(MemoryTag.DRAM0, "model/conv2d_17/BiasAdd"),
+        TracepointCondition(MemoryTag.DRAM0, "model/conv2d_20/BiasAdd")
       )*/
     )
 
@@ -2316,8 +2473,8 @@ class CompilerSpec extends AnyFlatSpec {
       printLayersSummary = true,
       printGraph = true,
       /*tracepointConditions = List(
-        TracepointCondition(MemoryTag.Vars, "model/conv2d_17/BiasAdd"),
-        TracepointCondition(MemoryTag.Vars, "model/conv2d_20/BiasAdd")
+        TracepointCondition(MemoryTag.DRAM0, "model/conv2d_17/BiasAdd"),
+        TracepointCondition(MemoryTag.DRAM0, "model/conv2d_20/BiasAdd")
       )*/
     )
 
@@ -2519,7 +2676,7 @@ class CompilerSpec extends AnyFlatSpec {
       printLayersSummary = true,
       printGraph = true,
       tracepointConditions = List(
-        TracepointCondition(MemoryTag.Vars, "Identity:0")
+        TracepointCondition(MemoryTag.DRAM0, "Identity:0")
       )
     )
 
@@ -2565,7 +2722,7 @@ class CompilerSpec extends AnyFlatSpec {
       printLayersSummary = true,
       printGraph = true,
       tracepointConditions = List(
-        TracepointCondition(MemoryTag.Vars, "dense_3")
+        TracepointCondition(MemoryTag.DRAM0, "dense_3")
       )
     )
 
@@ -2593,7 +2750,7 @@ class CompilerSpec extends AnyFlatSpec {
       printLayersSummary = true,
       printGraph = true,
       tracepointConditions = List(
-        TracepointCondition(MemoryTag.Vars, "dense_3")
+        TracepointCondition(MemoryTag.DRAM0, "dense_3")
       )
     )
 

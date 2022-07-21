@@ -5,8 +5,8 @@ package tensil.tools.compiler
 
 import scala.collection.mutable
 
-import _root_.tensil.tools.CompilerException
-import _root_.tensil.TablePrinter
+import tensil.tools.CompilerException
+import tensil.TablePrinter
 
 class MemorySpanAllocator() {
   private val allocatedSpans = mutable.Map.empty[MemoryRef, MemorySpan]
@@ -16,7 +16,7 @@ class MemorySpanAllocator() {
   def reportSpans(): Unit = {
     val tp = new TablePrinter(Some("MEMORY SPANS"))
 
-    for ((ref, allocatedSpan) <- allocatedSpans)
+    for ((ref, allocatedSpan) <- allocatedSpans.toSeq.sortBy(_._2.head.raw))
       tp.addNamedLine(
         ref.toString(),
         allocatedSpan.size,
@@ -38,17 +38,17 @@ class MemorySpanAllocator() {
 
       case None =>
         throw new CompilerException(
-          s"Insufficient ${space.name} memory to allocate ${ref}"
+          s"Insufficient ${space.name} memory to allocate ${ref} of size ${size}"
         )
     }
   }
 
   def blend(
       ref: MemoryRef,
-      blendeeNames: Seq[MemoryRef],
+      blendeeRefs: Seq[MemoryRef],
       blendedSpan: MemorySpan
   ): MemorySpan = {
-    val newSet      = (blendeeNames :+ ref).toSet
+    val newSet      = (blendeeRefs :+ ref).toSet
     val existingSet = blendedSets.find(set => !(newSet & set).isEmpty)
 
     if (existingSet.isDefined)

@@ -3,9 +3,7 @@
 
 package tensil.tools.compiler
 
-import scala.collection.mutable
-
-trait MemorySpace extends mutable.Cloneable[MemorySpace] {
+trait MemorySpace {
   val name: String
 
   def allocate(
@@ -14,4 +12,8 @@ trait MemorySpace extends mutable.Cloneable[MemorySpace] {
   ): Option[MemorySpan]
 
   def free(span: MemorySpan): Unit
+
+  def fork(): MemorySpace
+
+  def usage: MemoryUsage
 }

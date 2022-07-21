@@ -23,8 +23,9 @@ class ArenaMemorySpace private (
     val name: String,
     val tag: MemoryTag,
     val depth: MemoryAddressRaw,
-    private var next: MemoryAddressRaw
+    private val base: MemoryAddressRaw
 ) extends MemorySpace {
+  private var next = base
   def allocate(
       ref: MemoryRef,
       size: MemoryAddressRaw
@@ -47,6 +48,8 @@ class ArenaMemorySpace private (
       "Freeing from arena memory space is not supported"
     )
 
-  override def clone(): MemorySpace =
+  override def fork(): MemorySpace =
     new ArenaMemorySpace(name, tag, depth, next)
+
+  override def usage = MemoryUsage(maxSize = next, aggSize = next - base)
 }

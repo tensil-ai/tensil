@@ -3,6 +3,8 @@
 
 package tensil.tools.compiler
 
+import tensil.tools.CompilerException
+
 object HeapMemorySpace {
   def apply(
       name: String,
@@ -12,10 +14,7 @@ object HeapMemorySpace {
     new HeapMemorySpace(
       name,
       tag,
-      depth,
-      MemoryAddressRaw.Zero,
-      MemoryAddressRaw.Zero,
-      (MemoryAddressRaw.Zero until depth).toArray
+      depth
     )
 }
 
@@ -23,10 +22,10 @@ class HeapMemorySpace private (
     val name: String,
     val tag: MemoryTag,
     val depth: MemoryAddressRaw,
-    private var aggSizeVar: MemoryAddressRaw,
-    private var maxSizeVar: MemoryAddressRaw,
-    private var rawFreeSpan: Array[MemoryAddressRaw]
 ) extends MemorySpace {
+  private var aggSizeVar  = MemoryAddressRaw.Zero
+  private var maxSizeVar  = MemoryAddressRaw.Zero
+  private var rawFreeSpan = (MemoryAddressRaw.Zero until depth).toArray
 
   override def allocate(
       ref: MemoryRef,
@@ -52,17 +51,8 @@ class HeapMemorySpace private (
       (span.filter(a => a.tag == tag).map(_.raw) ++ rawFreeSpan).sorted.toArray
   }
 
-  override def clone(): MemorySpace = {
-    new HeapMemorySpace(
-      name,
-      tag,
-      depth,
-      aggSizeVar,
-      maxSizeVar,
-      rawFreeSpan.clone()
-    )
-  }
+  override def fork(): MemorySpace =
+    throw new CompilerException("Forking heap memory space is not supported")
 
-  def maxSize: MemoryAddressRaw = maxSizeVar
-  def aggSize: MemoryAddressRaw = aggSizeVar
+  override def usage = MemoryUsage(maxSize = maxSizeVar, aggSize = aggSizeVar)
 }

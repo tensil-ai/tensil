@@ -35,7 +35,8 @@ import tensil.tools.compiler.{
   IsolatedLocalSchedulingContext,
   SharedLocalSchedulingContext,
   NilHIR,
-  FrontendGraphPrinter
+  FrontendGraphPrinter,
+  MemoryUsage
 }
 
 class CompilerException(message: String) extends Exception(message) {}
@@ -530,43 +531,75 @@ object Compiler {
 
       tb.addNamedLine("Model", modelName)
       layout.addTableLines(tb)
-      if (dram0Space.maxSize != 0)
+
+      val dram0SpaceUsage = dram0Space.usage
+      val dram1SpaceUsage = dram1Space.usage
+      val accumulatorUsage = MemoryUsage(
+        layerSchedulerResults.map(_.accumulatorUsage)
+      )
+      val localUsage = MemoryUsage(
+        localSpace.usage +: layerSchedulerResults.map(_.localUsage)
+      )
+
+      if (dram0SpaceUsage.maxSize != 0)
         tb.addNamedLine(
           "DRAM0 maximum usage (vectors/scalars)",
-          dram0Space.maxSize,
-          dram0Space.maxSize * options.arch.arraySize
+          dram0SpaceUsage.maxSize,
+          dram0SpaceUsage.maxSize * options.arch.arraySize
         )
-      if (dram0Space.aggSize != 0)
+      if (dram0SpaceUsage.aggSize != 0)
         tb.addNamedLine(
           "DRAM0 aggregate usage (vectors/scalars)",
-          dram0Space.aggSize,
-          dram0Space.aggSize * options.arch.arraySize
+          dram0SpaceUsage.aggSize,
+          dram0SpaceUsage.aggSize * options.arch.arraySize
         )
-      if (dram1Space.maxSize != 0)
+      if (dram1SpaceUsage.maxSize != 0)
         tb.addNamedLine(
           "DRAM1 maximum usage (vectors/scalars)",
-          dram1Space.maxSize,
-          dram1Space.maxSize * options.arch.arraySize
+          dram1SpaceUsage.maxSize,
+          dram1SpaceUsage.maxSize * options.arch.arraySize
         )
-      if (dram1Space.aggSize != 0)
+      if (dram1SpaceUsage.aggSize != 0)
         tb.addNamedLine(
           "DRAM1 aggregate usage (vectors/scalars)",
-          dram1Space.aggSize,
-          dram1Space.aggSize * options.arch.arraySize
+          dram1SpaceUsage.aggSize,
+          dram1SpaceUsage.aggSize * options.arch.arraySize
         )
-      if (localSpace.maxSize != 0)
+      if (localUsage.maxSize != 0)
         tb.addNamedLine(
           "Local memory maximum usage (vectors/scalars)",
-          localSpace.maxSize,
-          localSpace.maxSize * options.arch.arraySize
+          localUsage.maxSize,
+          localUsage.maxSize * options.arch.arraySize
         )
-      if (localSpace.aggSize != 0)
+      if (localUsage.aggSize != 0)
         tb.addNamedLine(
           "Local memory aggregate usage (vectors/scalars)",
-          localSpace.aggSize,
-          localSpace.aggSize * options.arch.arraySize
+          localUsage.aggSize,
+          localUsage.aggSize * options.arch.arraySize
+        )
+      if (accumulatorUsage.maxSize != 0)
+        tb.addNamedLine(
+          "Accumumator memory maximum usage (vectors/scalars)",
+          accumulatorUsage.maxSize,
+          accumulatorUsage.maxSize * options.arch.arraySize
+        )
+      if (accumulatorUsage.aggSize != 0)
+        tb.addNamedLine(
+          "Accumumator memory aggregate usage (vectors/scalars)",
+          accumulatorUsage.aggSize,
+          accumulatorUsage.aggSize * options.arch.arraySize
         )
       tb.addNamedLine("Number of layers", layerSchedulerResults.size)
+      if (!layerSchedulerResults.isEmpty) {
+        tb.addNamedLine(
+          "Maximum number of stages",
+          layerSchedulerResults.map(_.numberOfStages).max
+        )
+        tb.addNamedLine(
+          "Maximum number of partitions",
+          layerSchedulerResults.map(_.numberOfPartitions).max
+        )
+      }
       Stats.printSummary(
         backendStats,
         tb,
@@ -615,14 +648,6 @@ object Compiler {
               "Number of stages:"
             ) ++ groupResultsWithIndex
               .map(_._1.numberOfStages)
-          )
-        )
-        tb.addLine(
-          new TableLine(
-            List(
-              "Number of combined stages:"
-            ) ++ groupResultsWithIndex
-              .map(_._1.numberOfCombinedStages)
           )
         )
         tb.addLine(
@@ -695,7 +720,9 @@ object Compiler {
             List(
               "Accumulator utilization (%):"
             ) ++ groupResultsWithIndex
-              .map(_._1.accumulatorUtilization)
+              .map(
+                _._1.accumulatorUsage.maxSize.toFloat / options.arch.accumulatorDepth.toFloat
+              )
               .map(_ * 100f)
               .map(f => f"$f%.1f")
           )
@@ -703,7 +730,9 @@ object Compiler {
         tb.addLine(
           new TableLine(
             List("Local utilization (%):") ++ groupResultsWithIndex
-              .map(_._1.localUtilization)
+              .map(
+                _._1.localUsage.maxSize.toFloat / options.arch.threadLocalDepth.toFloat
+              )
               .map(_ * 100f)
               .map(f => f"$f%.1f")
           )

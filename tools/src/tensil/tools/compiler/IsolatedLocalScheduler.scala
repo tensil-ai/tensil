@@ -46,14 +46,14 @@ class IsolatedLocalScheduler(
       .sortBy(_._1.firstConstAddressValue)
       .map(_._2.seq.toSeq)
 
-    case class UsageInfo(
+    case class EstimatedUsageInfo(
         accumulatorSize: Int,
         localSize: Int,
     )
 
     case class PartitionInfo(
         roots: Option[Seq[MemoryAddress]],
-        usage: UsageInfo
+        estimatedUsage: EstimatedUsageInfo
     )
 
     case class CombinedStageInfo(
@@ -95,14 +95,14 @@ class IsolatedLocalScheduler(
             ): Seq[PartitionInfo] = {
               case class MaximumPartitionSizeInfo(
                   n: Option[Int],
-                  usage: UsageInfo
+                  estimatedUsage: EstimatedUsageInfo
               )
 
               def findNextMaximumPartitionSize(
                   roots: Seq[MemoryAddress],
                   n: Int = 1,
                   powerOfTwoPass: Boolean = true,
-                  prevUsage: Option[UsageInfo] = None
+                  prevEstimatedUsage: Option[EstimatedUsageInfo] = None
               ): MaximumPartitionSizeInfo = {
                 require(roots.size > 0)
 
@@ -115,7 +115,7 @@ class IsolatedLocalScheduler(
                     includeNonReusableConsts = true,
                     includeVars = true
                   ) + reusableConsts.size
-                val usage = UsageInfo(
+                val estimatedUsage = EstimatedUsageInfo(
                   accumulatorSize = accumulatorSize,
                   localSize = localSize
                 )
@@ -131,7 +131,7 @@ class IsolatedLocalScheduler(
                       */
                     MaximumPartitionSizeInfo(
                       n = None,
-                      usage = usage
+                      estimatedUsage = estimatedUsage
                     )
                   else {
                     if (powerOfTwoPass)
@@ -139,18 +139,18 @@ class IsolatedLocalScheduler(
                         roots,
                         (n / 2) + 1,
                         false,
-                        prevUsage
+                        prevEstimatedUsage
                       )
                     else
                       MaximumPartitionSizeInfo(
                         n = Some(n - 1),
-                        usage = prevUsage.get
+                        estimatedUsage = prevEstimatedUsage.get
                       )
                   }
                 } else if (n >= roots.size)
                   MaximumPartitionSizeInfo(
                     n = Some(roots.size),
-                    usage = usage
+                    estimatedUsage = estimatedUsage
                   )
                 else {
                   if (powerOfTwoPass)
@@ -158,21 +158,21 @@ class IsolatedLocalScheduler(
                       roots,
                       n * 2,
                       true,
-                      Some(usage)
+                      Some(estimatedUsage)
                     )
                   else
                     findNextMaximumPartitionSize(
                       roots,
                       n + 1,
                       false,
-                      Some(usage)
+                      Some(estimatedUsage)
                     )
                 }
               }
 
               if (!roots.isEmpty) {
                 findNextMaximumPartitionSize(roots) match {
-                  case MaximumPartitionSizeInfo(None, usage) =>
+                  case MaximumPartitionSizeInfo(None, estimatedUsage) =>
                     /**
                       * When cannot find a partition that is fitting the
                       * memories return roots as None and usage that is
@@ -180,16 +180,16 @@ class IsolatedLocalScheduler(
                       */
                     partitions :+ PartitionInfo(
                       roots = None,
-                      usage = usage
+                      estimatedUsage = estimatedUsage
                     )
-                  case MaximumPartitionSizeInfo(Some(n), usage) =>
+                  case MaximumPartitionSizeInfo(Some(n), estimatedUsage) =>
                     val (partition, rest) = roots.splitAt(n)
 
                     partitionRoots(
                       rest,
                       partitions :+ PartitionInfo(
                         roots = Some(partition),
-                        usage = usage
+                        estimatedUsage = estimatedUsage
                       )
                     )
 
@@ -214,9 +214,9 @@ class IsolatedLocalScheduler(
       combinationCandidateStages
         .map(_.partitions.last)
         .filter(!_.roots.isDefined)
-        .map(_.usage)
+        .map(_.estimatedUsage)
         .headOption match {
-        case Some(UsageInfo(accumulatorSize, localSize)) =>
+        case Some(EstimatedUsageInfo(accumulatorSize, localSize)) =>
           if (prevStages.isDefined)
             prevStages.get
           else {
@@ -254,15 +254,14 @@ class IsolatedLocalScheduler(
       }
     }
 
-    val name                   = s"LAYER $layerIndex"
-    val numberOfStages         = rootsByStages.size
-    val stages                 = combineStages()
-    val numberOfCombinedStages = stages.size
-    val partitions             = stages.map(_.partitions).flatten
-    val numberOfPartitions     = partitions.size
-    val maximumRootsSize       = partitions.map(_.roots.get.size).max
-    val accumulatorSize        = partitions.map(_.usage.accumulatorSize).max
-    val localSize              = partitions.map(_.usage.localSize).max
+    val name               = s"LAYER $layerIndex"
+    val stages             = combineStages()
+    val numberOfStages     = stages.size
+    val partitions         = stages.map(_.partitions).flatten
+    val numberOfPartitions = partitions.size
+    val maximumRootsSize   = partitions.map(_.roots.get.size).max
+    val accumulatorSize    = partitions.map(_.estimatedUsage.accumulatorSize).max
+    val localSize          = partitions.map(_.estimatedUsage.localSize).max
 
     val accumulatorUtilization =
       accumulatorSize.toFloat / context.options.arch.accumulatorDepth.toFloat
@@ -273,21 +272,28 @@ class IsolatedLocalScheduler(
 
     if (context.options.printProgress) {
       println(
-        s"HIR scheduled onto ${numberOfCombinedStages} stage(s) and ${numberOfPartitions} partition(s)"
+        s"HIR scheduled onto ${numberOfStages} stage(s) and ${numberOfPartitions} partition(s)"
       )
     }
 
-    val instructionsCounts = stages.zipWithIndex.par
+    case class StageLoweringResult(
+        initInstructionsCount: InstructionAddress,
+        partitionInstructionsCounts: Seq[InstructionAddress],
+        accumulatorUsage: MemoryUsage,
+        localUsage: MemoryUsage
+    )
+
+    val stageLoweringResults = stages.zipWithIndex.par
       .map({
         case (stage, i) =>
-          val localSpace =
+          val initLocalSpace =
             ArenaMemorySpace(
               "Local",
               MemoryTag.Local,
               context.options.arch.threadLocalDepth
             )
           val initLocalAllocator = RenamingMemoryAllocator(
-            localSpace,
+            initLocalSpace,
             Set(MemoryTag.DRAM1, MemoryTag.DRAM0)
           )
 
@@ -307,99 +313,142 @@ class IsolatedLocalScheduler(
 
           initSegment.segmentLir.endEmit()
 
-          val partitionSegmentAndStats = stage.partitions.zipWithIndex.par
-            .map({
-              case (partition, j) =>
-                val partitionLocalAllocator = initLocalAllocator.clone()
-                val kinds = Seq(
-                  BackendSegmentKey.Load,
-                  BackendSegmentKey.Compute,
-                  BackendSegmentKey.Save
-                )
-                val statsByKind = kinds.map(kind => kind -> new Stats()).toMap
-                val segmentsByKind = kinds
-                  .map(kind =>
-                    kind -> backend.mkSegment(
-                      BackendSegmentKey(layerIndex, i, j, kind),
-                      Some(statsByKind(kind))
-                    )
+          case class SegmentLoweringResult(
+              segment: BackendSegment,
+              stats: Stats
+          )
+
+          case class PartitionLoweringResult(
+              segmentLoweringResults: Seq[SegmentLoweringResult],
+              accumulatorUsage: MemoryUsage,
+              localUsage: MemoryUsage
+          )
+
+          val partitionLoweringResults =
+            stage.partitions.zipWithIndex.par
+              .map({
+                case (partition, j) =>
+                  val partitionLocalSpace = initLocalSpace.fork()
+                  val partitionLocalAllocator =
+                    initLocalAllocator.fork(partitionLocalSpace)
+                  val kinds = Seq(
+                    BackendSegmentKey.Load,
+                    BackendSegmentKey.Compute,
+                    BackendSegmentKey.Save
                   )
-                  .toMap
+                  val statsByKind = kinds.map(kind => kind -> new Stats()).toMap
+                  val segmentsByKind = kinds
+                    .map(kind =>
+                      kind -> backend.mkSegment(
+                        BackendSegmentKey(layerIndex, i, j, kind),
+                        Some(statsByKind(kind))
+                      )
+                    )
+                    .toMap
 
-                val nodes = traverseRoots(partition.roots.get)
+                  val nodes = traverseRoots(partition.roots.get)
 
-                lowerLoadConsts(
-                  segmentsByKind(BackendSegmentKey.Load).segmentLir,
-                  partitionLocalAllocator,
-                  nodes,
-                  includeReusableConsts = false,
-                  includeNonReusableConsts = true
-                )
+                  lowerLoadConsts(
+                    segmentsByKind(BackendSegmentKey.Load).segmentLir,
+                    partitionLocalAllocator,
+                    nodes,
+                    includeReusableConsts = false,
+                    includeNonReusableConsts = true
+                  )
 
-                lowerLoadVars(
-                  segmentsByKind(BackendSegmentKey.Load).segmentLir,
-                  partitionLocalAllocator,
-                  nodes
-                )
+                  lowerLoadVars(
+                    segmentsByKind(BackendSegmentKey.Load).segmentLir,
+                    partitionLocalAllocator,
+                    nodes
+                  )
 
-                lowerCompute(
-                  segmentsByKind(BackendSegmentKey.Compute).segmentLir,
-                  partitionLocalAllocator,
-                  nodes
-                )
+                  val accumulatorUsage = lowerCompute(
+                    segmentsByKind(BackendSegmentKey.Compute).segmentLir,
+                    partitionLocalAllocator,
+                    nodes
+                  )
 
-                lowerSaveVars(
-                  segmentsByKind(BackendSegmentKey.Save).segmentLir,
-                  partitionLocalAllocator,
-                  nodes
-                )
+                  lowerSaveVars(
+                    segmentsByKind(BackendSegmentKey.Save).segmentLir,
+                    partitionLocalAllocator,
+                    nodes
+                  )
 
-                segmentsByKind.values.foreach(_.segmentLir.endEmit())
-                segmentsByKind.map {
-                  case (kind, segment) => (segment, statsByKind(kind))
-                }
-            })
-            .seq
+                  segmentsByKind.values.foreach(_.segmentLir.endEmit())
 
-          (initSegment, initStats, partitionSegmentAndStats)
+                  PartitionLoweringResult(
+                    segmentLoweringResults = segmentsByKind.map {
+                      case (kind, segment) =>
+                        SegmentLoweringResult(
+                          segment = segment,
+                          stats = statsByKind(kind)
+                        )
+                    }.toSeq,
+                    accumulatorUsage = accumulatorUsage,
+                    localUsage = partitionLocalSpace.usage
+                  )
+              })
+              .seq
+
+          (
+            PartitionLoweringResult(
+              segmentLoweringResults = Seq(
+                SegmentLoweringResult(segment = initSegment, stats = initStats)
+              ),
+              accumulatorUsage = MemoryUsage(0, 0),
+              localUsage = initLocalSpace.usage
+            ),
+            partitionLoweringResults
+          )
       })
       .seq
       .map({
-        case ((initSegment, initStats, partitionSegmentAndStats)) => {
-          backend.emitSegment(initSegment)
+        case ((initLoweringResult, partitionLoweringResults)) => {
+          val initAndPartitionsLoweringResults =
+            initLoweringResult +: partitionLoweringResults
 
-          stats.add(initStats)
+          for (r <- initAndPartitionsLoweringResults) {
+            r.segmentLoweringResults.foreach(r => stats.add(r.stats))
 
-          val instructionsCounts =
-            partitionSegmentAndStats.map(segmentAndStats => {
-              segmentAndStats.foreach(v => stats.add(v._2))
+            for (r <- r.segmentLoweringResults) {
+              backend.emitSegment(r.segment)
 
-              for ((partitionSegment, partitionStats) <- segmentAndStats)
-                yield {
-                  backend.emitSegment(partitionSegment)
+              r.segment.instructionsCount
+            }
+          }
 
-                  partitionSegment.instructionsCount
-                }
-            })
-
-          (initSegment.instructionsCount, instructionsCounts.flatten)
+          StageLoweringResult(
+            initInstructionsCount = initLoweringResult
+              .segmentLoweringResults(0)
+              .segment
+              .instructionsCount,
+            partitionInstructionsCounts = partitionLoweringResults.map(r =>
+              r.segmentLoweringResults.map(_.segment.instructionsCount).sum
+            ),
+            accumulatorUsage = MemoryUsage(
+              initAndPartitionsLoweringResults.map(_.accumulatorUsage)
+            ),
+            localUsage =
+              MemoryUsage(initAndPartitionsLoweringResults.map(_.localUsage)),
+          )
         }
       })
 
     if (context.options.printProgress) {
       println(
-        s"LIR emitted for ${instructionsCounts.map(pair => pair._1 + pair._2.sum).sum} instruction(s)"
+        s"LIR emitted for ${stageLoweringResults.map(r => r.initInstructionsCount + r.partitionInstructionsCounts.sum).sum} instruction(s)"
       )
     }
 
-    val stageInitInstructionCounts = instructionsCounts.map(_._1)
-    val partitionInstructionCounts = instructionsCounts.map(_._2).flatten
-    val macEfficiency              = Stats.macEfficiency(stats, context.options.arch, macs)
+    val stageInitInstructionCounts =
+      stageLoweringResults.map(_.initInstructionsCount)
+    val partitionInstructionCounts =
+      stageLoweringResults.map(_.partitionInstructionsCounts).flatten
+    val macEfficiency = Stats.macEfficiency(stats, context.options.arch, macs)
 
     if (context.options.printSchedulerSummary) {
       val tb = new TablePrinter(Some(s"$name SCHEDULER SUMMARY"))
       tb.addNamedLine("Stages", numberOfStages)
-      tb.addNamedLine("Combined Stages", numberOfCombinedStages)
       tb.addNamedLine("Partitions", numberOfPartitions)
       tb.addNamedLine("Partition results size", maximumRootsSize)
       tb.addNamedLine("Partition accumulator size", accumulatorSize)
@@ -475,12 +524,13 @@ class IsolatedLocalScheduler(
 
     SchedulerResult(
       numberOfStages = numberOfStages,
-      numberOfCombinedStages = numberOfCombinedStages,
       numberOfPartitions = numberOfPartitions,
       cycles = stats.aggregateCycles,
       energy = stats.aggregateEnergy,
-      accumulatorUtilization = accumulatorUtilization,
-      localUtilization = localUtilization,
+      accumulatorUsage = MemoryUsage(
+        stageLoweringResults.map(_.accumulatorUsage)
+      ),
+      localUsage = MemoryUsage(stageLoweringResults.map(_.localUsage)),
       macs = macs,
       macEfficiency = macEfficiency,
     )

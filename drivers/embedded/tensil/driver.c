@@ -528,11 +528,15 @@ tensil_error_t tensil_driver_load_model(struct tensil_driver *driver,
                                    "Incompatible model");
 
     tensil_error_t error = TENSIL_ERROR_NONE;
+    char file_name[FF_MAX_LFN];
 
     for (size_t i = 0; i < model->consts_size; i++) {
+        strcpy(file_name, model->path);
+        strcat(file_name, model->consts[i].file_name);
+
         error = tensil_driver_load_dram_vectors_from_file(
             driver, TENSIL_DRAM1, model->consts[i].base, model->consts[i].size,
-            model->consts[i].file_name);
+            file_name);
 
         if (error)
             return error;
@@ -546,8 +550,11 @@ tensil_error_t tensil_driver_load_model(struct tensil_driver *driver,
         }
     }
 
+    strcpy(file_name, model->path);
+    strcat(file_name, model->prog.file_name);
+
     error = tensil_driver_load_program_from_file(driver, model->prog.size,
-                                                 model->prog.file_name);
+                                                 file_name);
 
     if (error)
         return error;

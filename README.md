@@ -16,6 +16,7 @@ For in-depth end-to-end instructions check our tutorials.
 - [Learn Tensil with ResNet and Ultra96](https://www.tensil.ai/docs/tutorials/resnet20-ultra96v2/)
 - [Learn how to build speech controlled robot with Tensil and Arty A7 - Part I](https://www.tensil.ai/docs/tutorials/speech-robot-part1/)
 - [Learn how to build speech controlled robot with Tensil and Arty A7 - Part II](https://www.tensil.ai/docs/tutorials/speech-robot-part2/)
+- [Getting Tensil to run ResNet at 300 FPS on ZCU104](https://www.tensil.ai/docs/tutorials/resnet20-zcu104/)
 
 ## Documentation
 

@@ -32,6 +32,16 @@ class OnnxFrontend(
     graphStream: Option[OutputStream],
     options: CompilerOptions
 ) extends Frontend {
+  val opsetVersion = modelProto.opsetImport(0).version.get
+
+  val MinOpsetVersion = 9
+  val MaxOpsetVersion = 10
+
+  if (opsetVersion < MinOpsetVersion || opsetVersion > MaxOpsetVersion)
+    throw new CompilerException(
+      s"ONNX opset ${opsetVersion} is not supported. Supported range is [${MinOpsetVersion}, ${MaxOpsetVersion}]."
+    )
+
   private object VarsDimensions {
     def apply(
         number: Int,

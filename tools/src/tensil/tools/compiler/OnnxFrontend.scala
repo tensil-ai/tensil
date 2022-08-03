@@ -2216,7 +2216,7 @@ class OnnxFrontend(
         matMulProto.input(1),
         if (matMulProto.input.isDefinedAt(2)) Some(matMulProto.input(2))
         else None,
-        transBAttr != 0
+        transB != 0
       )
 
     val inputVars =

@@ -89,13 +89,29 @@ class OnnxFrontend(
       )
 
     def apply(height: Int, width: Int): MemoryDimensions =
-      MemoryDimensions(
-        arraySize = arch.arraySize,
-        "HW",
-        "HW",
-        isWeights = true,
-        dimensions = Vector(height, width)
-      )
+      apply(height, width, false)
+
+    def apply(
+        height: Int,
+        width: Int,
+        transpose: Boolean
+    ): MemoryDimensions =
+      if (transpose)
+        MemoryDimensions(
+          arraySize = arch.arraySize,
+          "WH",
+          "HW",
+          isWeights = true,
+          dimensions = Vector(height, width)
+        )
+      else
+        MemoryDimensions(
+          arraySize = arch.arraySize,
+          "HW",
+          "HW",
+          isWeights = true,
+          dimensions = Vector(height, width)
+        )
 
     def apply(
         channelsOut: Int,
@@ -111,21 +127,27 @@ class OnnxFrontend(
         dimensions = Vector(channelsOut, channelsIn, height, width)
       )
 
-    def apply(shape: Shape): MemoryDimensions =
-      if (shape.size == 1)
-        ConstsDimensions(shape(0))
-      else if (shape.size == 2)
-        ConstsDimensions(shape(0), shape(1))
-      else if (shape.size == 4)
-        ConstsDimensions(shape(0), shape(1), shape(2), shape(3))
-      else
+    def apply(shape: Shape, transpose: Boolean): MemoryDimensions =
+      if (transpose && shape.size != 2)
         throw new CompilerException(
-          s"Consts tensor shape of ${shape} is not supported"
+          s"Transposing consts is supported for 2D tensors only"
         )
+      else {
+        if (shape.size == 1)
+          ConstsDimensions(shape(0))
+        else if (shape.size == 2)
+          ConstsDimensions(shape(0), shape(1), transpose)
+        else if (shape.size == 4)
+          ConstsDimensions(shape(0), shape(1), shape(2), shape(3))
+        else
+          throw new CompilerException(
+            s"Consts tensor shape of ${shape} is not supported"
+          )
+      }
   }
 
-  def mkConstsDimensions(shape: Shape): MemoryDimensions =
-    ConstsDimensions(shape)
+  def mkConstsDimensions(shape: Shape, transpose: Boolean): MemoryDimensions =
+    ConstsDimensions(shape, transpose)
 
   private val nodeProtos            = mutable.Map.empty[String, NodeProto]
   private val tensorProtos          = mutable.Map.empty[String, TensorProto]
@@ -346,6 +368,8 @@ class OnnxFrontend(
             rewriteLayer(remainingProtos, nodeProto, emitters)
           case "Reshape" =>
             rewriteSimple(remainingProtos, emitReshape(_, nodeProto), emitters)
+          case "Flatten" =>
+            rewriteSimple(remainingProtos, emitFlatten(_, nodeProto), emitters)
           case "Split" =>
             rewriteSimple(remainingProtos, emitSplit(_, nodeProto), emitters)
           case "Concat" =>
@@ -1007,16 +1031,53 @@ class OnnxFrontend(
       context: EmitContext,
       reshapeProto: NodeProto
   ): Unit = {
-    val inputVars =
-      context.mm
-        .consumeObject(reshapeProto.input(0), Seq(reshapeProto.name.get))
-    val inputDims = inputVars.dims
-
     val shape = getTensorData(tensorProtos(reshapeProto.input(1)))
       .asInstanceOf[TensorData[Long]]
       .as1D
       .map(_.toInt)
       .toArray
+
+    val inputVars =
+      context.mm
+        .consumeObject(reshapeProto.input(0), Seq(reshapeProto.name.get))
+
+    doEmitReshape(context, reshapeProto, inputVars, shape)
+  }
+
+  private def emitFlatten(
+      context: EmitContext,
+      flattenProto: NodeProto
+  ): Unit = {
+    val axisAttr = getAttr(flattenProto, "axis").get
+
+    require(axisAttr.`type`.get.isInt)
+
+    val axis = axisAttr.i.get.toInt
+
+    val inputVars =
+      context.mm
+        .consumeObject(flattenProto.input(0), Seq(flattenProto.name.get))
+
+    val shape =
+      if (axis == 0) Array(1, inputVars.dims.modelDimensions.product)
+      else
+        Array(
+          inputVars.dims.modelDimensions.slice(0, axis).product,
+          inputVars.dims.modelDimensions
+            .slice(axis, inputVars.dims.order)
+            .product
+        )
+
+    doEmitReshape(context, flattenProto, inputVars, shape)
+  }
+
+  private def doEmitReshape(
+      context: EmitContext,
+      nodeProto: NodeProto,
+      inputVars: MemoryObject,
+      shape: Array[Int]
+  ): Unit = {
+    val inputDims = inputVars.dims
 
     var pixelDims = VarsDimensions(1, arch.arraySize)
     val outputDims = VarsDimensions(Shape(if (shape.exists(_ == -1)) {
@@ -1082,7 +1143,7 @@ class OnnxFrontend(
     val outputNames =
       if (groupedByOffsetPairs.size > 1) {
         val adjustedOutputTemp = context.mm.allocateTempObject(
-          reshapeProto.output(0),
+          nodeProto.output(0),
           outputDims
         )
 
@@ -1139,16 +1200,16 @@ class OnnxFrontend(
         Seq(inputVars.name)
 
     val outputVars = context.mm.blendObjects(
-      reshapeProto.output(0),
+      nodeProto.output(0),
       outputDims,
-      findInterLayerOutputs(context, reshapeProto.output(0), None),
+      findInterLayerOutputs(context, nodeProto.output(0), None),
       outputNames,
       outputAddresses
     )
 
     if (context.graphPrinter.isDefined)
       context.graphPrinter.get.printOp(
-        reshapeProto,
+        nodeProto,
         Seq(outputVars),
         Seq(inputVars)
       )
@@ -2111,6 +2172,24 @@ class OnnxFrontend(
       context: EmitContext,
       matMulProto: NodeProto
   ): MemoryObject = {
+    val transAAttr = getAttr(matMulProto, "transA")
+    val transBAttr = getAttr(matMulProto, "transB")
+
+    val transA = if (transAAttr.isDefined) {
+      require(transAAttr.get.`type`.get.isInt)
+      transAAttr.get.i.get.toInt
+    } else 0
+
+    val transB = if (transBAttr.isDefined) {
+      require(transBAttr.get.`type`.get.isInt)
+      transBAttr.get.i.get.toInt
+    } else 0
+
+    if (transA != 0)
+      throw new CompilerException(
+        s"Gemm with transposed input A is not supported"
+      )
+
     context.mm.addPendingConst(
       matMulProto.input(1),
       getTensorData(tensorProtos(matMulProto.input(1)))
@@ -2127,6 +2206,7 @@ class OnnxFrontend(
         matMulProto.input(1),
         if (matMulProto.input.isDefinedAt(2)) Some(matMulProto.input(2))
         else None,
+        transBAttr != 0
       )
 
     val inputVars =

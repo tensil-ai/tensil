@@ -394,7 +394,7 @@ class OnnxFrontend(
             rewriteSimple(remainingProtos, emitPool(_, nodeProto), emitters)
           case "BatchNormalization" =>
             rewriteSimple(remainingProtos, emitNorm(_, nodeProto), emitters)
-          case "Relu" | "Softmax" | "LeakyRelu" =>
+          case "Relu" | "Softmax" | "LeakyRelu" | "Clip" =>
             rewriteSimple(remainingProtos, emitActivate(_, nodeProto), emitters)
           case "Add" =>
             rewriteSimple(remainingProtos, emitAdd(_, nodeProto), emitters)
@@ -2546,6 +2546,60 @@ class OnnxFrontend(
           outputTemp
         )
       }
+
+      case "Clip" =>
+        val minAttr = getAttr(activateProto, "min").get
+        val maxAttr = getAttr(activateProto, "max").get
+
+        require(minAttr.`type`.get.isFloat)
+        require(maxAttr.`type`.get.isFloat)
+
+        val min = minAttr.f.get
+        val max = maxAttr.f.get
+
+        val minName = s"${activateProto.name.get}+Min"
+        val maxName = s"${activateProto.name.get}+Max"
+
+        context.mm.addPendingConst(
+          minName,
+          new TensorData(
+            Shape(arch.arraySize),
+            Array.fill(arch.arraySize)(min),
+            org.tensorflow.framework.types.DataType.DT_FLOAT
+          )
+        )
+
+        context.mm.addPendingConst(
+          maxName,
+          new TensorData(
+            Shape(arch.arraySize),
+            Array.fill(arch.arraySize)(max),
+            org.tensorflow.framework.types.DataType.DT_FLOAT
+          )
+        )
+
+        val minConst = context.mm.getOrEmitConstObject(minName)
+        val maxConst = context.mm.getOrEmitConstObject(maxName)
+
+        val minTemp = context.mm.allocateTempObject(
+          minConst.name,
+          minConst.dims
+        )
+
+        val maxTemp = context.mm.allocateTempObject(
+          maxConst.name,
+          maxConst.dims
+        )
+
+        context.hir.emitLoad(minConst, minTemp)
+        context.hir.emitLoad(maxConst, maxTemp)
+
+        context.hir.emitClip(
+          inputTemp,
+          minTemp,
+          maxTemp,
+          outputTemp
+        )
     }
 
     if (context.graphPrinter.isDefined)

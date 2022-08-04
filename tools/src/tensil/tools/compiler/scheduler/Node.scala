@@ -147,6 +147,19 @@ class LeakyReluNode(
   override lazy val inputTemps = Seq(alpha, input)
 }
 
+class ClipNode(
+    val min: MemoryAddress,
+    val max: MemoryAddress,
+    val input: MemoryAddress,
+    output: MemoryAddress
+) extends TempOutputNode(output) {
+  require(min.tag == MemoryTag.Temp)
+  require(max.tag == MemoryTag.Temp)
+  require(input.tag == MemoryTag.Temp)
+
+  override lazy val inputTemps = Seq(min, max, input)
+}
+
 class PoolNode(
     val op: String,
     output: MemoryAddress,

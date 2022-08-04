@@ -124,8 +124,13 @@ class TfFrontend(
         )
   }
 
-  def mkConstsDimensions(shape: Shape): MemoryDimensions =
-    ConstsDimensions(shape)
+  def mkConstsDimensions(shape: Shape, transpose: Boolean): MemoryDimensions =
+    if (transpose)
+      throw new CompilerException(
+        s"Transposing consts is not supported"
+      )
+    else
+      ConstsDimensions(shape)
 
   private val nodeDefs  = mutable.Map.empty[String, NodeDef]
   private val nodeEdges = mutable.Map.empty[String, Seq[String]]

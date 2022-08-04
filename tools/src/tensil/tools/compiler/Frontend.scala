@@ -9,5 +9,5 @@ abstract class Frontend {
   def traverse(outputNames: Seq[String]): Seq[String]
   def rewrite(program: Seq[String]): Seq[Emitter]
 
-  def mkConstsDimensions(shape: Shape): MemoryDimensions
+  def mkConstsDimensions(shape: Shape, transpose: Boolean): MemoryDimensions
 }

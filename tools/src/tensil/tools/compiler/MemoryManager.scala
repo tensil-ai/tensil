@@ -31,7 +31,7 @@ class MemoryManager(
     constsStream: OutputStream,
     dataType: ArchitectureDataType,
     arch: Architecture,
-    mkConstsDimensions: (Shape) => MemoryDimensions,
+    mkConstsDimensions: (Shape, Boolean) => MemoryDimensions,
     traceContext: TraceContext,
     tracepointConditions: Seq[TracepointCondition]
 ) {
@@ -192,7 +192,8 @@ class MemoryManager(
 
   def getOrEmitWeightsAndBiasObjects(
       weightsName: String,
-      biasName: Option[String]
+      biasName: Option[String],
+      transposeWeights: Boolean = false
   ): (MemoryObject, Option[MemoryObject]) = {
     val biasObject =
       if (biasName.isDefined) {
@@ -217,7 +218,11 @@ class MemoryManager(
           Nil
         )
       else
-        mkConstObject(resolvedWeightsName, constsDataStream)
+        mkConstObject(
+          resolvedWeightsName,
+          constsDataStream,
+          transpose = transposeWeights
+        )
 
     (weightsObject, biasObject)
   }
@@ -230,7 +235,7 @@ class MemoryManager(
       if (freeableAllocator.hasObject(name))
         freeableAllocator.consumeObject(name, Nil)
       else
-        mkConstObject(name, constsDataStream, broadcastDims)
+        mkConstObject(name, constsDataStream, broadcastDims = broadcastDims)
 
     constObject
   }
@@ -256,7 +261,8 @@ class MemoryManager(
   private def mkConstObject(
       name: String,
       stream: DataOutputStream,
-      broadcastDims: Option[MemoryDimensions] = None
+      broadcastDims: Option[MemoryDimensions] = None,
+      transpose: Boolean = false
   ): MemoryObject = {
     val tensorData = pendingFloatConsts(name)
     val tensorSize = tensorData.shape.product
@@ -269,7 +275,7 @@ class MemoryManager(
           throw new CompilerException("Only scalar broadcast is supported")
 
         (broadcastDims.get, true)
-      } else (mkConstsDimensions(tensorData.shape), false)
+      } else (mkConstsDimensions(tensorData.shape, transpose), false)
 
     dims.buildConsts((offset: Option[Int]) =>
       dataType.writeFloatConst(

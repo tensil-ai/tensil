@@ -72,8 +72,12 @@ object ArchitectureDataTypeUtil {
     val csvStream = new DataOutputStream(new FileOutputStream(csvFileName))
 
     for (_ <- 0L until size) {
-      for (_ <- 0 until arraySize)
-        csvStream.writeBytes(s"${dataType.readFloatConst(dataStream)},")
+      for (i <- 0 until arraySize) {
+        csvStream.writeBytes(s"${dataType.readFloatConst(dataStream)}")
+
+        if (i != arraySize - 1)
+          csvStream.writeBytes(",")
+      }
 
       csvStream.writeBytes("\r\n")
     }

@@ -265,26 +265,24 @@ class MemoryManager(
       transpose: Boolean = false
   ): MemoryObject = {
     val tensorData = pendingFloatConsts(name)
-    val tensorSize = tensorData.shape.product
-    val (dims, broadcastScalar) =
-      if (
-        broadcastDims.isDefined &&
-        broadcastDims.get.sizeScalars != tensorSize
-      ) {
-        if (tensorSize != 1)
-          throw new CompilerException("Only scalar broadcast is supported")
 
-        (broadcastDims.get, true)
-      } else (mkConstsDimensions(tensorData.shape, transpose), false)
+    val dims =
+      if (broadcastDims.isDefined) broadcastDims.get
+      else mkConstsDimensions(tensorData.shape, transpose)
 
-    dims.buildConsts((offset: Option[Int]) =>
-      dataType.writeFloatConst(
-        if (offset.isDefined)
-          tensorData.data(if (broadcastScalar) 0 else offset.get)
-        else
-          0f,
-        stream
-      )
+    require(dims.order >= tensorData.shape.size)
+
+    dims.buildConsts(
+      Seq.fill(dims.order - tensorData.shape.size)(1) ++ tensorData.shape.toSeq,
+      broadcastDims.isDefined,
+      (offset: Option[Int]) =>
+        dataType.writeFloatConst(
+          if (offset.isDefined)
+            tensorData.data(offset.get)
+          else
+            0f,
+          stream
+        )
     )
 
     addConstSize(dims.sizeScalars, dims.sizeVectors)

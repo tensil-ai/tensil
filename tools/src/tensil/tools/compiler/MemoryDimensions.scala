@@ -186,12 +186,7 @@ class MemoryDimensions private (
       else modelPos
 
     def modelOffset(modelPos: Seq[Int]): Option[Int] =
-      if (
-        sourceShape.zipWithIndex
-          .forall {
-            case (dim, i) => modelPos(i) < dim
-          }
-      )
+      if (modelPos.zip(sourceShape).forall { case (pos, shape) => pos < shape })
         Some(
           if (order > 0)
             modelPos(modelPos.size - 1) +

@@ -31,7 +31,7 @@ class MemoryManager(
     constsStream: OutputStream,
     dataType: ArchitectureDataType,
     arch: Architecture,
-    mkConstsDimensions: (Shape, Boolean) => MemoryDimensions,
+    mkConstsDimensions: (Shape, Option[Int], Boolean) => MemoryDimensions,
     traceContext: TraceContext,
     tracepointConditions: Seq[TracepointCondition]
 ) {
@@ -193,6 +193,7 @@ class MemoryManager(
   def getOrEmitWeightsAndBiasObjects(
       weightsName: String,
       biasName: Option[String],
+      weightsGroupSize: Option[Int] = None,
       transposeWeights: Boolean = false
   ): (MemoryObject, Option[MemoryObject]) = {
     val biasObject =
@@ -221,6 +222,7 @@ class MemoryManager(
         mkConstObject(
           resolvedWeightsName,
           constsDataStream,
+          groupSize = weightsGroupSize,
           transpose = transposeWeights
         )
 
@@ -262,19 +264,22 @@ class MemoryManager(
       name: String,
       stream: DataOutputStream,
       broadcastDims: Option[MemoryDimensions] = None,
+      groupSize: Option[Int] = None,
       transpose: Boolean = false
   ): MemoryObject = {
     val tensorData = pendingFloatConsts(name)
 
     val dims =
       if (broadcastDims.isDefined) broadcastDims.get
-      else mkConstsDimensions(tensorData.shape, transpose)
+      else mkConstsDimensions(tensorData.shape, groupSize, transpose)
 
     require(dims.order >= tensorData.shape.size)
 
     dims.buildConsts(
-      Seq.fill(dims.order - tensorData.shape.size)(1) ++ tensorData.shape.toSeq,
-      broadcastDims.isDefined,
+      sourceShape = Seq
+        .fill(dims.order - tensorData.shape.size)(1) ++ tensorData.shape.toSeq,
+      broadcast = broadcastDims.isDefined,
+      groupSize = groupSize,
       (offset: Option[Int]) =>
         dataType.writeFloatConst(
           if (offset.isDefined)

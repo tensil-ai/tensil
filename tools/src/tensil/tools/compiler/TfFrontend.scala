@@ -124,10 +124,14 @@ class TfFrontend(
         )
   }
 
-  def mkConstsDimensions(shape: Shape, transpose: Boolean): MemoryDimensions =
+  def mkConstsDimensions(shape: Shape, groupSize: Option[Int], transpose: Boolean): MemoryDimensions =
     if (transpose)
       throw new CompilerException(
         s"Transposing consts is not supported"
+      )
+    else if (groupSize.isDefined)
+      throw new CompilerException(
+        s"Consts grouping is not supported"
       )
     else
       ConstsDimensions(shape)

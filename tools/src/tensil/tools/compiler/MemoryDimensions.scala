@@ -170,6 +170,7 @@ class MemoryDimensions private (
   def buildConsts(
       sourceShape: Seq[Int],
       broadcast: Boolean,
+      groupSize: Option[Int],
       build: (Option[Int]) => Unit
   ): Unit = {
     require(sourceShape.size == order)
@@ -180,13 +181,31 @@ class MemoryDimensions private (
     def modelPos(layoutPos: Int*) =
       (0 until layoutPos.size).map(i => layoutPos(layout.indexOf(i)))
 
+    val shift = if (groupSize.isDefined) {
+      require(channelsIn == channelsOut)
+      Some(channelsIn / groupSize.get)
+    } else None
+
+    def shiftPos(modelPos: Seq[Int]): Seq[Int] =
+      if (groupSize.isDefined) {
+        val modelPosArray = modelPos.toArray
+        modelPosArray(channelsIndex) -= (modelPosArray(
+          channelsOutIndex
+        ) / shift.get) * shift.get
+        modelPosArray
+      } else modelPos
+
     def broadcastPos(modelPos: Seq[Int]): Seq[Int] =
       if (broadcast)
         modelPos.zip(sourceShape).map { case (pos, shape) => pos % shape }
       else modelPos
 
     def modelOffset(modelPos: Seq[Int]): Option[Int] =
-      if (modelPos.zip(sourceShape).forall { case (pos, shape) => pos < shape })
+      if (
+        modelPos.zip(sourceShape).forall {
+          case (pos, shape) => pos >= 0 && pos < shape
+        }
+      )
         Some(
           if (order > 0)
             modelPos(modelPos.size - 1) +
@@ -215,13 +234,19 @@ class MemoryDimensions private (
               for (i2 <- 0 until atLayout(2))
                 if (order > 3)
                   for (i3 <- 0 until atLayout(3))
-                    build(modelOffset(broadcastPos(modelPos(i0, i1, i2, i3))))
+                    build(
+                      modelOffset(
+                        broadcastPos(shiftPos(modelPos(i0, i1, i2, i3)))
+                      )
+                    )
                 else
-                  build(modelOffset(broadcastPos(modelPos(i0, i1, i2))))
+                  build(
+                    modelOffset(broadcastPos(shiftPos(modelPos(i0, i1, i2))))
+                  )
             else
-              build(modelOffset(broadcastPos(modelPos(i0, i1))))
+              build(modelOffset(broadcastPos(shiftPos(modelPos(i0, i1)))))
         else
-          build(modelOffset(broadcastPos(modelPos(i0))))
+          build(modelOffset(broadcastPos(shiftPos(modelPos(i0)))))
   }
 
   def numberVectors      = atVectors(numberIndex)

@@ -98,9 +98,11 @@ object EmulatorHelper {
     else if (modelName.startsWith("cnn_mnist"))
       Mnist.prepareInputStream(arraySize, count, true)
     else if (modelName.startsWith("resnet20v2"))
-      ResNet.prepareInputStream(dataType, arraySize, count)
-    else if (modelName.startsWith("resnet50v2"))
-      ResNet50.prepareInputStream(dataType, arraySize, count)
+      Cifar.prepareInputStream(dataType, arraySize, count)
+    else if (
+      modelName.startsWith("resnet50v2") || modelName.startsWith("mobilenetv2")
+    )
+      ImageNet.prepareInputStream(dataType, arraySize, count)
     else if (modelName.startsWith("reshape_1d_4d"))
       Reshape.prepareInputStream(dataType, arraySize, count)
     else if (yoloPattern.findFirstIn(modelName).isDefined) {
@@ -181,9 +183,31 @@ object EmulatorHelper {
     )
       Mnist.assertOutput(dataType, arraySize, bytes, count)
     else if (modelName.startsWith("resnet20v2"))
-      ResNet.assertOutput(dataType, arraySize, bytes, count)
+      Cifar.assertOutput(dataType, arraySize, bytes, count)
     else if (modelName.startsWith("resnet50v2"))
-      ResNet50.assertOutput(dataType, arraySize, bytes, count)
+      ImageNet.assertOutput(
+        dataType,
+        arraySize,
+        bytes,
+        count,
+        Seq(
+          386, // African_elephant
+          248, // Eskimo_dog
+          285  // Egyptian_cat
+        )
+      )
+    else if (modelName.startsWith("mobilenetv2"))
+      ImageNet.assertOutput(
+        dataType,
+        arraySize,
+        bytes,
+        count,
+        Seq(
+          386, // African_elephant
+          273, // dingo
+          285  // Egyptian_cat
+        )
+      )
     else if (modelName.startsWith("reshape_1d_4d"))
       Reshape.assertOutput(dataType, arraySize, bytes, count)
     else if (yoloPattern.findFirstIn(modelName).isDefined) {
@@ -198,7 +222,9 @@ object EmulatorHelper {
   private def minimumInputCount(modelName: String): Int =
     if (modelName.startsWith("xor"))
       4
-    else if (modelName.startsWith("resnet50v2"))
+    else if (
+      modelName.startsWith("resnet50v2") || modelName.startsWith("mobilenetv2")
+    )
       3
     else if (
       modelName

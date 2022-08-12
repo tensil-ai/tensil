@@ -2695,6 +2695,79 @@ class CompilerSpec extends AnyFlatSpec {
     )
   }
 
+  val MobileNetFloat32Architecture = Architecture.mkWithDefaults(
+    dataType = ArchitectureDataType.FLOAT32,
+    arraySize = 32,
+    dram0Depth = Mebi * 4,
+    dram1Depth = Mebi * 4,
+    accumulatorDepth = Kibi * 16,
+    localDepth = Kibi * 64,
+    stride0Depth = 8,
+    stride1Depth = 8,
+  )
+
+  val MobileNetFp18bp10Architecture = Architecture.mkWithDefaults(
+    dataType = ArchitectureDataType.FP18BP10,
+    arraySize = 32,
+    dram0Depth = Mebi * 4,
+    dram1Depth = Mebi * 4,
+    accumulatorDepth = Kibi * 16,
+    localDepth = Kibi * 64,
+    stride0Depth = 8,
+    stride1Depth = 8,
+  )
+
+  it should "Compile ONNX float MobileNetV2" taggedAs (Slow) in {
+    val name         = "mobilenetv2_float_onnx"
+    val traceContext = new ExecutiveTraceContext()
+    val options = CompilerOptions(
+      arch = MobileNetFloat32Architecture,
+      printSummary = true
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/mobilenetv2.onnx",
+      List("output"),
+      options,
+      traceContext
+    )
+
+    EmulatorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize,
+      traceContext = traceContext
+    )
+  }
+
+  it should "Compile ONNX fixed18bp10 MobileNetV2" taggedAs (Slow) in {
+    val name         = "mobilenetv2_fixed18bp10_onnx"
+    val traceContext = new ExecutiveTraceContext()
+    val options = CompilerOptions(
+      arch = MobileNetFp18bp10Architecture,
+      printSummary = true,
+      printLayersSummary = true,
+      printGraph = true,
+      tracepointConditions = List(
+        TracepointCondition(MemoryTag.DRAM0, "output")
+      )
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/mobilenetv2.onnx",
+      List("output"),
+      options,
+      traceContext
+    )
+
+    EmulatorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize,
+      traceContext = traceContext
+    )
+  }
+
   val SpeechCommandsFp16bp8Architecture = Architecture.mkWithDefaults(
     dataType = ArchitectureDataType.FP16BP8,
     arraySize = 8,

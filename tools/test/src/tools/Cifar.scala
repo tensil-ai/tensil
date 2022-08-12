@@ -9,13 +9,13 @@ import scala.io.Source
 import tensil.tools.emulator.{Emulator, ExecutiveTraceContext}
 import tensil.ArchitectureDataType
 
-object ResNet {
+object Cifar {
   def prepareInputStream(
       dataType: ArchitectureDataType,
       arraySize: Int,
       count: Int
   ): InputStream = {
-    val fileName = s"./models/data/resnet_input_${count}x32x32x${arraySize}.csv"
+    val fileName = s"./models/data/cifar_${count}x${arraySize}.csv"
 
     val inputPrep           = new ByteArrayOutputStream()
     val inputPrepDataStream = new DataOutputStream(inputPrep)
@@ -30,10 +30,10 @@ object ResNet {
     new ByteArrayInputStream(inputPrep.toByteArray())
   }
 
-  val ClassSize = 10
-  val GoldenClasses: Array[Int] = Array(
+  val GoldenClasses = Seq(
     0, 9, 5, 7, 9, 8, 5, 7, 8, 6
   )
+  val ClassSize = GoldenClasses.size
 
   def assertOutput(
       dataType: ArchitectureDataType,
@@ -47,7 +47,12 @@ object ResNet {
     for (i <- 0 until count) {
       val expected = GoldenClasses(i)
       val actual = ArchitectureDataTypeUtil.argMax(
-        ArchitectureDataTypeUtil.readResult(dataType, output, arraySize, ClassSize)
+        ArchitectureDataTypeUtil.readResult(
+          dataType,
+          output,
+          arraySize,
+          ClassSize
+        )
       )
 
       println(s"expected=$expected, actual=$actual")

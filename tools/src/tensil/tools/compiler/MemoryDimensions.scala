@@ -181,6 +181,38 @@ class MemoryDimensions private (
     def modelPos(layoutPos: Int*) =
       (0 until layoutPos.size).map(i => layoutPos(layout.indexOf(i)))
 
+    /**
+      * If group size is specified the channel weights will
+      * be transformed into a square with the side of Ci (Co == Ci).
+      * The weights will be placed on the diagonal in square blocks
+      * with the side of Ci / groupSize.
+      *
+      * For example, when groupSize == 4 and the channel
+      * weights in the model are of size 8(Ci)x2(Co):
+      *
+      * XX
+      * XX
+      * XX
+      * XX
+      * XX
+      * XX
+      * XX
+      * XX
+      *
+      * This function will transform channel weights into
+      * 8(Ci)x8(Co) square with zero padding outside of the
+      * diagonal:
+      *
+      * XX------
+      * XX------
+      * --XX----
+      * --XX----
+      * ----XX--
+      * ----XX--
+      * ------XX
+      * ------XX
+      */
+
     val shift = if (groupSize.isDefined) {
       require(channelsIn == channelsOut)
       Some(channelsIn / groupSize.get)

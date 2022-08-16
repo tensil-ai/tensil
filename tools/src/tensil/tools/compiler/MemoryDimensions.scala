@@ -167,19 +167,76 @@ class MemoryDimensions private (
       dimension
   }
 
-  def buildConsts(build: (Option[Int]) => Unit): Unit = {
+  def buildConsts(
+      sourceShape: Seq[Int],
+      broadcast: Boolean,
+      groupSize: Option[Int],
+      build: (Option[Int]) => Unit
+  ): Unit = {
+    require(sourceShape.size == order)
+
     def atLayout(i: Int) =
       atVectors(layout(i)) * (if (i == order - 1) arraySize else 1)
 
     def modelPos(layoutPos: Int*) =
       (0 until layoutPos.size).map(i => layoutPos(layout.indexOf(i)))
 
+    /**
+      * If group size is specified the channel weights will
+      * be transformed into a square with the side of Ci (Co == Ci).
+      * The weights will be placed on the diagonal in square blocks
+      * with the side of Ci / groupSize.
+      *
+      * For example, when groupSize == 4 and the channel
+      * weights in the model are of size 8(Ci)x2(Co):
+      *
+      * XX
+      * XX
+      * XX
+      * XX
+      * XX
+      * XX
+      * XX
+      * XX
+      *
+      * This function will transform channel weights into
+      * 8(Ci)x8(Co) square with zero padding outside of the
+      * diagonal:
+      *
+      * XX------
+      * XX------
+      * --XX----
+      * --XX----
+      * ----XX--
+      * ----XX--
+      * ------XX
+      * ------XX
+      */
+
+    val shift = if (groupSize.isDefined) {
+      require(channelsIn == channelsOut)
+      Some(channelsIn / groupSize.get)
+    } else None
+
+    def shiftPos(modelPos: Seq[Int]): Seq[Int] =
+      if (groupSize.isDefined) {
+        val modelPosArray = modelPos.toArray
+        modelPosArray(channelsIndex) -= (modelPosArray(
+          channelsOutIndex
+        ) / shift.get) * shift.get
+        modelPosArray
+      } else modelPos
+
+    def broadcastPos(modelPos: Seq[Int]): Seq[Int] =
+      if (broadcast)
+        modelPos.zip(sourceShape).map { case (pos, shape) => pos % shape }
+      else modelPos
+
     def modelOffset(modelPos: Seq[Int]): Option[Int] =
       if (
-        dimensions.zipWithIndex
-          .forall {
-            case (dim, i) => modelPos(i) < dim
-          }
+        modelPos.zip(sourceShape).forall {
+          case (pos, shape) => pos >= 0 && pos < shape
+        }
       )
         Some(
           if (order > 0)
@@ -187,13 +244,13 @@ class MemoryDimensions private (
               (if (order > 1)
                  ((if (order > 2)
                      ((if (order > 3)
-                         modelPos(modelPos.size - 4) * dimensions(
+                         modelPos(modelPos.size - 4) * sourceShape(
                            modelPos.size - 3
                          )
-                       else 0) + modelPos(modelPos.size - 3)) * dimensions(
+                       else 0) + modelPos(modelPos.size - 3)) * sourceShape(
                        modelPos.size - 2
                      )
-                   else 0) + modelPos(modelPos.size - 2)) * dimensions(
+                   else 0) + modelPos(modelPos.size - 2)) * sourceShape(
                    modelPos.size - 1
                  )
                else 0)
@@ -209,13 +266,19 @@ class MemoryDimensions private (
               for (i2 <- 0 until atLayout(2))
                 if (order > 3)
                   for (i3 <- 0 until atLayout(3))
-                    build(modelOffset(modelPos(i0, i1, i2, i3)))
+                    build(
+                      modelOffset(
+                        broadcastPos(shiftPos(modelPos(i0, i1, i2, i3)))
+                      )
+                    )
                 else
-                  build(modelOffset(modelPos(i0, i1, i2)))
+                  build(
+                    modelOffset(broadcastPos(shiftPos(modelPos(i0, i1, i2))))
+                  )
             else
-              build(modelOffset(modelPos(i0, i1)))
+              build(modelOffset(broadcastPos(shiftPos(modelPos(i0, i1)))))
         else
-          build(modelOffset(modelPos(i0)))
+          build(modelOffset(broadcastPos(shiftPos(modelPos(i0)))))
   }
 
   def numberVectors      = atVectors(numberIndex)

@@ -14,14 +14,9 @@ case class MemoryObject(
   def mkSub(
       name: String,
       offset: Int,
-      dims: MemoryDimensions,
-      repeats: Int = 1
+      dims: MemoryDimensions
   ): MemoryObject = {
-    val subAddresses =
-      Seq
-        .fill(repeats)(span.slice(offset, (offset + dims.sizeVectors)))
-        .flatten
-        .toArray
+    val subAddresses = span.slice(offset, (offset + dims.sizeVectors)).toArray
 
     MemoryObject(
       name,

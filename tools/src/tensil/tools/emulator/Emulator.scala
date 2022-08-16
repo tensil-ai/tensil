@@ -586,6 +586,7 @@ class Emulator[T : NumericWithMAC : ClassTag](
           val r = simdOp match {
             case SIMDOp.Zero     => zero
             case SIMDOp.Max      => if (left(i) > right(i)) left(i) else right(i)
+            case SIMDOp.Min      => if (left(i) < right(i)) left(i) else right(i)
             case SIMDOp.Add      => left(i) + right(i)
             case SIMDOp.Subtract => left(i) - right(i)
             case SIMDOp.Multiply => left(i) * right(i)

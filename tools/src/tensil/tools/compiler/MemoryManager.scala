@@ -31,7 +31,7 @@ class MemoryManager(
     constsStream: OutputStream,
     dataType: ArchitectureDataType,
     arch: Architecture,
-    mkConstsDimensions: (Shape, Boolean) => MemoryDimensions,
+    mkConstsDimensions: (Shape, Option[Int], Boolean) => MemoryDimensions,
     traceContext: TraceContext,
     tracepointConditions: Seq[TracepointCondition]
 ) {
@@ -193,6 +193,7 @@ class MemoryManager(
   def getOrEmitWeightsAndBiasObjects(
       weightsName: String,
       biasName: Option[String],
+      weightsGroupSize: Option[Int] = None,
       transposeWeights: Boolean = false
   ): (MemoryObject, Option[MemoryObject]) = {
     val biasObject =
@@ -221,6 +222,7 @@ class MemoryManager(
         mkConstObject(
           resolvedWeightsName,
           constsDataStream,
+          groupSize = weightsGroupSize,
           transpose = transposeWeights
         )
 
@@ -262,29 +264,30 @@ class MemoryManager(
       name: String,
       stream: DataOutputStream,
       broadcastDims: Option[MemoryDimensions] = None,
+      groupSize: Option[Int] = None,
       transpose: Boolean = false
   ): MemoryObject = {
     val tensorData = pendingFloatConsts(name)
-    val tensorSize = tensorData.shape.product
-    val (dims, broadcastScalar) =
-      if (
-        broadcastDims.isDefined &&
-        broadcastDims.get.sizeScalars != tensorSize
-      ) {
-        if (tensorSize != 1)
-          throw new CompilerException("Only scalar broadcast is supported")
 
-        (broadcastDims.get, true)
-      } else (mkConstsDimensions(tensorData.shape, transpose), false)
+    val dims =
+      if (broadcastDims.isDefined) broadcastDims.get
+      else mkConstsDimensions(tensorData.shape, groupSize, transpose)
 
-    dims.buildConsts((offset: Option[Int]) =>
-      dataType.writeFloatConst(
-        if (offset.isDefined)
-          tensorData.data(if (broadcastScalar) 0 else offset.get)
-        else
-          0f,
-        stream
-      )
+    require(dims.order >= tensorData.shape.size)
+
+    dims.buildConsts(
+      sourceShape = Seq
+        .fill(dims.order - tensorData.shape.size)(1) ++ tensorData.shape.toSeq,
+      broadcast = broadcastDims.isDefined,
+      groupSize = groupSize,
+      (offset: Option[Int]) =>
+        dataType.writeFloatConst(
+          if (offset.isDefined)
+            tensorData.data(offset.get)
+          else
+            0f,
+          stream
+        )
     )
 
     addConstSize(dims.sizeScalars, dims.sizeVectors)

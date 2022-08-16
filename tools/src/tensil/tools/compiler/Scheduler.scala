@@ -258,6 +258,27 @@ abstract class Scheduler(
     }
   }
 
+  def emitClip(
+      inputObj: MemoryObject,
+      minObj: MemoryObject,
+      maxObj: MemoryObject,
+      outputObj: MemoryObject
+  ): Unit = {
+    require(inputObj.dims.sizeVectors == outputObj.dims.sizeVectors)
+    require(minObj.dims.sizeVectors == 1)
+    require(maxObj.dims.sizeVectors == 1)
+    for (i <- 0 until outputObj.dims.sizeVectors) {
+      val output = outputObj.mkAddress(i)
+      require(!tempOutputNodesByOutput.contains(output))
+      tempOutputNodesByOutput(output) = new ClipNode(
+        minObj.mkAddress(0),
+        maxObj.mkAddress(0),
+        inputObj.mkAddress(i),
+        output
+      )
+    }
+  }
+
   def emitLeakyRelu(
       inputObj: MemoryObject,
       alphaObj: MemoryObject,
@@ -1001,6 +1022,49 @@ abstract class Scheduler(
         SIMDDestination.Output,
         outputAccAddress,
         inputAccAddress
+      )
+    }
+
+    for (
+      clipNode <-
+        nodes
+          .filter(_.isInstanceOf[ClipNode])
+          .map(_.asInstanceOf[ClipNode])
+          .sortBy(_.output)
+    ) {
+      val outputAccAddress = accumulatorAllocator.allocate(clipNode.output)
+      val minAccAddress    = accumulatorAllocator.locate(clipNode.min)
+      val maxAccAddress    = accumulatorAllocator.locate(clipNode.max)
+      val inputAccAddress  = accumulatorAllocator.locate(clipNode.input)
+
+      lir.emitSIMD(
+        accumulate = false,
+        SIMDOp.Move,
+        SIMDSource.Input,
+        0,
+        SIMDDestination.Register1,
+        MemoryAddress.Invalid,
+        inputAccAddress
+      )
+
+      lir.emitSIMD(
+        accumulate = false,
+        SIMDOp.Max,
+        SIMDSource.Input,
+        SIMDSource.Register1,
+        SIMDDestination.Register1,
+        MemoryAddress.Invalid,
+        minAccAddress
+      )
+
+      lir.emitSIMD(
+        accumulate = false,
+        SIMDOp.Min,
+        SIMDSource.Input,
+        SIMDSource.Register1,
+        SIMDDestination.Output,
+        outputAccAddress,
+        maxAccAddress
       )
     }
 

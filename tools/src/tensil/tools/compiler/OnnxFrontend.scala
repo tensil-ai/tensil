@@ -137,10 +137,18 @@ class OnnxFrontend(
         dimensions = Vector(channelsOut, channelsIn, height, width)
       )
 
-    def apply(shape: Shape, transpose: Boolean): MemoryDimensions =
+    def apply(
+        shape: Shape,
+        groupSize: Option[Int],
+        transpose: Boolean
+    ): MemoryDimensions =
       if (transpose && shape.size != 2)
         throw new CompilerException(
           s"Transposing consts is supported for 2D tensors only"
+        )
+      else if (groupSize.isDefined && shape.size != 4)
+        throw new CompilerException(
+          s"Grouping consts is supported for 4D tensors only"
         )
       else {
         if (shape.size == 1)
@@ -148,7 +156,12 @@ class OnnxFrontend(
         else if (shape.size == 2)
           ConstsDimensions(shape(0), shape(1), transpose)
         else if (shape.size == 4)
-          ConstsDimensions(shape(0), shape(1), shape(2), shape(3))
+          ConstsDimensions(
+            shape(0),
+            shape(1) * groupSize.getOrElse(1),
+            shape(2),
+            shape(3)
+          )
         else
           throw new CompilerException(
             s"Consts tensor shape of ${shape} is not supported"
@@ -156,8 +169,12 @@ class OnnxFrontend(
       }
   }
 
-  def mkConstsDimensions(shape: Shape, transpose: Boolean): MemoryDimensions =
-    ConstsDimensions(shape, transpose)
+  def mkConstsDimensions(
+      shape: Shape,
+      groupSize: Option[Int],
+      transpose: Boolean
+  ): MemoryDimensions =
+    ConstsDimensions(shape, groupSize, transpose)
 
   private val nodeProtos            = mutable.Map.empty[String, NodeProto]
   private val tensorProtos          = mutable.Map.empty[String, TensorProto]
@@ -394,7 +411,7 @@ class OnnxFrontend(
             rewriteSimple(remainingProtos, emitPool(_, nodeProto), emitters)
           case "BatchNormalization" =>
             rewriteSimple(remainingProtos, emitNorm(_, nodeProto), emitters)
-          case "Relu" | "Softmax" | "LeakyRelu" =>
+          case "Relu" | "Softmax" | "LeakyRelu" | "Clip" =>
             rewriteSimple(remainingProtos, emitActivate(_, nodeProto), emitters)
           case "Add" =>
             rewriteSimple(remainingProtos, emitAdd(_, nodeProto), emitters)
@@ -2049,6 +2066,7 @@ class OnnxFrontend(
         conv2DProto.input(1),
         if (conv2DProto.input.isDefinedAt(2)) Some(conv2DProto.input(2))
         else None,
+        weightsGroupSize = if (group > 1) Some(group) else None
       )
 
     val (paddingTop, paddingLeft, paddingBottom, paddingRight) =
@@ -2118,10 +2136,9 @@ class OnnxFrontend(
         weights,
         (l + k * weights.dims.widthVectors) * weights.dims.channelsInVectors * weights.dims.channelsOutVectors,
         ConstsDimensions(
-          weights.dims.channelsIn * group,
+          weights.dims.channelsIn,
           weights.dims.channelsOut
-        ),
-        group
+        )
       )
 
       val withBias = (l == 0) && (k == 0)
@@ -2216,7 +2233,7 @@ class OnnxFrontend(
         matMulProto.input(1),
         if (matMulProto.input.isDefinedAt(2)) Some(matMulProto.input(2))
         else None,
-        transB != 0
+        transposeWeights = transB != 0
       )
 
     val inputVars =
@@ -2546,6 +2563,60 @@ class OnnxFrontend(
           outputTemp
         )
       }
+
+      case "Clip" =>
+        val minAttr = getAttr(activateProto, "min").get
+        val maxAttr = getAttr(activateProto, "max").get
+
+        require(minAttr.`type`.get.isFloat)
+        require(maxAttr.`type`.get.isFloat)
+
+        val min = minAttr.f.get
+        val max = maxAttr.f.get
+
+        val minName = s"${activateProto.name.get}+Min"
+        val maxName = s"${activateProto.name.get}+Max"
+
+        context.mm.addPendingConst(
+          minName,
+          new TensorData(
+            Shape(arch.arraySize),
+            Array.fill(arch.arraySize)(min),
+            org.tensorflow.framework.types.DataType.DT_FLOAT
+          )
+        )
+
+        context.mm.addPendingConst(
+          maxName,
+          new TensorData(
+            Shape(arch.arraySize),
+            Array.fill(arch.arraySize)(max),
+            org.tensorflow.framework.types.DataType.DT_FLOAT
+          )
+        )
+
+        val minConst = context.mm.getOrEmitConstObject(minName)
+        val maxConst = context.mm.getOrEmitConstObject(maxName)
+
+        val minTemp = context.mm.allocateTempObject(
+          minConst.name,
+          minConst.dims
+        )
+
+        val maxTemp = context.mm.allocateTempObject(
+          maxConst.name,
+          maxConst.dims
+        )
+
+        context.hir.emitLoad(minConst, minTemp)
+        context.hir.emitLoad(maxConst, maxTemp)
+
+        context.hir.emitClip(
+          inputTemp,
+          minTemp,
+          maxTemp,
+          outputTemp
+        )
     }
 
     if (context.graphPrinter.isDefined)
@@ -2750,14 +2821,12 @@ class OnnxFrontend(
   private def mkSub(
       obj: MemoryObject,
       offset: Int,
-      dims: MemoryDimensions = VarsDimensions(arch.arraySize),
-      repeats: Int = 1
+      dims: MemoryDimensions = VarsDimensions(arch.arraySize)
   ): MemoryObject =
     obj.mkSub(
       obj.name,
       offset,
-      dims,
-      repeats
+      dims
     )
 
   private def getOrEmitAdjustmentWeights(

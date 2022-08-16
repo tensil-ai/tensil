@@ -15,6 +15,7 @@ import java.io.{
 
 import scala.reflect.ClassTag
 import scala.collection.mutable
+import scala.io.Source
 
 import tensil.{
   Architecture,
@@ -33,11 +34,16 @@ case class Args(
     modelFile: File = new File("."),
     inputFiles: Seq[File] = Nil,
     outputFiles: Seq[File] = Nil,
+    compareFiles: Seq[File] = Nil,
     numberOfRuns: Int = 1,
     localConsts: Boolean = false,
 )
 
 object Main extends App {
+  private val ANSI_RESET = "\u001B[0m"
+  private val ANSI_RED   = "\u001B[31m"
+  private val ANSI_GREEN = "\u001B[32m"
+
   val argParser = new scopt.OptionParser[Args]("compile") {
     help("help").text("Prints this usage text")
 
@@ -57,6 +63,11 @@ object Main extends App {
       .valueName("<file>, ...")
       .action((x, c) => c.copy(outputFiles = x))
       .text("Output (.csv) files")
+
+    opt[Seq[File]]('c', "compare")
+      .valueName("<file>, ...")
+      .action((x, c) => c.copy(compareFiles = x))
+      .text("Compare output (.csv) files")
 
     opt[Int]('r', "number-of-runs")
       .valueName("<integer>")
@@ -86,6 +97,7 @@ object Main extends App {
             model,
             args.inputFiles,
             args.outputFiles,
+            args.compareFiles,
             args.numberOfRuns,
             args.localConsts,
             traceContext
@@ -97,6 +109,7 @@ object Main extends App {
             model,
             args.inputFiles,
             args.outputFiles,
+            args.compareFiles,
             args.numberOfRuns,
             args.localConsts,
             traceContext
@@ -108,6 +121,7 @@ object Main extends App {
             model,
             args.inputFiles,
             args.outputFiles,
+            args.compareFiles,
             args.numberOfRuns,
             args.localConsts,
             traceContext
@@ -119,6 +133,7 @@ object Main extends App {
             model,
             args.inputFiles,
             args.outputFiles,
+            args.compareFiles,
             args.numberOfRuns,
             args.localConsts,
             traceContext
@@ -130,6 +145,7 @@ object Main extends App {
             model,
             args.inputFiles,
             args.outputFiles,
+            args.compareFiles,
             args.numberOfRuns,
             args.localConsts,
             traceContext
@@ -145,6 +161,7 @@ object Main extends App {
       model: Model,
       inputFiles: Seq[File],
       outputFiles: Seq[File],
+      compareFiles: Seq[File],
       numberOfRuns: Int,
       localConsts: Boolean,
       traceContext: ExecutiveTraceContext
@@ -201,7 +218,22 @@ object Main extends App {
       if (outputFiles.size != 0)
         for ((output, file) <- model.outputs.zip(outputFiles)) yield {
           val outputPrep = new ByteArrayOutputStream()
-          (output, Some(file), outputPrep, new DataOutputStream(outputPrep))
+          (
+            output,
+            Some((false, file)),
+            outputPrep,
+            new DataOutputStream(outputPrep)
+          )
+        }
+      else if (compareFiles.size != 0)
+        for ((output, file) <- model.outputs.zip(compareFiles)) yield {
+          val outputPrep = new ByteArrayOutputStream()
+          (
+            output,
+            Some((true, file)),
+            outputPrep,
+            new DataOutputStream(outputPrep)
+          )
         }
       else
         for (output <- model.outputs) yield {
@@ -231,19 +263,79 @@ object Main extends App {
       trace.printTrace()
     }
 
-    for ((output, file, outputPrep, _) <- outputPreps) {
+    for ((output, compareAndFile, outputPrep, _) <- outputPreps) {
       val outputStream = new DataInputStream(
         new ByteArrayInputStream(outputPrep.toByteArray())
       )
 
-      if (file.isDefined)
-        ArchitectureDataTypeUtil.readToCsv(
-          dataType,
-          outputStream,
-          model.arch.arraySize,
-          output.size * numberOfRuns,
-          file.get.getAbsolutePath()
-        )
+      if (compareAndFile.isDefined)
+        if (compareAndFile.get._1) {
+          val source = Source.fromFile(compareAndFile.get._2.getAbsolutePath())
+          val compare =
+            source.getLines().map(_.split(",").map(_.toFloat)).flatten.toArray
+          source.close()
+
+          val result = ArchitectureDataTypeUtil.readResult(
+            dataType,
+            outputStream,
+            model.arch.arraySize,
+            output.size.toInt * numberOfRuns * model.arch.arraySize
+          )
+
+          require(result.size == compare.size)
+
+          for (i <- 0 until numberOfRuns) {
+            val tb = new TablePrinter(Some(s"COMPARE ${output.name}, RUN ${i}"))
+
+            for (j <- 0 until output.size.toInt) {
+              val offset = (i * output.size.toInt + j) * model.arch.arraySize
+              val resultVector =
+                result.slice(offset, offset + model.arch.arraySize)
+              val compareVector =
+                compare.slice(offset, offset + model.arch.arraySize)
+
+              val withDeltas = resultVector
+                .zip(compareVector)
+                .map {
+                  case (resultScalar, compareScalar) =>
+                    (resultScalar, compareScalar, resultScalar - compareScalar)
+                }
+
+              if (withDeltas.exists(t => Math.abs(t._3) > dataType.error)) {
+                tb
+                  .addLine(
+                    TableLine(
+                      f"${j}%08d",
+                      withDeltas
+                        .grouped(8)
+                        .map(_.map({
+                          case (resultScalar, compareScalar, delta) => {
+                            val mismatch = Math.abs(delta) > dataType.error
+                            val s =
+                              if (mismatch) f"($delta%.4f)"
+                              else f"$resultScalar%.4f"
+                            val sColored = (if (mismatch) ANSI_RED
+                                            else ANSI_GREEN) + s + ANSI_RESET
+                            " " * (12 - s.length()) + sColored
+                          }
+                        }).mkString)
+                        .toIterable
+                    )
+                  )
+              }
+            }
+
+            print(tb.toString())
+          }
+        } else {
+          ArchitectureDataTypeUtil.readToCsv(
+            dataType,
+            outputStream,
+            model.arch.arraySize,
+            output.size * numberOfRuns,
+            compareAndFile.get._2.getAbsolutePath()
+          )
+        }
       else {
         val r = ArchitectureDataTypeUtil.readResult(
           dataType,

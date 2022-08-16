@@ -43,6 +43,13 @@ trait HIR {
       outputObj: MemoryObject
   ): Unit
 
+  def emitClip(
+      inputObj: MemoryObject,
+      minObj: MemoryObject,
+      maxObj: MemoryObject,
+      outputObj: MemoryObject
+  ): Unit
+
   def emitLeakyRelu(
       inputObj: MemoryObject,
       alphaObj: MemoryObject,

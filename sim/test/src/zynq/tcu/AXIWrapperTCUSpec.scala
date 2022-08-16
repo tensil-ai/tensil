@@ -36,7 +36,7 @@ import tensil.tcu.instruction.{
   Configure
 }
 import tensil.mem.MemoryImplementation
-import tensil.tools.{ArchitectureDataTypeUtil, ResNet}
+import tensil.tools.{ArchitectureDataTypeUtil, Cifar}
 import tensil.util.divCeil
 
 class AXIWrapperTCUSpec extends FunUnitSpec {
@@ -328,7 +328,7 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
                   )
 
                   val resultsSize =
-                    divCeil(ResNet.ClassSize, m.layout.arch.arraySize)
+                    divCeil(Cifar.ClassSize, m.layout.arch.arraySize)
 
                   for (l <- 0 until batchSize) {
 
@@ -343,8 +343,8 @@ class AXIWrapperTCUSpec extends FunUnitSpec {
 
                     assert(
                       ArchitectureDataTypeUtil.argMax(
-                        result.flatten.take(ResNet.ClassSize).toArray
-                      ) == ResNet.GoldenClasses(k * batchSize + l)
+                        result.flatten.take(Cifar.ClassSize).toArray
+                      ) == Cifar.GoldenClasses(k * batchSize + l)
                     )
                   }
                 }

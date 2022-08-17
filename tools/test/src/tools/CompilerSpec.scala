@@ -2768,6 +2768,59 @@ class CompilerSpec extends AnyFlatSpec {
     )
   }
 
+  it should "Compile ONNX float MobileNetV2 with input batch of 3" taggedAs (Slow) in {
+    val name         = "mobilenetv2_float_onnx"
+    val traceContext = new ExecutiveTraceContext()
+    val options = CompilerOptions(
+      arch = MobileNetFloat32Architecture,
+      inputShapes = CompilerInputShapes.mkWithBatchSize(3),
+      printSummary = true
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/mobilenetv2.onnx",
+      List("output"),
+      options,
+      traceContext
+    )
+
+    EmulatorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize,
+      traceContext = traceContext
+    )
+  }
+
+  it should "Compile ONNX fixed18bp10 MobileNetV2 with input batch of 3" taggedAs (Slow) in {
+    val name         = "mobilenetv2_fixed18bp10_onnx"
+    val traceContext = new ExecutiveTraceContext()
+    val options = CompilerOptions(
+      arch = MobileNetFp18bp10Architecture,
+      inputShapes = CompilerInputShapes.mkWithBatchSize(3),
+      printSummary = true,
+      printLayersSummary = true,
+      printGraph = true,
+      tracepointConditions = List(
+        TracepointCondition(MemoryTag.DRAM0, "output")
+      )
+    )
+
+    Compiler.compile(
+      name,
+      s"${Models}/mobilenetv2.onnx",
+      List("output"),
+      options,
+      traceContext
+    )
+
+    EmulatorHelper.test(
+      name,
+      inputBatchSize = options.inputShapes.batchSize,
+      traceContext = traceContext
+    )
+  }
+
   val SpeechCommandsFp16bp8Architecture = Architecture.mkWithDefaults(
     dataType = ArchitectureDataType.FP16BP8,
     arraySize = 8,

@@ -449,6 +449,14 @@ class OnnxFrontend(
               emitGlobalPool(_, nodeProto),
               emitters
             )
+          case "Gather" =>
+            rewriteSimple(remainingProtos, emitGather(_, nodeProto), emitters)
+          case "Unsqueeze" =>
+            rewriteSimple(
+              remainingProtos,
+              emitUnsqueeze(_, nodeProto),
+              emitters
+            )
           case op =>
             throw new CompilerException(
               s"Unsupported op ${op} (${nodeProto.name.get})"
@@ -917,6 +925,69 @@ class OnnxFrontend(
     )
   }
 
+  private def emitGather(
+      context: EmitContext,
+      gatherProto: NodeProto
+  ): Unit = {
+    val axisAttr = getAttr(gatherProto, "axis").get
+
+    require(axisAttr.`type`.get.isInt)
+
+    val axis = axisAttr.i.get
+
+    val data =
+      context.mm
+        .getPendingLongConst(gatherProto.input(0))
+        .asInstanceOf[TensorData[Long]]
+
+    val indices = context.mm
+      .getPendingLongConst(gatherProto.input(1))
+      .asInstanceOf[TensorData[Long]]
+
+    if (axis != 0 || data.shape.size != 1 || indices.shape.size != 0)
+      throw new CompilerException("Only 1D gather is supported");
+
+    if (indices.as1D(0) < 0 || indices.as1D(0) >= data.shape(0))
+      throw new CompilerException("Gather index is outside of data shape");
+
+    context.mm.addPendingConst(
+      gatherProto.output(0),
+      new TensorData(
+        Shape(),
+        Seq(data.as1D(indices.as1D(0).toInt)),
+        org.tensorflow.framework.types.DataType.DT_INT64
+      )
+    )
+  }
+
+  private def emitUnsqueeze(
+      context: EmitContext,
+      unsqueezeProto: NodeProto
+  ): Unit = {
+    val axesAttr = getAttr(unsqueezeProto, "axes").get
+
+    require(axesAttr.`type`.get.isInts)
+
+    val axes = axesAttr.ints
+
+    val data =
+      context.mm
+        .getPendingLongConst(unsqueezeProto.input(0))
+        .asInstanceOf[TensorData[Long]]
+
+    if (axes.size != 1 || axes(0) != 0 || data.shape.size != 0)
+      throw new CompilerException("Only scalar unsqueeze is supported");
+
+    context.mm.addPendingConst(
+      unsqueezeProto.output(0),
+      new TensorData(
+        Shape(1),
+        data.as1D,
+        org.tensorflow.framework.types.DataType.DT_INT64
+      )
+    )
+  }
+
   private def emitConstant(
       context: EmitContext,
       constantProto: NodeProto
@@ -1058,7 +1129,10 @@ class OnnxFrontend(
       context: EmitContext,
       reshapeProto: NodeProto
   ): Unit = {
-    val shape = getTensorData(tensorProtos(reshapeProto.input(1)))
+    val shapeInputName = reshapeProto.input(1)
+    val shape = (if (tensorProtos.contains(shapeInputName))
+                   getTensorData(tensorProtos(shapeInputName))
+                 else context.mm.getPendingLongConst(shapeInputName))
       .asInstanceOf[TensorData[Long]]
       .as1D
       .map(_.toInt)
@@ -1437,6 +1511,27 @@ class OnnxFrontend(
           Shape(output.size),
           output,
           org.tensorflow.framework.types.DataType.DT_FLOAT
+        )
+      )
+    } else if (
+      concatProto.input.forall(name =>
+        context.mm.hasPendingLongConst(name) || tensorProtos.contains(name)
+      )
+    ) {
+      val output = concatProto.input
+        .map(name =>
+          (if (context.mm.hasPendingLongConst(name))
+             context.mm.getPendingLongConst(name)
+           else getTensorData(tensorProtos(name))).as1D
+        )
+        .flatten
+
+      context.mm.addPendingConst(
+        concatProto.output(0),
+        new TensorData(
+          Shape(output.size),
+          output,
+          org.tensorflow.framework.types.DataType.DT_INT64
         )
       )
     } else {

@@ -85,6 +85,9 @@ class MemoryManager(
   def hasPendingFloatConst(name: String) =
     pendingFloatConsts.get(name).isDefined
 
+  def hasPendingLongConst(name: String) =
+    pendingLongConsts.get(name).isDefined
+
   def getPendingIntConst(name: String)   = pendingIntConsts(name)
   def getPendingLongConst(name: String)  = pendingLongConsts(name)
   def getPendingFloatConst(name: String) = pendingFloatConsts(name)

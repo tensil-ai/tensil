@@ -33,7 +33,7 @@ For reference documentation see our [website](https://www.tensil.ai/docs/).
 
 ```
 docker pull tensilai/tensil
-docker run -u $(id -u ${USER}):$(id -g ${USER}) -v $(pwd):/work -w /work -it tensilai/tensil bash
+sudo docker run -u $(id -u ${USER}):$(id -g ${USER}) -v $(pwd):/work -w /work -it tensilai/tensil bash
 ```
 
 ## Compile AI/ML model
